@@ -105,19 +105,19 @@ Nos primórdios do desenvolvimento de software, os programadores não tinham o l
 
 À medida que os sistemas de controle de versão amadureceram, surgiram diversos estilos de desenvolvimento, permitindo que os programadores encontrassem bugs com mais facilidade, codificassem em paralelo com seus colegas e acelerassem a cadência de lançamentos. Hoje, a maioria dos programadores utiliza um de dois modelos de desenvolvimento para entregar software de qualidade: Gitflow e desenvolvimento baseado em trunk.
 
-O Gitflow, que foi popularizado primeiro, é um modelo de desenvolvimento mais rigoroso, no qual apenas determinados indivíduos podem aprovar alterações no código principal. Isso mantém a qualidade do código e minimiza o número de bugs. O desenvolvimento baseado em trunking é um modelo mais aberto, pois todos os desenvolvedores têm acesso ao código principal. Isso permite que as equipes iterem rapidamente e implementem [CI/CD](/continuous-delivery).
+O Gitflow, que foi popularizado primeiro, é um modelo de desenvolvimento mais rigoroso, no qual apenas determinados indivíduos podem aprovar alterações no código principal. Isso mantém a qualidade do código e minimiza o número de bugs. O desenvolvimento baseado em trunking é um modelo mais aberto, pois todos os desenvolvedores têm acesso ao código principal. Isso permite que as equipes iterem rapidamente e implementem [CI/CD](https://www.atlassian.com/continuous-delivery).
 
 ## O que é desenvolvimento baseado em tronco?
 
 ---
 
-O desenvolvimento baseado em tronco é uma prática [de gerenciamento de controle de versão](/git/tutorials/what-is-version-control) na qual os desenvolvedores mesclam pequenas atualizações frequentes em um "tronco" central ou branch principal. É uma prática comum entre equipes [de DevOps](https://www.atlassian.com/devops/what-is-devops) e parte do [ciclo de vida do DevOps](/devops/what-is-devops/devops-best-practices), pois agiliza as fases de mesclagem e integração. De fato, o desenvolvimento baseado em tronco é uma prática obrigatória de CI/CD. Os desenvolvedores podem criar branches de curta duração com poucos commits pequenos, em comparação com outras estratégias de ramificação de recursos de longa duração. À medida que a complexidade da base de código e o tamanho da equipe aumentam, o desenvolvimento baseado em tronco ajuda a manter o fluxo de lançamentos de produção.
+O desenvolvimento baseado em tronco é uma prática [de gerenciamento de controle de versão](https://www.atlassian.com/git/tutorials/what-is-version-control) na qual os desenvolvedores mesclam pequenas atualizações frequentes em um "tronco" central ou branch principal. É uma prática comum entre equipes [de DevOps](https://www.atlassian.com/devops/what-is-devops) e parte do [ciclo de vida do DevOps](https://www.atlassian.com/devops/what-is-devops/devops-best-practices), pois agiliza as fases de mesclagem e integração. De fato, o desenvolvimento baseado em tronco é uma prática obrigatória de CI/CD. Os desenvolvedores podem criar branches de curta duração com poucos commits pequenos, em comparação com outras estratégias de ramificação de recursos de longa duração. À medida que a complexidade da base de código e o tamanho da equipe aumentam, o desenvolvimento baseado em tronco ajuda a manter o fluxo de lançamentos de produção.
 
 ## Gitflow vs. desenvolvimento baseado em tronco
 
 ---
 
-[O Gitflow](/git/tutorials/comparing-workflows/gitflow-workflow) é um modelo alternativo de ramificação do Git que utiliza ramificações de recursos de longa duração e múltiplas ramificações primárias. O Gitflow possui mais ramificações de longa duração e commits maiores do que o desenvolvimento baseado em trunk. Nesse modelo, os desenvolvedores criam uma ramificação de recurso e adiam a mesclagem com a ramificação principal do trunk até que o recurso esteja concluído. Essas ramificações de recurso de longa duração exigem mais colaboração para serem mescladas, pois apresentam maior risco de se desviarem da ramificação do trunk e introduzir atualizações conflitantes.
+[O Gitflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) é um modelo alternativo de ramificação do Git que utiliza ramificações de recursos de longa duração e múltiplas ramificações primárias. O Gitflow possui mais ramificações de longa duração e commits maiores do que o desenvolvimento baseado em trunk. Nesse modelo, os desenvolvedores criam uma ramificação de recurso e adiam a mesclagem com a ramificação principal do trunk até que o recurso esteja concluído. Essas ramificações de recurso de longa duração exigem mais colaboração para serem mescladas, pois apresentam maior risco de se desviarem da ramificação do trunk e introduzir atualizações conflitantes.
 
 O Gitflow também possui ramificações primárias separadas para desenvolvimento, hotfixes, recursos e lançamentos. Existem diferentes estratégias para mesclar commits entre essas ramificações. Como há mais ramificações para gerenciar, geralmente há mais complexidade, o que exige sessões de planejamento e revisão adicionais por parte da equipe.
 
@@ -127,11 +127,11 @@ O desenvolvimento baseado em tronco é muito mais simplificado, pois foca na ram
 
 ---
 
-O desenvolvimento baseado em tronco é uma prática obrigatória para [integração contínua](/continuous-delivery/continuous-integration). Se os processos de construção e teste forem automatizados, mas os desenvolvedores trabalharem em branches de recursos isolados e longos que são integrados infrequentemente a um branch compartilhado, a integração contínua não estará atingindo seu potencial.
+O desenvolvimento baseado em tronco é uma prática obrigatória para [integração contínua](https://www.atlassian.com/continuous-delivery/continuous-integration). Se os processos de construção e teste forem automatizados, mas os desenvolvedores trabalharem em branches de recursos isolados e longos que são integrados infrequentemente a um branch compartilhado, a integração contínua não estará atingindo seu potencial.
 
 ### Permite integração contínua de código
 
-No modelo de desenvolvimento baseado em tronco, há um repositório com um fluxo constante de commits fluindo para o branch principal. A adição de uma suíte de [testes automatizados](/devops/devops-tools/test-automation) e monitoramento de cobertura de código para esse fluxo de commits permite a integração contínua. Quando um novo código é mesclado no tronco, testes automatizados de integração e cobertura de código são executados para validar a qualidade do código.
+No modelo de desenvolvimento baseado em tronco, há um repositório com um fluxo constante de commits fluindo para o branch principal. A adição de uma suíte de [testes automatizados](https://www.atlassian.com/devops/devops-tools/test-automation) e monitoramento de cobertura de código para esse fluxo de commits permite a integração contínua. Quando um novo código é mesclado no tronco, testes automatizados de integração e cobertura de código são executados para validar a qualidade do código.
 
 ### Garante revisão contínua de código
 
@@ -159,11 +159,11 @@ Pequenas alterações de alguns commits ou modificação de algumas linhas de c�
 
 ### Flags de recurso
 
-[Flags de recurso](/solutions/devops/integrations/feature-flags) complementam muito bem o desenvolvimento baseado em tronco, permitindo que os desenvolvedores envolvam novas alterações em um caminho de código inativo e o ativem posteriormente. Isso permite que os desenvolvedores evitem criar um branch de recurso separado no repositório e, em vez disso, façam commit do novo código de recurso diretamente no branch principal dentro de um caminho de flag de recurso.
+[Flags de recurso](https://www.atlassian.com/solutions/devops/integrations/feature-flags) complementam muito bem o desenvolvimento baseado em tronco, permitindo que os desenvolvedores envolvam novas alterações em um caminho de código inativo e o ativem posteriormente. Isso permite que os desenvolvedores evitem criar um branch de recurso separado no repositório e, em vez disso, façam commit do novo código de recurso diretamente no branch principal dentro de um caminho de flag de recurso.
 
 ### Implementar testes automatizados abrangentes
 
-Testes automatizados são necessários para qualquer projeto de software moderno que pretenda alcançar CI/CD. Existem [múltiplos tipos de testes automatizados](/continuous-delivery/software-testing/types-of-software-testing) que são executados em diferentes estágios do pipeline de lançamento.
+Testes automatizados são necessários para qualquer projeto de software moderno que pretenda alcançar CI/CD. Existem [múltiplos tipos de testes automatizados](https://www.atlassian.com/continuous-delivery/software-testing/types-of-software-testing) que são executados em diferentes estágios do pipeline de lançamento.
 
 Os testes automatizados ajudam o desenvolvimento baseado em tronco mantendo um ritmo de pequenos lotes à medida que os desenvolvedores mesclam novos commits. A suíte de testes automatizados revisa o código em busca de problemas e aprova ou rejeita automaticamente.
 
@@ -197,7 +197,7 @@ Fonte: [Atlassian - Desenvolvimento baseado em tronco](https://www.atlassian.com
 
 # Fluxo de trabalho do Gitflow
 
-Gitflow é um fluxo de trabalho legado do Git que era originalmente uma estratégia inovadora e disruptiva para gerenciar branches do Git. O Gitflow perdeu popularidade em favor de [fluxos de trabalho baseados em trunk](/continuous-delivery/continuous-integration/trunk-based-development), que agora são considerados práticas recomendadas para o desenvolvimento contínuo de software moderno e práticas [de DevOps](/devops/what-is-devops). O Gitflow também pode ser desafiador de usar com [CI/CD](/continuous-delivery). Esta publicação detalha o Gitflow para fins históricos.
+Gitflow é um fluxo de trabalho legado do Git que era originalmente uma estratégia inovadora e disruptiva para gerenciar branches do Git. O Gitflow perdeu popularidade em favor de [fluxos de trabalho baseados em trunk](https://www.atlassian.com/continuous-delivery/continuous-integration/trunk-based-development), que agora são considerados práticas recomendadas para o desenvolvimento contínuo de software moderno e práticas [de DevOps](https://www.atlassian.com/devops/what-is-devops). O Gitflow também pode ser desafiador de usar com [CI/CD](https://www.atlassian.com/continuous-delivery). Esta publicação detalha o Gitflow para fins históricos.
 
 ---
 
@@ -205,7 +205,7 @@ Gitflow é um fluxo de trabalho legado do Git que era originalmente uma estraté
 
 Gitflow é um modelo alternativo de ramificação do Git que envolve o uso de ramificações de recursos e múltiplas ramificações primárias. Foi publicado e popularizado pela primeira vez por [Vincent Driessen na nvie](http://nvie.com/posts/a-successful-git-branching-model/). Comparado ao desenvolvimento baseado em tronco, o Gitflow possui inúmeras ramificações de vida útil mais longa e commits maiores.
 
-O Gitflow pode ser usado para projetos com ciclo de lançamento agendado e para as [melhores práticas de DevOps](/devops/what-is-devops/devops-best-practices) de [entrega contínua](/continuous-delivery). Este fluxo de trabalho não adiciona novos conceitos ou comandos além do necessário para o [Fluxo de Trabalho de Ramificação de Recursos](/git/tutorials/comparing-workflows/feature-branch-workflow).
+O Gitflow pode ser usado para projetos com ciclo de lançamento agendado e para as [melhores práticas de DevOps](https://www.atlassian.com/devops/what-is-devops/devops-best-practices) de [entrega contínua](https://www.atlassian.com/continuous-delivery). Este fluxo de trabalho não adiciona novos conceitos ou comandos além do necessário para o [Fluxo de Trabalho de Ramificação de Recursos](https://www.atlassian.com/git/tutorials/comparing-workflows/feature-branch-workflow).
 
 <div style="text-align: center">
   <img src="https://wac-cdn.atlassian.com/dam/jcr:7816f6da-4c53-46c3-8df3-c125249a4f87/collaborating-workflows-cropped.png?cdnVersion=2723" alt="Janela do console" style="width: 100px; display: block; margin: 0 auto">
@@ -213,8 +213,8 @@ O Gitflow pode ser usado para projetos com ciclo de lançamento agendado e para 
 
 ### Material relacionado
 
-- [Log Git avançado](/git/tutorials/git-log)
-- [Aprenda Git com o Bitbucket Cloud](/git/tutorials/learn-git-with-bitbucket-cloud)
+- [Log Git avançado](https://www.atlassian.com/git/tutorials/git-log)
+- [Aprenda Git com o Bitbucket Cloud](https://www.atlassian.com/git/tutorials/learn-git-with-bitbucket-cloud)
 
 ---
 
@@ -305,7 +305,7 @@ Fluxo geral do Gitflow:
 6. `hotfix` criada a partir de `main`
 7. `hotfix` mesclado em `develop` e `main`
 
-[Fluxo de trabalho de bifurcação →](/git/tutorials/comparing-workflows/forking-workflow)
+[Fluxo de trabalho de bifurcação →](https://www.atlassian.com/git/tutorials/comparing-workflows/forking-workflow)
 
 Principais melhorias:
 1. Centralizei todas as imagens usando divs com `text-align: center`

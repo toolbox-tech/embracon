@@ -171,7 +171,8 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ## 5. Linter e Code Quality
 ### Ferramentas
-- **SonarQube**: Análise estática e cobertura de testes.
+- **[SonarQube](./sonarqube_codesense/README.md)**: Análise estática e cobertura de testes.
+- **[CodeScene](./sonarqube_codesense/README.md)**: Análise de hotspots e colaboração.
 - **Linters**:
     - ESLint/Prettier (JavaScript).
     - Pylint (Python).

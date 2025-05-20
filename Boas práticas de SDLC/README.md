@@ -185,8 +185,8 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ## 6. API Design (Swagger/Stoplight)
 ### Documentação
-- **Swagger/OpenAPI**: Especificação contratual.
-- **Stoplight**: Design colaborativo.
+- **[Swagger/OpenAPI](./swagger_stoplight/README.md)**: Especificação contratual.
+- **[Stoplight](./swagger_stoplight/README.md)**: Design colaborativo.
 - **Padrões**:
     - Versionamento (`/v1/users`).
     - Exemplos de payloads.

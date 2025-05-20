@@ -364,7 +364,6 @@ Fonte: [Atlassian - Gitflow workflow](https://www.atlassian.com/git/tutorials/co
 ### Automação
 - Use **GitHub Actions/GitLab CI** para:
     - Rodar testes e linters.
-    - Validar mensagens de commit (com `commitlint`).
 
 ---
 
@@ -443,15 +442,5 @@ Fonte: [Atlassian - Gitflow workflow](https://www.atlassian.com/git/tutorials/co
 
 ---
 
-## 9. Ferramentas Recomendadas
-| Categoria       | Ferramentas               |
-|----------------|--------------------------|
-| Commits        | Commitizen, commitlint   |
-| Code Quality   | SonarQube, ESLint        |
-| API Design     | Swagger, Stoplight       |
-| Automação      | GitHub Actions, husky    |
-
----
-
 ## Fluxo Completo SDLC
-![Fluxo Completo do SDLC](img/SDLC.png)
+![Fluxo Completo do SDLC](../img/SDLC.png)

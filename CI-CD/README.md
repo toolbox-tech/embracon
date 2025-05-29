@@ -2,7 +2,7 @@
 
 Este documento descreve as estratégias para otimizar pipelines CI/CD no GitHub Enterprise, incluindo cache de dependências, cache de layers Docker e padronização de imagens.
 
-## 1. Cache de Dependências
+## 1. Cache de Dependências, Layers Docker e Configurações de Pipeline
 
 ### Estrutura de Diretórios
 
@@ -16,53 +16,7 @@ pipelines-standards/
     └── snyk.yaml
 ```
 
-### Implementação
-
-Adicione ao seu workflow (`/.github/workflows/your-workflow.yml`):
-
-```yaml
-steps:
-  - name: Cache dependencies
-    uses: actions/cache@v3
-    with:
-      path: |
-        ~/.cache/pip
-        ~/.npm
-        **/node_modules
-        **/vendor/bundle
-      key: ${{ runner.os }}-deps-${{ hashFiles('**/lockfiles') }}
-      restore-keys: |
-        ${{ runner.os }}-deps-
-```
-
-## 2. Cache de Layers Docker
-
-### Implementação
-
-```yaml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-      
-      - name: Build and push
-        uses: docker/build-push-action@v3
-        with:
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
-```
-
-## 3. Padronização de Imagens Docker
+## 2. Padronização de Imagens Docker
 
 ### Estrutura Recomendada
 
@@ -90,7 +44,7 @@ docker-standards/
    - 2 revisores técnicos
    - Assinatura de segurança
 
-## 4. Documentação e Governança
+## 3. Documentação e Governança
 
 ### Conteúdo Essencial
 

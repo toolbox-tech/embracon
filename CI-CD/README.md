@@ -4,6 +4,18 @@ Este documento descreve as estratégias para otimizar pipelines CI/CD no GitHub 
 
 ## 1. Cache de Dependências
 
+### Estrutura de Diretórios
+
+```
+pipelines-standards/
+├── cache/
+│   ├── dependencies.yaml
+│   ├── docker.yaml
+└── security/
+    ├── gitleaks.yaml
+    └── snyk.yaml
+```
+
 ### Implementação
 
 Adicione ao seu workflow (`/.github/workflows/your-workflow.yml`):

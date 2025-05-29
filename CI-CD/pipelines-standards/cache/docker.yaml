@@ -1,3 +1,7 @@
+name: Docker Layer Caching
+on: [push, pull_request]
+
+jobs:
   docker-build:
     needs: build
     runs-on: ubuntu-latest

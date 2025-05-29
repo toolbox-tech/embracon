@@ -60,7 +60,7 @@ docker-standards/
    - [Workshop de Otimização](training/optimization-workshop.md)
    - [FAQ Comum](docs/faq.md)
 
-## Métricas de Sucesso
+## Métricas de Sucesso (exemplo)
 
 | Métrica               | Baseline | Meta      |
 |-----------------------|----------|-----------|

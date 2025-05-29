@@ -11,15 +11,15 @@ Consulte os arquivos desta pasta para detalhes sobre cada pipeline implementado.
 
 Para otimizar os pipelines de CI/CD, é essencial implementar estratégias de cache para dependências e camadas Docker. Isso reduz o tempo de build e melhora a eficiência do processo.
 
-O arquivo [cache.yaml](./cache/cache.yaml) contém as configurações necessárias para implementar o cache de dependências. 
+O arquivo [dependencies.yaml](./cache/dependencies.yaml) contém as configurações necessárias para implementar o cache de dependências. 
 
 O arquivo [docker.yaml](./cache/docker.yaml) contém as configurações para o cache de camadas Docker, permitindo que as builds sejam mais rápidas ao reutilizar camadas já construídas.
 
 ## Segurança
 
-O arquivo [gitleaks.yaml](./cache/gitleaks.yaml) contém as regras de segurança para o GitLeaks, uma ferramenta que ajuda a identificar segredos expostos no código. É importante revisar e aplicar essas regras para garantir a segurança do repositório.
+O arquivo [gitleaks.yaml](./security/gitleaks.yaml) contém as regras de segurança para o GitLeaks, uma ferramenta que ajuda a identificar segredos expostos no código. É importante revisar e aplicar essas regras para garantir a segurança do repositório.
 
-O arquivo [snyk.yaml](./cache/snyk.yaml) contém as configurações para o Snyk, uma ferramenta de segurança que analisa vulnerabilidades em dependências e imagens Docker. Certifique-se de configurar corretamente o Snyk para monitorar e corrigir vulnerabilidades.
+O arquivo [snyk.yaml](./security/snyk.yaml) contém as configurações para o Snyk, uma ferramenta de segurança que analisa vulnerabilidades em dependências e imagens Docker. Certifique-se de configurar corretamente o Snyk para monitorar e corrigir vulnerabilidades.
 
 
 

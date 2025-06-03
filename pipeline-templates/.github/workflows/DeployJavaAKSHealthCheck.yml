@@ -1,0 +1,389 @@
+name: Deploy Java AKS HealthCheck
+env:
+  registry: azrsrvpcrg01.azurecr.io
+  version: 2.0.${{ github.run_number }}
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      project:
+        required: true
+        type: string
+      dockerfile:
+        required: false
+        type: string
+      buildArgs:
+        required: false
+        type: string
+      appContextPath:
+        required: false
+        type: string
+      dockerArgs:
+        required: false
+        type: string
+        
+     
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App JWT Token
+        id: generate_jwt
+        env:
+          APP_ID: "1039452"  
+          PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+        run: |
+         
+          header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          unsigned_token="$header.$payload"
+          signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          jwt="$unsigned_token.$signature"
+
+          echo "JWT=$jwt" >> $GITHUB_ENV
+      - name: Get Installation Access Token
+        id: get_install_token
+        env:
+          JWT: "${{ env.JWT }}"
+        run: |
+          response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+          token=$(echo "$response" | jq -r '.token')
+          echo "INSTALLATION_TOKEN=$token" >> $GITHUB_ENV
+      
+      - name: Checkout code with submodules
+        uses: actions/checkout@v3
+        with:
+          token: ${{ env.INSTALLATION_TOKEN }}
+          submodules: true
+          
+      - name: get inputs
+        run: |
+          echo "REPLICAS=$(yq '.REPLICAS' inputs.yml)" >> $GITHUB_ENV
+          echo "REPLICAS_MAX=$(yq '.REPLICAS_MAX' inputs.yml)" >> $GITHUB_ENV
+          echo "JDBC_CONNECTION_ACTIVE=$(yq '.JDBC_CONNECTION_ACTIVE' inputs.yml)" >> $GITHUB_ENV
+          echo "REQUESTS_PER_SECOND=$(yq '.REQUESTS_PER_SECOND' inputs.yml)" >> $GITHUB_ENV
+          echo "SKIP_BUILD=$(yq '.SKIP_BUILD' inputs.yml)" >> $GITHUB_ENV
+          echo "CONFIGMAP_DEPLOY=$(yq '.CONFIGMAP_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+          echo "SECRETS_DEPLOY=$(yq '.SECRETS_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+ 
+      - name: Force Load environment variables
+        run: |
+          echo "Loading environment variables from .env file"
+          source $GITHUB_ENV
+        
+
+      - name: Include Submodules
+        run: |
+          git submodule init
+      - name: Clone Template Repository
+              
+        run: |
+          git clone --depth 1 https://x-access-token:${{ env.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+        #git clone --depth 1 https://x-access-token:${{ env.INSTALLATION_TOKEN }}@github.com/embracon-br/webatendimento-embracon-autoatendimento-salesforce-lib.git salesforce
+          
+          
+      - name: Load Variables
+        run: |
+          
+          echo "AD_NAMESERVER_DEV=$(yq '.AD_NAMESERVER_DEV' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AD_NAMESERVER_HOM=$(yq '.AD_NAMESERVER_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AD_NAMESERVER_PROD_01=$(yq '.AD_NAMESERVER_PROD_01' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AD_NAMESERVER_PROD_02=$(yq '.AD_NAMESERVER_PROD_02' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AD_NAMESERVER=$(yq '.AD_NAMESERVER' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AD_SEARCH_DEV_HOM=$(yq '.AD_SEARCH_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AD_SEARCH_PROD=$(yq '.AD_SEARCH_PROD' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AKS_PROD_CLUSTER_HOST=$(yq '.AKS_PROD_CLUSTER_HOST' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AKS_DEV_HOM_CLUSTER_HOST=$(yq '.AKS_DEV_HOM_CLUSTER_HOST' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AKS_RESOURCE_PROD=$(yq '.AKS_RESOURCE_PROD' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "AKS_RESOURCE_DEV_HOM=$(yq '.AKS_RESOURCE_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+          echo "HEALTH_CHECK_TIMEOUT_SECONDS=$(yq '.HEALTH_CHECK_TIMEOUT_SECONDS' template_repo/vars.yml)" >> $GITHUB_ENV
+
+
+
+      - name: Build Image
+        if: env.SKIP_BUILD == 'false'
+        run: |
+          
+          if [[ "${{ inputs.environment }}" == "prod" || "${{ inputs.environment }}" == "hom" ]]; then
+            dockerfilePath=${{ inputs.dockerfile }}
+            if [[ -z "${{ inputs.dockerfile }}" ]]; then
+              echo "Erro: Para o ambiente '${{ inputs.environment }}', é obrigatório especificar o Dockerfile corporativo."
+              exit 1
+            fi
+          elif [[ "${{ inputs.environment }}" == "dev" ]]; then
+           
+            dockerfilePath=${{ inputs.dockerfile }}
+          else
+           
+            echo "Ambiente não especificado. Usando Dockerfile padrão no caminho 'Dockerfile'."
+            
+          fi
+          
+          buildCmd="docker build -t ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }} --build-arg ENVIRONMENT=${{ inputs.environment }}"
+
+          if [ -n "${{ inputs.buildArgs }}" ]; then
+            echo "BuildArgs definidos. Adicionando ao comando de build."
+            buildCmd+=" --build-arg \"${{ inputs.buildArgs }}\""
+          else
+            echo "buildArgs não definidos. Executando build sem buildArgs adicionais."
+          fi
+          
+          # Verificar se dockerArgs estão definidos e adicioná-los ao comando
+          if [ -n "${{ inputs.dockerArgs }}" ]; then
+            echo "DockerArgs definidos. Adicionando ao comando de build."
+            IFS=',' read -ra argsArray <<< "${{ inputs.dockerArgs }}"
+            for arg in "${argsArray[@]}"; do
+              buildCmd+=" --build-arg $arg"
+            done
+          else
+            echo "dockerArgs não definidos. Executando build sem dockerArgs adicionais."
+          fi
+          
+          # Completar o comando com o caminho do Dockerfile e executar
+          if [[ -n "${{ inputs.dockerfile }}" ]]; then
+            buildCmd+=" -f template_repo/dockerfiles/${dockerfilePath}/Dockerfile ."
+          else
+            buildCmd+=" -f Dockerfile ."
+          fi
+          echo "Executando comando: $buildCmd"
+          eval "$buildCmd"
+          
+          # Tag para 'latest'
+          docker tag ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }} ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+     
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: azrsrvpcrg01.azurecr.io
+          username: ${{ secrets.ACR_ENTRA_CLIENT_ID }}
+          password: ${{ secrets.ACR_ENTRA_SECRET }}
+      - name: Push Docker Image
+        env:
+          registry: azrsrvpcrg01.azurecr.io
+          version: 2.0.${{ github.run_number }}
+        if: env.SKIP_BUILD == 'false'
+        run: |
+         
+          docker push ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }}
+          docker push ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+      - name: Create Docker network for healthcheck
+        if: env.SKIP_BUILD == 'false'
+        env:
+          registry: azrsrvpcrg01.azurecr.io
+          version: 2.0.${{ github.run_number }}
+        run: |
+          docker network create healthcheck || true
+          docker container run -p 80:80 -d --rm --network healthcheck --name "${{ inputs.project }}.healthcheck.local" -e ENV=local ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }}
+        
+      - name: Create healthcheck directory
+        run: rm -Rf healthcheck && mkdir healthcheck
+      - name: Set healthcheck flags
+        run: |
+          echo "hasHealth=false" >> $GITHUB_ENV
+          echo "hasInfo=false" >> $GITHUB_ENV
+
+
+
+
+      - name: Run Healthcheck
+        if: env.SKIP_BUILD == 'false'
+        run: |
+      
+      
+          # Execute o loop de health check com timeout
+          timeout ${{ env.HEALTH_CHECK_TIMEOUT_SECONDS }} bash -c "
+            until [[ \"\$hasHealth\" == true && \"\$hasInfo\" == true ]]; do
+              echo 'Running health check validation...'
+              
+              # Execute o comando Docker e capture a saída
+              stdout=\$(docker run --rm --network healthcheck \
+                -v \$(pwd)/template_repo/scripts/healthcheck.sh:/app/template_repo/scripts/healthcheck.sh \
+                ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }} \
+                bash /app/template_repo/scripts/healthcheck.sh ${{ inputs.project }})
+              
+              # Exiba a saída no console para depuração
+              echo \"\$stdout\"
+              
+              # Atualize as variáveis com base na saída do comando
+              if [[ \"\$stdout\" == *\"UP\"* ]]; then
+                echo \"Health check passed!\" 
+                hasHealth=true
+              fi
+              
+              if [[ \"\$stdout\" == *\"version\"* ]]; then
+                echo \"Info check passed!\" 
+                hasInfo=true
+              fi
+
+              
+              # Aguarde antes de tentar novamente
+              sleep 5
+            done
+      
+            # Exporta variáveis para o ambiente do GitHub
+            echo \"hasHealth=\$hasHealth\" >> $GITHUB_ENV
+            echo \"hasInfo=\$hasInfo\" >> $GITHUB_ENV
+
+          "
+
+
+
+
+      
+
+  Change_Envs_Apply_in_Cluster:
+     name: Change Envs & Apply in Cluster
+     runs-on: self-hosted
+     needs: Build
+     steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+        - name: Generate GitHub App JWT Token
+          id: generate_jwt
+          env:
+            APP_ID: "1039452"  
+            PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+          run: |
+            # Instalação do openssl e dependências
+            # sudo apt-get update && sudo apt-get install -y jq openssl
+  
+            # Gerando o token JWT
+            header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            unsigned_token="$header.$payload"
+            signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            jwt="$unsigned_token.$signature"
+  
+            echo "JWT=$jwt" >> $GITHUB_ENV
+        - name: Get Installation Access Token
+          id: get_install_token
+          env:
+            JWT: "${{ env.JWT }}"
+          run: |
+            response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+            token=$(echo "$response" | jq -r '.token')
+            echo "INSTALLATION_TOKEN=$token" >> $GITHUB_ENV
+        - name: Clone Template Repository
+              
+          run: |
+            git clone --depth 1 https://x-access-token:${{ env.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+            
+          
+          
+        - name: Load Variables
+          run: |
+          
+            echo "AD_NAMESERVER_DEV=$(yq '.AD_NAMESERVER_DEV' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AD_NAMESERVER_HOM=$(yq '.AD_NAMESERVER_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AD_NAMESERVER_PROD_01=$(yq '.AD_NAMESERVER_PROD_01' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AD_NAMESERVER_PROD_02=$(yq '.AD_NAMESERVER_PROD_02' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AD_NAMESERVER=$(yq '.AD_NAMESERVER' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AD_SEARCH_DEV_HOM=$(yq '.AD_SEARCH_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AD_SEARCH_PROD=$(yq '.AD_SEARCH_PROD' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AKS_PROD_CLUSTER_HOST=$(yq '.AKS_PROD_CLUSTER_HOST' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AKS_DEV_HOM_CLUSTER_HOST=$(yq '.AKS_DEV_HOM_CLUSTER_HOST' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AKS_RESOURCE_PROD=$(yq '.AKS_RESOURCE_PROD' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "AKS_RESOURCE_DEV_HOM=$(yq '.AKS_RESOURCE_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "HEALTH_CHECK_ENDPOINT_PROD=$(yq '.HEALTH_CHECK_ENDPOINT_PROD' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "HEALTH_CHECK_ENDPOINT_HOM=$(yq '.HEALTH_CHECK_ENDPOINT_HOM' template_repo/vars.yml)" >> $GITHUB_ENV
+            echo "HEALTH_CHECK_ENDPOINT_DES=$(yq '.HEALTH_CHECK_ENDPOINT_DES' template_repo/vars.yml)" >> $GITHUB_ENV
+       
+        - name: get inputs
+          run: |
+            echo "REPLICAS=$(yq '.REPLICAS' inputs.yml)" >> $GITHUB_ENV
+            echo "REPLICAS_MAX=$(yq '.REPLICAS_MAX' inputs.yml)" >> $GITHUB_ENV
+            echo "JDBC_CONNECTION_ACTIVE=$(yq '.JDBC_CONNECTION_ACTIVE' inputs.yml)" >> $GITHUB_ENV
+            echo "REQUESTS_PER_SECOND=$(yq '.REQUESTS_PER_SECOND' inputs.yml)" >> $GITHUB_ENV
+            echo "SKIP_BUILD=$(yq '.SKIP_BUILD' inputs.yml)" >> $GITHUB_ENV
+            echo "CONFIGMAP_DEPLOY=$(yq '.CONFIGMAP_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+            echo "SECRETS_DEPLOY=$(yq '.SECRETS_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+            echo "REQUESTS_PER_SECOND=$(yq '.JDBC_CONNECTION_ACTIVE' inputs.yml)" >> $GITHUB_ENV
+            
+
+        - name: Seds Apllication And Envs
+          env:
+            version: 2.0.${{ github.run_number }}
+          run: |
+            sed -i 's/#APPLICATION_NAME#/${{ inputs.project }}/g' k8s/deployment.yml
+            sed -i 's/#APPLICATION_IMAGE_NAME#/${{ inputs.project }}/g' k8s/deployment.yml
+            sed -i 's/#ENV#/${{ inputs.environment }}/g' k8s/deployment.yml
+            sed -i 's/#REPLICAS#/${{ env.REPLICAS }}/g' k8s/deployment.yml
+            sed -i 's/#APP_VERSION#/${{ env.version }}/g' k8s/deployment.yml
+            sed -i 's/#REGISTRY#/azrsrvpcrg01.azurecr.io/g' k8s/deployment.yml
+            sed -i 's/#JDBC_CONNECTION_ACTIVE#/${{ env.JDBC_CONNECTION_ACTIVE }}/g' k8s/deployment.yml
+            sed -i 's/#REQUESTS_PER_SECOND#/${{ env.REQUESTS_PER_SECOND }}/g' k8s/deployment.yml
+            sed -i 's/#REPLICAS_MAX#/${{ env.REPLICAS_MAX }}/g' k8s/deployment.yml
+       
+
+            cat k8s/deployment.yml
+      
+        - name: Seds Name Servers and Searchs - prod
+          if: ${{ inputs.environment == 'prod' }}
+          run: |
+            sed -i 's/#AKS_NAMESERVER_01#/${{ env.AD_NAMESERVER_PROD_01 }}/g' k8s/deployment.yml
+            sed -i 's/#AKS_NAMESERVER_02#/${{ env.AD_NAMESERVER_PROD_02 }}/g' k8s/deployment.yml
+            sed -i 's/#AKS_NAMESERVER_03#/${{ env.AD_NAMESERVER_HOM }}/g' k8s/deployment.yml
+            sed -i 's/#AKS_SEARCH#/${{ env.AD_SEARCH_PROD }}/g' k8s/deployment.yml
+            
+            
+        - name: Seds Name Servers and Searchs - non prod
+          if: ${{ inputs.environment != 'prod' }}
+          run: |
+            sed -i 's/#AKS_NAMESERVER_01#/${{ env.AD_NAMESERVER_PROD_01 }}/g' k8s/deployment.yml
+            sed -i 's/#AKS_NAMESERVER_02#/${{ env.AD_NAMESERVER_PROD_02 }}/g' k8s/deployment.yml
+            sed -i 's/#AKS_NAMESERVER_03#/${{ env.AD_NAMESERVER_HOM }}/g' k8s/deployment.yml
+            sed -i 's/#AKS_SEARCH#/${{ env.AD_SEARCH_DEV_HOM }}/g' k8s/deployment.yml
+
+        - name: Seds EndpointHealthCheck - prod
+          if: ${{ inputs.environment == 'prod' }}
+          run: |
+            sed -i 's|#HEALTH_CHECK_ENDPOINT#|${{ env.HEALTH_CHECK_ENDPOINT_PROD }}|g' k8s/deployment.yml
+
+        - name: Seds EndpointHealthCheck - homolog
+          if: ${{ inputs.environment == 'hom' }}
+          run: |
+            sed -i 's|#HEALTH_CHECK_ENDPOINT#|${{ env.HEALTH_CHECK_ENDPOINT_HOM }}|g' k8s/deployment.yml
+
+        - name: Seds EndpointHealthCheck - develop
+          if: ${{ inputs.environment == 'dev' }}
+          run: |
+            sed -i 's|#HEALTH_CHECK_ENDPOINT#|${{ env.HEALTH_CHECK_ENDPOINT_DES }}|g' k8s/deployment.yml
+         
+
+            
+        - name: Config cluster
+          uses: azure/login@v1
+          with:
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+
+        
+        - name: Apply Config Map
+          if: ${{ env.CONFIGMAP_DEPLOY == 'true' }}
+          run: kubectl apply -f k8s/configmap-${{ inputs.environment }}.yml
+
+        - name: Apply Secrets
+          if: ${{ env.SECRETS_DEPLOY == 'true' }}
+          run: kubectl apply -f k8s/secrets-${{ inputs.environment }}.yml
+
+        - name: Apply in Cluster PROD
+          if: env.SKIP_BUILD == 'false' && inputs.environment == 'prod'
+          run: |
+            > $HOME/.kube/config
+            az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_PROD }} --name ${{ env.AKS_PROD_CLUSTER_HOST }} --overwrite-existing
+            kubectl config set-cluster k8s-prod --insecure-skip-tls-verify=true --server=https://${{ env.AKS_PROD_CLUSTER_HOST }}
+            kubectl get namespaces
+            kubectl apply -f k8s/deployment.yml
+            
+        - name: Apply in Cluster NonPROD
+          if: env.SKIP_BUILD == 'false' && inputs.environment != 'prod'
+          run: |
+            > $HOME/.kube/config
+            az aks get-credentials --resource-group ${{ env.AKS_RESOURCE_DEV_HOM }} --name ${{ env.AKS_DEV_HOM_CLUSTER_HOST }} --overwrite-existing
+            kubectl config set-cluster k8s-dev-hom --insecure-skip-tls-verify=true --server=https://${{ env.AKS_DEV_HOM_CLUSTER_HOST }}
+            kubectl get namespaces
+            cat k8s/deployment.yml
+            kubectl apply -f k8s/deployment.yml

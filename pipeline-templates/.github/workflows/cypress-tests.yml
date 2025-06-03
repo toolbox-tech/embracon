@@ -1,0 +1,70 @@
+# Nome exibido no GitHub Actions para o workflow
+name: Cypress Tests with Allure
+
+# Este workflow é chamado por outros workflows através da palavra-chave "workflow_call"
+on:
+  workflow_call:
+    inputs:
+      # Nome do ambiente (ex: dev, staging, prod) que será passado por quem chamar esse workflow
+      environment:
+        required: true
+        type: string
+
+      # Nome do projeto chamador (apenas informativo nesse caso, mas pode ser usado para logs ou caminhos)
+      project:
+        required: true
+        type: string
+
+# Definição dos jobs que o GitHub Actions executará
+jobs:
+  cypress:
+    name: Run Cypress Tests  # Nome exibido na interface
+    runs-on: ubuntu-latest   # Runner que será usado (Ubuntu mais recente)
+
+    # Variáveis de ambiente que ficam disponíveis para todos os passos do job
+    env:
+      PROJECT: ${{ inputs.project }}         # Valor vindo do workflow chamador
+      ENVIRONMENT: ${{ inputs.environment }} # Valor vindo do workflow chamador
+
+    # Define que todos os scripts serão executados com shell bash
+    defaults:
+      run:
+        shell: bash
+
+    # Lista de passos a serem executados em sequência
+    steps:
+      # 1. Faz checkout do código-fonte do repositório
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Instala o Node.js (versão 18) e habilita cache para dependências do npm
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      # 3. Instala as dependências do projeto listadas no package-lock.json
+      - name: Install project dependencies
+        run: npm ci
+
+      # 4. Executa os testes Cypress com suporte ao Allure (via plugin)
+      # Mesmo que os testes falhem, o workflow continua para gerar o relatório
+      - name: Run Cypress tests with Allure
+        run: |
+          npx cypress run --env allure=true || echo "⚠️ Testes falharam, relatório será gerado mesmo assim."
+
+      # 5. Instala o CLI do Allure globalmente e gera o relatório a partir dos resultados dos testes
+      - name: Install Allure CLI and Generate Report
+        run: |
+          npm install -g allure-commandline
+          allure generate ./allure-results --clean -o ./allure-report
+
+      # 6. Faz upload do relatório Allure como artefato no GitHub
+      # Isso garante que mesmo em caso de falha dos testes, o relatório estará disponível
+      - name: Upload Allure Report Artifact
+        if: always()  # Executa mesmo que etapas anteriores falhem
+        uses: actions/upload-artifact@v3
+        with:
+          name: allure-report               # Nome do artefato que será mostrado no GitHub Actions
+          path: ./allure-report             # Caminho onde o relatório foi gerado

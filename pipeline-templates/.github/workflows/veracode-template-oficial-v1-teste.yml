@@ -1,0 +1,328 @@
+name: Veracode-PHP Template
+
+########################################################
+# 0. Parâmetros do workflow reutilizável
+########################################################
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        description: ID único da build
+        required: true
+        type: string
+
+      environment:
+        description: Ambiente (dev, qa, prod)
+        required: true
+        type: string
+
+      project_veracode:
+        description: Nome lógico do projeto no Veracode
+        required: true
+        type: string
+
+      veracode_policy_name:
+        description: Policy a aplicar (override opcional)
+        required: false
+        type: string
+        default: Embracon-Corporativa
+
+########################################################
+jobs:
+########################################################
+
+# ------------------------------------------------------
+# JOB 1 — AutoPack (PHP + Composer)
+# ------------------------------------------------------
+  AutoPack:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # ② Instala o PHP + Composer
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ inputs.php_version || '8.2' }}
+          tools: composer:v2        # sempre Composer 2.x
+
+      # ③ Descobre o composer.json (primeiro que aparecer) e instala deps
+      - name: Composer install
+        id: comp
+        shell: bash
+        run: |
+          FILE=$(find . -name 'composer.json' | head -n1)
+          if [[ -z "$FILE" ]]; then
+            echo "::error::Nenhum composer.json encontrado"; exit 1
+          fi
+          DIR=$(dirname "$FILE")
+          echo "composer_dir=$DIR" >> "$GITHUB_OUTPUT"
+          echo "🎼  composer.json localizado em: $DIR"
+
+          composer --working-dir="$DIR" install \
+            --no-interaction --prefer-dist --no-progress
+
+      # Empacota com Veracode CLI (mesma lógica)
+      - name: Empacotar Artefatos para Scan
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/${{ inputs.build-id }}"
+          curl -fsS https://tools.veracode.com/veracode-cli/install | sh
+          ./veracode package --source . \
+                             --output "$GITHUB_WORKSPACE/artifacts/${{ inputs.build-id }}" \
+                             --trust
+
+          find "$GITHUB_WORKSPACE/artifacts/${{ inputs.build-id }}" -name "*.zip" \
+            | while read f; do unzip -o -d "$(dirname "$f")" "$f"; done
+
+          rm -f "$GITHUB_WORKSPACE/artifacts/${{ inputs.build-id }}"/*.zip
+          zip analysisPack.zip -r "$GITHUB_WORKSPACE/artifacts/${{ inputs.build-id }}"
+          mv analysisPack.zip "$GITHUB_WORKSPACE/artifacts/${{ inputs.build-id }}/analysisPack.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: analysisPack
+          path: artifacts/${{ inputs.build-id }}/analysisPack.zip
+          
+# JOB 2 — SCA
+# ------------------------------------------------------
+  SCA:
+    needs: AutoPack
+    runs-on: ubuntu-24.04
+    env:
+      SRCCLR_API_TOKEN: ${{ secrets.SCA_ORGANIZACIONAL }}
+      SCA_WORKSPACE_WEBAPP: ${{ secrets.WORKSPACE_WEBAPP }}
+      SCA_WORKSPACE_AKS:    ${{ secrets.SCA_WORKSPACE_AKS }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve workspace slug
+        id: slug
+        shell: bash
+        run: |
+          declare -A MAP=( ["clientereides"]="SCA_WORKSPACE_AKS"
+                           ["clienterei-frontend"]="SCA_WORKSPACE_WEBAPP"
+                           ["projeto"]="SCA_WORKSPACE_AKS" 
+                           
+                           )
+                           
+                           #Coloque acima os projetos e seus respectivos workspaces 
+                           
+          secret="${MAP[${{ inputs.project_veracode }}]}"
+          [[ -z "$secret" ]] && { echo "::error::Projeto sem workspace"; exit 1; }
+          echo "slug=${!secret}" >> $GITHUB_OUTPUT
+
+      - name: Run Veracode SCA
+        env:
+          SRCCLR_WORKSPACE_SLUG: ${{ steps.slug.outputs.slug }}
+        run: |
+          curl -sSL https://download.sourceclear.com/ci.sh | sh -s scan --update-advisor --uri-as-name --recursive
+
+# ------------------------------------------------------
+# JOB 3 — Pipeline Scan
+# ------------------------------------------------------
+  Scan:
+    name: ⏱️ Veracode Pipeline Scan
+    runs-on: ubuntu-24.04
+    needs: AutoPack
+    
+    steps:
+      # 1) Baixa o artifact com nome 'analysisPack'
+      - name: Baixar Artefato para Análise
+        uses: actions/download-artifact@v4
+        with:
+          name: analysisPack
+  
+      # 2) (Opcional) Listar arquivos baixados para confirmar o que veio
+      
+  
+      - name: Detectar arquivo de análise
+        id: detect_artifact
+        run: |
+            if [ -f "analysisPack.zip" ]; then
+              echo "Usando analysisPack.zip."
+              echo "artifact_file=analysisPack.zip" >> $GITHUB_OUTPUT
+            else
+              echo "Erro: analysisPack.zip não encontrado"
+            fi
+
+      - name: Policy Name Substitution
+        id: policy-name-sub
+        run: |
+        
+            # Setar policy default
+            echo "policy_veracode_sub=${{ inputs.veracode_policy_name }}" >> "$GITHUB_OUTPUT"
+            
+            # Forçar policy 
+            declare -A POLICY_MAP
+            POLICY_MAP["transferenciacota-api"]="Politica-de-seguranca-Legados"
+            POLICY_MAP["hierarquia-service"]="Embracon-hierarquia_boavista"
+            POLICY_MAP["embrapay-api"]="Embracon-Corporativa"
+            POLICY_MAP["clientereides"]="Embracon-clientereides"
+            POLICY_MAP["boavistaapi"]="Embracon-hierarquia_boavista"
+            POLICY_MAP["extratocota-service"]="Embracon-Corporativa"
+            POLICY_MAP["embraconutils"]="Embracon-Corporativa"
+            POLICY_MAP["mapacomissaoservice"]="Embracon-mapacomissaoservice-api"
+            POLICY_MAP["nomedoprojeto-api"]="nomedapolicy"
+            POLICY_MAP["logindes"]="Embracon-login-api"
+            POLICY_MAP["simulacreditodes"]="Embracon-simulacredito-api"
+            POLICY_MAP["embracon-api"]="Embracon-embracon-api"
+            POLICY_MAP["embrapagdes"]="Embracon-embrapag-api"
+            POLICY_MAP["area-restrita-api"]="Embracon-area-restrita-api"
+            POLICY_MAP["evento-cotades"]="Embracon-Corporativa"
+            POLICY_MAP["boleto-service"]="Embracon-Corporativa"
+            POLICY_MAP["documentos-api"]="Embracon-Corporativa"
+            POLICY_MAP["logs-backend"]="Embracon-logs-backend"
+            POLICY_MAP["gebol-captcha"]="Embracon-gebol-captcha-api" 
+            POLICY_MAP["gebol-business"]="Embracon-gebol-business-api" 
+            POLICY_MAP["gebol-core"]="Embracon-gebol-core-api"
+            POLICY_MAP["processarslipjob"]="Embracon-Corporativa"
+            POLICY_MAP["procon"]="Embracon-Corporativa"
+            POLICY_MAP["assinaturaeletronica"]="Embracon-assinaturaeletronica-api"
+            POLICY_MAP["integracao-api"]="Embracon-integracao-api"
+            POLICY_MAP["baasrw"]="Embracon-baas_baasrw"
+            POLICY_MAP["geradorboleto-api"]="Embracon-geradorboleto-api"
+            POLICY_MAP["rating-api"]="Embracon-rating-api"
+            POLICY_MAP["sender-marketingcloud-api"]="Embracon-sender-marketingcloud-api"
+            POLICY_MAP["portal-corretora"]="Embracon-portal-corretora-api"
+            POLICY_MAP["integracaosf"]="Embracon-integracaosf-api"
+            POLICY_MAP["embracon-api-assembleia"]="Embracon-Corporativa"
+            POLICY_MAP["embracon-api-pagamentos"]="Embracon-Corporativa"
+            POLICY_MAP["embracon-api-login"]="Embracon-Corporativa"
+            POLICY_MAP["embracon-api-vendas"]="Embracon-Corporativa"
+            POLICY_MAP["embracon-api-clientes"]="Embracon-Corporativa"
+            POLICY_MAP["embracon-api-simulacoes"]="Embracon-Corporativa"
+            POLICY_MAP["gebol-frontend"]="Embracon-gebol-frontend"
+            POLICY_MAP["assinaturaeletronica-admin"]="Embracon-assinaturaeletronica-admin"
+            POLICY_MAP["clienterei-frontend"]="Embracon-clienterei-frontend"
+            POLICY_MAP["reset-senha-front"]="Embracon-reset-senha-front"
+            POLICY_MAP["compliance"]="Embracon-compliance"
+            POLICY_MAP["geradorboleto-web"]="Embracon-GeradorBoleto_WebatendFront"
+            POLICY_MAP["transferenciacota-front"]="Embracon-transferenciacota-front"
+            POLICY_MAP["rating-web"]="Embracon-rating-web"
+            POLICY_MAP["portaldocumentacao-frontend"]="Embracon-portaldocumentacao-frontend_logsfrontend"
+            POLICY_MAP["file-service-dev"]="Embracon-file-service"
+            POLICY_MAP["webatendimento-api"]="Embracon-webatendimentointegration_webatendimentoapi"
+            POLICY_MAP["webatendimento-integration-support"]="Embracon-webatendimentointegration_webatendimentoapi"
+            POLICY_MAP["embracon-webatendimento-frontend-partner-customization"]="Embracon-Corporativa"
+            POLICY_MAP["webatendimento-pwa"]="Embracon-GeradorBoleto_WebatendFront"
+            POLICY_MAP["portal-corretora-front"]="Embracon-CorretoraFront"
+            POLICY_MAP["baas"]="Embracon-baas_baasrw"
+            POLICY_MAP["simplimais-api"]="Embracon-Corporativa"
+            
+            
+            if [[ ${POLICY_MAP[${{ inputs.project_veracode }}]} != "" ]]; then
+                echo "Forçar policy de ${{ inputs.veracode_policy_name }} para ${POLICY_MAP[${{ inputs.project_veracode }}]}"
+                echo "policy_veracode_sub=${POLICY_MAP[${{ inputs.project_veracode }}]}" >> "$GITHUB_OUTPUT"
+            fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ScanResults
+          path: results.json
+
+# ------------------------------------------------------
+# JOB 4 — SAST
+# ------------------------------------------------------
+  SAST:
+      runs-on: ubuntu-24.04
+      needs: AutoPack
+      steps:
+        - name: Baixar Artefato para Análise SAST
+          uses: actions/download-artifact@v4
+          with:
+            name: analysisPack
+  
+        - name: Baixar Veracode SAST Wrapper
+          run: |
+            curl -O -L https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/24.7.14.0/vosp-api-wrappers-java-24.7.14.0.jar
+  
+        - name: Project Name Substitution
+          id: project-name-sub
+          run: |
+            # Caso projeto não esteja no map, utiliza o nome padrão
+            echo "project_veracode_sub=${{ inputs.project_veracode }}" >> "$GITHUB_OUTPUT"
+            
+            # Criar o mapeamento de nomes dos projetos
+            declare -A PROJECT_MAP
+            PROJECT_MAP["nomeprojetozuado"]="novonomeprojeto"
+            PROJECT_MAP["nomeprojetozuado02"]="novonomeprojeto02"
+            PROJECT_MAP["simulacreditodes"]="simulacredito-api"
+            PROJECT_MAP["embrapagdes"]="embrapag-api"
+            PROJECT_MAP["portal-corretora"]="portal-corretora-api"
+            PROJECT_MAP["mapacomissaoservice"]="mapacomissaoservice-api"
+            PROJECT_MAP["boavistaapi"]="boavista-api"
+            PROJECT_MAP["evento-cotades"]="evento-cota-api"
+            PROJECT_MAP["extratocota-service"]="extratocota-service-api"
+            PROJECT_MAP["hierarquia-service"]="hierarquia-service-api"
+            PROJECT_MAP["procon"]="procon-api"
+            PROJECT_MAP["embraconutils"]="embraconutils-api"
+            PROJECT_MAP["logindes"]="login-api" 
+            PROJECT_MAP["gebol-captcha"]="gebol-captcha-api" 
+            PROJECT_MAP["gebol-business"]="gebol-business-api" 
+            PROJECT_MAP["gebol-core"]="gebol-core-api" 
+            PROJECT_MAP["assinaturaeletronica"]="assinaturaeletronica-api" 
+            PROJECT_MAP["integracaosf"]="integracaosf-api"
+            PROJECT_MAP["portal-corretora"]="portal-corretora-api"
+            PROJECT_MAP["webatendimento-integration-support"]="webatendimento-integration"
+            PROJECT_MAP["embracon-webatendimento-frontend-partner-customization"]="embracon-webatendimento-admin"
+            PROJECT_MAP["webatendimento-pwa"]="webatendimento-frontend"
+            ##PROJECT_MAP["project"]="name"
+                      
+            
+            # Setar o nome do projeto, se houver mapeamento
+            if [[ ${PROJECT_MAP[${{ inputs.project_veracode }}]} != "" ]]; then
+              echo "Definindo novo nome para de ${{ inputs.project_veracode }} para ${PROJECT_MAP[${{ inputs.project_veracode }}]}"
+              echo "project_veracode_sub=${PROJECT_MAP[${{ inputs.project_veracode }}]}" >> "$GITHUB_OUTPUT"
+            fi
+  
+        - name: Read Project Name Substitution
+          run: echo "${{ steps.project-name-sub.outputs.project_veracode_sub }}"
+  
+        - name: Executar Veracode SAST
+          env:
+            VID: ${{ secrets.APIID_VERACODE }}
+            VKEY: ${{ secrets.APIKEY_VERACODE }}
+            ENVIRONMENT: ${{ inputs.environment }}
+          run: |
+            # Verifica se existe um WAR
+            WAR_FILE=$(find . -maxdepth 2 -name "*.war" | head -n 1)
+            if [ -f "$WAR_FILE" ]; then
+              echo "Aplicação WAR detectada. Usando arquivo: $WAR_FILE"
+              ARTIFACT="$WAR_FILE"
+            else
+              # Procura por um JAR (excluindo o vosp-api-wrappers)
+              JAR_FILE=$(find . -maxdepth 2 -name "*.jar" -not -name "vosp-api-wrappers*.jar" | head -n 1)
+              if [ -f "$JAR_FILE" ]; then
+                echo "Java build detectado. Usando arquivo: $JAR_FILE"
+                ARTIFACT="$JAR_FILE"
+              else
+                echo "Nenhum WAR ou JAR encontrado. Usando analysisPack.zip."
+                ARTIFACT="analysisPack.zip"
+              fi
+            fi
+  
+            if [ "$ENVIRONMENT" == "prod" ]; then
+              echo "Executando SAST em ambiente de produção..."
+              java -jar vosp-api-wrappers-java-24.7.14.0.jar \
+                -vid $VID -vkey $VKEY \
+                -action uploadandscan \
+                -appname "${{ steps.project-name-sub.outputs.project_veracode_sub }}" \
+                -version "${{ github.run_id }}" \
+                -filepath "$ARTIFACT" \
+                -createprofile true \
+                -deleteincompletescan 2 \
+                -createsandbox false
+            else
+              echo "Executando SAST em ambiente de sandbox..."
+              java -jar vosp-api-wrappers-java-24.7.14.0.jar \
+                -vid $VID -vkey $VKEY \
+                -action uploadandscan \
+                -appname "${{ steps.project-name-sub.outputs.project_veracode_sub }}" \
+                -version "${{ github.run_id }}" \
+                -filepath "$ARTIFACT" \
+                -createprofile true \
+                -deleteincompletescan 2 \
+                -createsandbox true \
+                -sandboxname "$ENVIRONMENT" \
+                -debug
+            fi

@@ -1,0 +1,453 @@
+name: Deploy Java AKS v3
+
+on:
+  workflow_call:
+    inputs:
+      # Variaveis que os projetos podem sobrescrever
+      environment:
+        description: 'Ambiente de execução do build'
+        required: true
+        type: string
+      project:
+        description: 'Nome do projeto'
+        required: true
+        type: string
+      dockerfile:
+        description: 'Imagem docker corporativa'
+        default: ''
+        required: false
+        type: string
+      buildArgs:
+        description: 'Argumentos que serão repassados no momento do build da imagem'
+        default: ''
+        required: false
+        type: string
+     
+      # Variaveis que permitem sobrescrever via formulário
+      replicas:
+        description: 'Número de PODs desejados'
+        required: false
+        type: string
+        default: '1'
+      skipBuild:
+        description: 'Se sim, todo o processo de build será saltado.'
+        default: false
+        required: false
+        type: boolean
+      skipDeploy:
+        description: 'Se sim, todo o processo de deploy será saltado.'
+        default: false
+        required: false
+        type: boolean
+      configMapDeploy:
+        description: 'Se sim, vai fazer o apply do ConfigMap. Atenção: estão função sobrescreve os valores atuais.'
+        default: false
+        required: false
+        type: boolean
+      secretsDeploy:
+        description: 'Se sim, vai fazer o apply do Secret. Atenção: estão função sobrescreve os valores atuais.'
+        default: false
+        required: false
+        type: boolean
+
+env:
+  REGISTRY: azrsrvpcrg01.azurecr.io
+  VERSION: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+
+jobs:
+  
+
+  Input:
+    timeout-minutes: 1
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    outputs:
+      REPLICAS: ${{ steps.set-outputs.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ steps.set-outputs.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ steps.set-outputs.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ steps.set-outputs.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ steps.set-outputs.outputs.SECRETS_DEPLOY }}
+    steps:
+      - name: Input Request
+        id: interactive-inputs
+        uses: boasihq/interactive-inputs@v2
+        with:
+          ngrok-authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
+          title: 'Por favor preencha o formulário para realizar um deploy customizado. Caso contrário, será utilizado os valores padrões.'
+          timeout: 60
+          interactive: |
+            fields:
+              - label: replicas
+                properties:
+                  display: Número de PODs desejados
+                  type: text
+                  description: Ao selecionar o numero de PODs desejados será aplicado no Kubernetes no momento do deploy
+                  defaultValue: "1"
+                  required: false
+              - label: skipBuild
+                properties:
+                  display: Desaja saltar o build?
+                  type: boolean
+                  description: Se sim, todo o processo de build será saltado.
+                  defaultValue: false
+                  required: false
+              - label: skipDeploy
+                properties:
+                  display: Deseja saltar o deploy?
+                  type: boolean
+                  description: Se sim, todo o processo de deploy será saltado.
+                  defaultValue: false
+                  required: false
+              - label: configMapDeploy
+                properties:
+                  display: Deseja fazer deploy do ConfigMap?
+                  type: boolean
+                  description: Se sim, o confimap do Kubernetes será sobrescrito para a nova versão.
+                  defaultValue: false
+                  required: false
+              - label: secretsDeploy
+                properties:
+                  display: Deseja fazer deploy do Secrets?
+                  type: boolean
+                  description: Se sim, o secrets do Kubernetes será sobrescrito para a nova versão.
+                  defaultValue: false
+                  required: false
+
+      - name: Display Inputs
+        shell: bash
+        run: |
+
+          echo "Display Inputs"
+          echo -e "\n==============================\n"
+          echo "Detected Inputs: ${{join(steps.interactive-inputs.outputs.*, '\n')}}"
+          echo -e "\n==============================\n"
+        
+      - name: Set Outputs
+        id: set-outputs
+        run: |
+
+          echo "REPLICAS=${{ steps.interactive-inputs.outputs.replicas }}" >> "$GITHUB_OUTPUT"
+          echo "SKIP_BUILD=${{ steps.interactive-inputs.outputs.skipBuild }}" >> "$GITHUB_OUTPUT"
+          echo "SKIP_DEPLOY=${{ steps.interactive-inputs.outputs.skipDeploy }}" >> "$GITHUB_OUTPUT"
+          echo "CONFIGMAP_DEPLOY=${{ steps.interactive-inputs.outputs.configMapDeploy }}" >> "$GITHUB_OUTPUT"
+          echo "SECRETS_DEPLOY=${{ steps.interactive-inputs.outputs.secretsDeploy }}" >> "$GITHUB_OUTPUT"
+
+  Variables:
+    runs-on: ubuntu-24.04
+    needs: Input
+    outputs:
+      REPLICAS: ${{ steps.set-variables.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ steps.set-variables.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ steps.set-variables.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ steps.set-variables.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ steps.set-variables.outputs.SECRETS_DEPLOY }}
+    env:
+      REPLICAS: ${{ needs.Input.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ needs.Input.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Input.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Input.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Input.outputs.SECRETS_DEPLOY }}
+    steps:  
+      - name: Set Variables
+        id: set-variables
+        run: |
+
+          echo "REPLICAS=${{ env.REPLICAS }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.REPLICAS }}" == "" ]]; then
+            echo "REPLICAS=${{ inputs.replicas }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "REPLICAS=${{ env.REPLICAS }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.SKIP_BUILD }}" == "" ]]; then
+            echo "SKIP_BUILD=${{ inputs.skipBuild  }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "SKIP_DEPLOY=${{ env.SKIP_DEPLOY }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.SKIP_DEPLOY }}" == "" ]]; then
+            echo "SKIP_DEPLOY=${{ inputs.skipDeploy  }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "CONFIGMAP_DEPLOY=${{ env.CONFIGMAP_DEPLOY }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.CONFIGMAP_DEPLOY }}" == "" ]]; then
+            echo "CONFIGMAP_DEPLOY=${{ inputs.configMapDeploy  }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "SECRETS_DEPLOY=${{ env.SECRETS_DEPLOY }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.SECRETS_DEPLOY }}" == "" ]]; then
+            echo "SECRETS_DEPLOY=${{ inputs.secretsDeploy  }}" >> "$GITHUB_OUTPUT"
+          fi
+ 
+  Build:
+    name: Build
+    runs-on: ubuntu-24.04
+    needs: Variables
+    outputs:
+      REPLICAS: ${{ needs.Variables.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ needs.Variables.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Variables.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Variables.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Variables.outputs.SECRETS_DEPLOY }}
+    env:
+      REPLICAS: ${{ needs.Variables.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ needs.Variables.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Variables.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Variables.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Variables.outputs.SECRETS_DEPLOY }}
+    steps:
+      - name: Generate GitHub App JWT Token
+        id: generate_jwt
+        env:
+          APP_ID: "1039452"  
+          PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+        run: |
+         
+          header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          unsigned_token="$header.$payload"
+          signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          jwt="$unsigned_token.$signature"
+
+          echo "JWT=$jwt" >> $GITHUB_ENV
+
+      - name: Get Installation Access Token
+        id: get_install_token
+        env:
+          JWT: "${{ env.JWT }}"
+        run: |
+          response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+          token=$(echo "$response" | jq -r '.token')
+          echo "INSTALLATION_TOKEN=$token" >> $GITHUB_OUTPUT
+      
+      - name: Checkout code with submodules
+        uses: actions/checkout@v3
+        with:
+          token: ${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+          
+ 
+      - name: Force Load environment variables
+        run: |
+          echo "Loading environment variables from .env file"
+          source $GITHUB_ENV
+        
+
+      - name: Include Submodules
+        run: |
+          git submodule init
+
+      - name: Clone Template Repository
+              
+        run: |
+          git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo          
+
+      - name: Build Image
+        if: ${{ env.SKIP_BUILD == 'false' }}
+        run: |
+          
+          if [[ "${{ inputs.environment }}" == "prod" || "${{ inputs.environment }}" == "hom" ]]; then
+            dockerfilePath=${{ inputs.dockerfile }}
+            if [[ -z "${{ inputs.dockerfile }}" ]]; then
+              echo "Erro: Para o ambiente '${{ inputs.environment }}', é obrigatório especificar o Dockerfile corporativo."
+              exit 1
+            fi
+          elif [[ "${{ inputs.environment }}" == "dev" ]]; then
+           
+            dockerfilePath=${{ inputs.dockerfile }}
+          else
+           
+            echo "Ambiente não especificado. Usando Dockerfile padrão no caminho 'Dockerfile'."
+            
+          fi
+          
+          buildCmd="docker build -t ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }} --build-arg ENVIRONMENT=${{ inputs.environment }}"
+
+          if [ -n "${{ inputs.buildArgs }}" ]; then
+            echo "BuildArgs definidos. Adicionando ao comando de build."
+            buildCmd+=" --build-arg BUILD_ARGS=\"${{ inputs.buildArgs }}\""
+          else
+            echo "buildArgs não definidos. Executando build sem buildArgs adicionais."
+          fi
+          
+          # Verificar se dockerArgs estão definidos e adicioná-los ao comando
+          if [ -n "${{ inputs.buildArgs }}" ]; then
+            echo "DockerArgs definidos. Adicionando ao comando de build."
+            IFS=',' read -ra argsArray <<< "${{ inputs.buildArgs }}"
+            for arg in "${argsArray[@]}"; do
+              buildCmd+=" --build-arg $arg"
+            done
+          else
+            echo "dockerArgs não definidos. Executando build sem dockerArgs adicionais."
+          fi
+          
+          # Completar o comando com o caminho do Dockerfile e executar
+          if [[ -n "${{ inputs.dockerfile }}" ]]; then
+            buildCmd+=" -f template_repo/dockerfiles/${dockerfilePath}/Dockerfile ."
+          else
+            buildCmd+=" -f Dockerfile ."
+          fi
+          echo "Executando comando: $buildCmd"
+          eval "$buildCmd"
+          
+          # Tag para 'latest'
+          docker tag ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }} ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+      - name: Login to Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: azrsrvpcrg01.azurecr.io
+          username: ${{ secrets.ACR_ENTRA_CLIENT_ID }}
+          password: ${{ secrets.ACR_ENTRA_SECRET }}
+
+      - name: Push Docker Image
+        env:
+          registry: azrsrvpcrg01.azurecr.io
+          version: 2.0.${{ github.run_number }}
+        if: env.SKIP_BUILD == 'false'
+        run: |
+         
+          docker push ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }}
+          docker push ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+          
+  Veracode:
+    name: Veracode
+    needs: Build
+    uses: embracon-br/pipeline-templates/.github/workflows/veracode-template-v3.yml@main
+    secrets: inherit
+    with:
+      build-id: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+      environment: ${{ inputs.environment }}
+      project_veracode: ${{ inputs.project }}
+
+  Deploy:
+    name: Deploy
+    runs-on: self-hosted
+    needs: 
+    - Build
+    - Veracode
+    outputs:
+      REPLICAS: ${{ needs.Build.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ needs.Build.outputs.SKIP_BUILD }}
+      CONFIGMAP_DEPLOY: ${{ needs.Build.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Build.outputs.SECRETS_DEPLOY }}
+    env:
+      REPLICAS: ${{ needs.Build.outputs.REPLICAS }}
+      SKIP_BUILD: ${{ needs.Build.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Build.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Build.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Build.outputs.SECRETS_DEPLOY }}  
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate GitHub App JWT Token
+        id: generate_jwt
+        env:
+          APP_ID: "1039452"  
+          PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+        run: |
+          # Instalação do openssl e dependências
+          # sudo apt-get update && sudo apt-get install -y jq openssl
+
+          # Gerando o token JWT
+          header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          unsigned_token="$header.$payload"
+          signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          jwt="$unsigned_token.$signature"
+
+          echo "JWT=$jwt" >> $GITHUB_ENV
+
+      - name: Get Installation Access Token
+        id: get_install_token
+        env:
+          JWT: "${{ env.JWT }}"
+        run: |
+          response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+          token=$(echo "$response" | jq -r '.token')
+          echo "INSTALLATION_TOKEN=$token" >> $GITHUB_OUTPUT
+
+      - name: Clone Template Repository
+            
+        run: |
+          git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+          
+          
+          
+      - name: Load Variables
+        id: load-variables
+        run: |
+        
+          echo "AD_NAMESERVER_DEV=$(yq '.AD_NAMESERVER_DEV' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER_HOM=$(yq '.AD_NAMESERVER_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER_PROD_01=$(yq '.AD_NAMESERVER_PROD_01' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER_PROD_02=$(yq '.AD_NAMESERVER_PROD_02' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER=$(yq '.AD_NAMESERVER' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_SEARCH_DEV_HOM=$(yq '.AD_SEARCH_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_SEARCH_PROD=$(yq '.AD_SEARCH_PROD' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AKS_PROD_CLUSTER_HOST=$(yq '.AKS_PROD_CLUSTER_HOST' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AKS_DEV_HOM_CLUSTER_HOST=$(yq '.AKS_DEV_HOM_CLUSTER_HOST' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AKS_RESOURCE_PROD=$(yq '.AKS_RESOURCE_PROD' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AKS_RESOURCE_DEV_HOM=$(yq '.AKS_RESOURCE_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+
+      - name: Seds Apllication And Envs
+        run: |
+          sed -i 's/#APPLICATION_NAME#/${{ inputs.project }}/g' k8s/deployment.yml
+          sed -i 's/#APPLICATION_IMAGE_NAME#/${{ inputs.project }}/g' k8s/deployment.yml
+          sed -i 's/#ENV#/${{ inputs.environment }}/g' k8s/deployment.yml
+          sed -i 's/#REPLICAS#/${{ env.REPLICAS }}/g' k8s/deployment.yml
+          sed -i 's/#APP_VERSION#/${{ env.VERSION }}/g' k8s/deployment.yml
+          sed -i 's/#REGISTRY#/${{ env.REGISTRY }}/g' k8s/deployment.yml
+          cat k8s/deployment.yml
+      
+      - name: Seds Name Servers and Searchs - prod
+        if: ${{ inputs.environment == 'prod' }}
+        run: |
+          sed -i 's/#AKS_NAMESERVER_01#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_01 }}/g' k8s/deployment.yml
+          sed -i 's/#AKS_NAMESERVER_02#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_02 }}/g' k8s/deployment.yml
+          sed -i 's/#AKS_NAMESERVER_03#/${{ steps.load-variables.outputs.AD_NAMESERVER_HOM }}/g' k8s/deployment.yml
+          sed -i 's/#AKS_SEARCH#/${{ steps.load-variables.outputs.AD_SEARCH_PROD }}/g' k8s/deployment.yml
+            
+            
+      - name: Seds Name Servers and Searchs - non prod
+        if: ${{ inputs.environment != 'prod' }}
+        run: |
+          sed -i 's/#AKS_NAMESERVER_01#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_01 }}/g' k8s/deployment.yml
+          sed -i 's/#AKS_NAMESERVER_02#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_02 }}/g' k8s/deployment.yml
+          sed -i 's/#AKS_NAMESERVER_03#/${{ steps.load-variables.outputs.AD_NAMESERVER_HOM }}/g' k8s/deployment.yml
+          sed -i 's/#AKS_SEARCH#/${{ steps.load-variables.outputs.AD_SEARCH_DEV_HOM }}/g' k8s/deployment.yml
+
+        
+      - name: Config cluster
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+            
+        
+      - name: Apply Config Map
+        if: ${{ env.CONFIGMAP_DEPLOY == 'true' }}
+        run: kubectl apply -f k8s/configmap-${{ inputs.environment }}.yml
+
+      - name: Apply Secrets
+        if: ${{ env.SECRETS_DEPLOY =='true' }}
+        run: kubectl apply -f k8s/secrets-${{ inputs.environment }}.yml
+
+      - name: Apply in Cluster PROD
+        if: env.SKIP_BUILD == 'false' && inputs.environment == 'prod'
+        run: |
+          > $HOME/.kube/config
+          az aks get-credentials --resource-group ${{ steps.load-variables.outputs.AKS_RESOURCE_PROD }} --name ${{ steps.load-variables.outputs.AKS_PROD_CLUSTER_HOST }} --overwrite-existing
+          kubectl config set-cluster k8s-prod --insecure-skip-tls-verify=true --server=https://${{ steps.load-variables.outputs.AKS_PROD_CLUSTER_HOST }}
+          kubectl get namespaces
+          kubectl apply -f k8s/deployment.yml
+            
+      - name: Apply in Cluster NonPROD
+        if: env.SKIP_BUILD == 'false' && inputs.environment != 'prod'
+        run: |
+          > $HOME/.kube/config
+          az aks get-credentials --resource-group ${{ steps.load-variables.outputs.AKS_RESOURCE_DEV_HOM }} --name ${{ steps.load-variables.outputs.AKS_DEV_HOM_CLUSTER_HOST }} --overwrite-existing
+          kubectl config set-cluster k8s-dev-hom --insecure-skip-tls-verify=true --server=https://${{ steps.load-variables.outputs.AKS_DEV_HOM_CLUSTER_HOST }}
+          kubectl get namespaces
+          cat k8s/deployment.yml
+          kubectl apply -f k8s/deployment.yml
+

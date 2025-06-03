@@ -1,0 +1,672 @@
+name: Deploy Java OKE Autoscaling
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Ambiente de execução do build'
+        required: true
+        type: string
+      project:
+        description: 'Nome do projeto'
+        required: true
+        type: string
+      dockerfile:
+        description: 'Imagem docker corporativa'
+        default: ''
+        required: false
+        type: string
+      buildArgs:
+        description: 'Argumentos que serão repassados no momento do build da imagem'
+        default: ''
+        required: false
+        type: string
+      appContextPath:
+        description: 'Para definir o contexto da aplicacao'
+        required: false
+        type: string
+      veracode_policy_name:
+        description: 'Nome da policy do Veracode'
+        required: false
+        type: string
+        default: 'Politica-de-seguranca-Legados'
+      k8sCluster:
+        description: 'Indicação do cluster kubernetes'
+        default: ''
+        required: false
+        type: string
+      copyPreBuildDir:
+        description: 'Utilizado para compor a imagem docker com instruçoes antes do build da imagem'
+        default: ''
+        required: false
+        type: string
+      copyBuildDir:
+        description: 'Utilizado para definir o diretorio de build da imagem docker'
+        default: ''
+        required: false
+        type: string
+      dockerArgs:
+        description: 'Utilizado para adicionar parametros no comando de build da imagem docker'
+        default: ''
+        required: false
+        type: string
+        
+      # Variaveis que permitem sobrescrever via formulário
+      replicas:
+        description: 'Número de PODs desejados'
+        required: false
+        type: string
+        default: '1'
+      replicasMax:
+        description: 'Número de PODs Maximo de autoscaling desejados'
+        required: false
+        type: string
+        default: '2'
+      skipBuild:
+        description: 'Se sim, todo o processo de build será saltado.'
+        default: false
+        required: false
+        type: boolean
+      skipDeploy:
+        description: 'Se sim, todo o processo de deploy será saltado.'
+        default: false
+        required: false
+        type: boolean
+      configMapDeploy:
+        description: 'Se sim, vai fazer o apply do ConfigMap. Atenção: estão função sobrescreve os valores atuais.'
+        default: false
+        required: false
+        type: boolean
+      secretsDeploy:
+        description: 'Se sim, vai fazer o apply do Secret. Atenção: estão função sobrescreve os valores atuais.'
+        default: false
+        required: false
+        type: boolean
+ 
+env:
+  REGISTRY: sa-saopaulo-1.ocir.io/grxpv7i9yybu
+  VERSION: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+
+jobs:
+
+  Input:
+    timeout-minutes: 1
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    outputs:
+      REPLICAS: ${{ steps.set-outputs.outputs.REPLICAS }}
+      REPLICAS_MAX: ${{ steps.set-outputs.outputs.REPLICAS_MAX }}
+      SKIP_BUILD: ${{ steps.set-outputs.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ steps.set-outputs.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ steps.set-outputs.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ steps.set-outputs.outputs.SECRETS_DEPLOY }}
+    steps:
+      - name: Input Request
+        id: interactive-inputs
+        uses: boasihq/interactive-inputs@v2
+        with:
+          ngrok-authtoken: ${{ secrets.NGROK_AUTHTOKEN }}
+          title: 'Por favor preencha o formulário para realizar um deploy customizado. Caso contrário, será utilizado os valores padrões.'
+          timeout: 60
+          interactive: |
+            fields:
+              - label: replicas
+                properties:
+                  display: Número de PODs desejados
+                  type: text
+                  description: Ao selecionar o numero de PODs desejados será aplicado no Kubernetes no momento do deploy
+                  defaultValue: "1"
+                  required: false
+              - label: replicas_max
+                properties:
+                  display: Número de PODs desejados
+                  type: text
+                  description: Ao selecionar o numero de PODs maximos de autoscaling desejados será aplicado no Kubernetes no momento do deploy
+                  defaultValue: "2"
+                  required: false
+              - label: skipBuild
+                properties:
+                  display: Desaja saltar o build?
+                  type: boolean
+                  description: Se sim, todo o processo de build será saltado.
+                  defaultValue: false
+                  required: false
+              - label: skipDeploy
+                properties:
+                  display: Deseja saltar o deploy?
+                  type: boolean
+                  description: Se sim, todo o processo de deploy será saltado.
+                  defaultValue: false
+                  required: false
+              - label: configMapDeploy
+                properties:
+                  display: Deseja fazer deploy do ConfigMap?
+                  type: boolean
+                  description: Se sim, o confimap do Kubernetes será sobrescrito para a nova versão.
+                  defaultValue: false
+                  required: false
+              - label: secretsDeploy
+                properties:
+                  display: Deseja fazer deploy do Secrets?
+                  type: boolean
+                  description: Se sim, o secrets do Kubernetes será sobrescrito para a nova versão.
+                  defaultValue: false
+                  required: false
+
+      - name: Display Inputs
+        shell: bash
+        run: |
+
+          echo "Display Inputs"
+          echo -e "\n==============================\n"
+          echo "Detected Inputs: ${{join(steps.interactive-inputs.outputs.*, '\n')}}"
+          echo -e "\n==============================\n"
+        
+      - name: Set Outputs
+        id: set-outputs
+        run: |
+
+          echo "REPLICAS=${{ steps.interactive-inputs.outputs.replicas }}" >> "$GITHUB_OUTPUT"
+          echo "REPLICAS_MAX=${{ steps.interactive-inputs.outputs.replicas_max }}" >> "$GITHUB_OUTPUT"
+          echo "SKIP_BUILD=${{ steps.interactive-inputs.outputs.skipBuild }}" >> "$GITHUB_OUTPUT"
+          echo "SKIP_DEPLOY=${{ steps.interactive-inputs.outputs.skipDeploy }}" >> "$GITHUB_OUTPUT"
+          echo "CONFIGMAP_DEPLOY=${{ steps.interactive-inputs.outputs.configMapDeploy }}" >> "$GITHUB_OUTPUT"
+          echo "SECRETS_DEPLOY=${{ steps.interactive-inputs.outputs.secretsDeploy }}" >> "$GITHUB_OUTPUT"
+
+  Variables:
+    runs-on: ubuntu-24.04
+    needs: Input
+    outputs:
+      REPLICAS: ${{ steps.set-variables.outputs.REPLICAS }}
+      REPLICAS_MAX: ${{ steps.set-variables.outputs.REPLICAS_MAX }}
+      SKIP_BUILD: ${{ steps.set-variables.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ steps.set-variables.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ steps.set-variables.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ steps.set-variables.outputs.SECRETS_DEPLOY }}
+    env:
+      REPLICAS: ${{ needs.Input.outputs.REPLICAS }}
+      REPLICAS_MAX: ${{ needs.Input.outputs.REPLICAS_MAX }}
+      SKIP_BUILD: ${{ needs.Input.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Input.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Input.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Input.outputs.SECRETS_DEPLOY }}
+    steps:  
+      - name: Set Variables
+        id: set-variables
+        run: |
+
+          echo "REPLICAS=${{ env.REPLICAS }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.REPLICAS }}" == "" ]]; then
+            echo "REPLICAS=${{ inputs.replicas }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "REPLICAS=${{ env.REPLICAS }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.SKIP_BUILD }}" == "" ]]; then
+            echo "SKIP_BUILD=${{ inputs.skipBuild  }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "SKIP_DEPLOY=${{ env.SKIP_DEPLOY }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.SKIP_DEPLOY }}" == "" ]]; then
+            echo "SKIP_DEPLOY=${{ inputs.skipDeploy  }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "CONFIGMAP_DEPLOY=${{ env.CONFIGMAP_DEPLOY }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.CONFIGMAP_DEPLOY }}" == "" ]]; then
+            echo "CONFIGMAP_DEPLOY=${{ inputs.configMapDeploy  }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "SECRETS_DEPLOY=${{ env.SECRETS_DEPLOY }}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ env.SECRETS_DEPLOY }}" == "" ]]; then
+            echo "SECRETS_DEPLOY=${{ inputs.secretsDeploy  }}" >> "$GITHUB_OUTPUT"
+          fi
+ 
+  Build:
+    name: Build
+    runs-on: ubuntu-24.04
+    needs: Variables
+    outputs:
+      REPLICAS: ${{ needs.Variables.outputs.REPLICAS }}
+      REPLICAS_MAX: ${{ needs.Variables.outputs.REPLICAS_MAX }}
+      SKIP_BUILD: ${{ needs.Variables.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Variables.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Variables.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Variables.outputs.SECRETS_DEPLOY }}
+    env:
+      REPLICAS: ${{ needs.Variables.outputs.REPLICAS }}
+      REPLICAS_MAX: ${{ needs.Variables.outputs.REPLICAS_MAX }}
+      SKIP_BUILD: ${{ needs.Variables.outputs.SKIP_BUILD }}
+      SKIP_DEPLOY: ${{ needs.Variables.outputs.SKIP_DEPLOY }}
+      CONFIGMAP_DEPLOY: ${{ needs.Variables.outputs.CONFIGMAP_DEPLOY }}
+      SECRETS_DEPLOY: ${{ needs.Variables.outputs.SECRETS_DEPLOY }}
+    steps:
+      - name: Generate GitHub App JWT Token
+        id: generate_jwt
+        env:
+          APP_ID: "1039452"  
+          PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+        run: |
+         
+          header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          unsigned_token="$header.$payload"
+          signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          jwt="$unsigned_token.$signature"
+
+          echo "JWT=$jwt" >> $GITHUB_OUTPUT
+
+      - name: Get Installation Access Token
+        id: get_install_token
+        env:
+          JWT: "${{ steps.generate_jwt.outputs.JWT }}"
+        run: |
+          response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+          token=$(echo "$response" | jq -r '.token')
+          echo "INSTALLATION_TOKEN=$token" >> $GITHUB_OUTPUT
+      
+      - name: Checkout code with submodules
+        uses: actions/checkout@v3
+        with:
+          token: ${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}
+          submodules: true
+          
+ 
+      - name: Force Load environment variables
+        run: |
+          echo "Loading environment variables from .env file"
+          source $GITHUB_ENV
+
+      - name: Clone Template Repository        
+        run: |
+          git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+  
+      - name: Verificar existência de pre_build_copy
+        id: pre_build
+        run: |
+          if [ -f "pre_build_copy" ]; then
+            echo "prebuild=true" >> $GITHUB_OUTPUT
+          else
+            echo "prebuild=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Construindo PreBuildDir
+        if: ${{ steps.pre_build.outputs.prebuild == 'true' }}
+        run: |
+          DOCKERFILE="template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile"
+          PREBUILD_CONTENT=$(cat pre_build_copy)
+          echo "$PREBUILD_CONTENT" > temp_prebuild.txt
+          sed -i "s|#PREBUILD_COPY#|$(printf '%s' "$PREBUILD_CONTENT" | sed 's/[&/\]/\\&/g' | sed ':a;N;$!ba;s/\n/\\n/g')|g" "$DOCKERFILE"
+          cat template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile
+  
+      - name: Verificar existência de build_copy
+        id: build_copy
+        run: |
+          if [ -f "build_copy" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+          else
+            echo "build=false" >> $GITHUB_OUTPUT
+          fi
+  
+      - name: Construindo BuildDir
+        if: ${{ steps.build_copy.outputs.build == 'true' }}
+        run: |
+          DOCKERFILE="template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile"
+          BUILD_CONTENT=$(cat build_copy)
+          echo "$BUILD_CONTENT" > temp_build.txt
+          sed -i "s|#BUILD_COPY#|$(printf '%s' "$BUILD_CONTENT" | sed 's/[&/\]/\\&/g' | sed ':a;N;$!ba;s/\n/\\n/g')|g" "$DOCKERFILE"
+          cat template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile
+
+
+      - name: Login to Oracle Container Registry
+        run: echo "${{ secrets.OCI_PASSWORD }}" | docker login ${{ env.REGISTRY }} --username ${{ secrets.OCI_USERNAME }} --password-stdin    
+
+      - name: Parse dockerArgs
+        id: docker_args_config
+        shell: bash
+        run: |
+          dockerArgs="${{ inputs.dockerArgs }}"
+
+          # Transform the string into an array of key-value pairs
+          IFS=',' read -r -a args_array <<< "$dockerArgs"
+
+          # Loop through each key-value pair and create environment variables
+          for pair in "${args_array[@]}"; do
+            key="${pair%%=*}"
+            value="${pair#*=}"
+
+            # Export each key-value pair as an environment variable
+            export "$key"="$value"
+            echo "$key=$value" >> $GITHUB_OUTPUT  # Add to GitHub Actions environment
+          done
+
+      - name: Config appContextPath condition
+        id: app_context_config
+        run: |
+          if [ -z "${{ inputs.appContextPath }}" ]; then
+            echo "appContextPath=${{ inputs.project }}" >> $GITHUB_OUTPUT
+          else
+            echo "appContextPath=${{ inputs.appContextPath }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Image
+        if: ${{ env.SKIP_BUILD == 'false' }}
+        run: |
+          if [[ "${{ inputs.environment }}" == "prod" || "${{ inputs.environment }}" == "hom" ]]; then
+            dockerfilePath=${{ inputs.dockerFile }}
+          if [[ -z "${{ inputs.dockerFile }}" ]]; then
+              echo "Erro: Para o ambiente '${{ inputs.environment }}', é obrigatório especificar o Dockerfile corporativo."
+              exit 1
+          fi
+          elif [[ "${{ inputs.environment }}" == "dev" ]]; then
+            
+            dockerfilePath=${{ inputs.dockerFile }}
+          else
+            
+            echo "Ambiente não especificado. Usando Dockerfile padrão no caminho 'Dockerfile'."
+            
+          fi
+          
+          buildCmd="docker build -t ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }} --build-arg ENVIRONMENT=${{ inputs.environment }} --build-arg TNSADMIN=/usr/lib/oracle/18.3/client64/lib/network/admin"
+
+          if [ -n "${{ inputs.buildArgs }}" ]; then
+            echo "BuildArgs definidos. Adicionando ao comando de build."
+            buildCmd+=" --build-arg BUILD_ARGS=\"${{ inputs.buildArgs }}\""
+          else
+            echo "buildArgs não definidos. Executando build sem buildArgs adicionais."
+          fi
+          
+          # Verificar se dockerArgs estão definidos e adicioná-los ao comando
+          if [ -n "${{ inputs.dockerArgs }}" ]; then
+            echo "DockerArgs definidos. Adicionando ao comando de build."
+            IFS=',' read -ra argsArray <<< "${{ inputs.dockerArgs }}"
+            for arg in "${argsArray[@]}"; do
+              buildCmd+=" --build-arg $arg"
+            done
+          else
+            echo "dockerArgs não definidos. Executando build sem dockerArgs adicionais."
+          fi
+          
+          # Completar o comando com o caminho do Dockerfile e executar
+          if [[ -n "${{ inputs.dockerFile }}" ]]; then
+            buildCmd+=" -f template_repo/dockerfiles/${dockerfilePath}/Dockerfile ."
+          else
+            buildCmd+=" -f Dockerfile ."
+          fi
+          echo "Executando comando: $buildCmd"
+          eval "$buildCmd"
+          
+          # Tag para 'latest'
+          docker tag ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }} ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+      
+      # - name: Create Docker network for healthcheck
+      #   if: env.SKIP_BUILD == 'false'
+      #   run: |
+      #     docker network create healthcheck || true
+      #     docker container run -p 80:80 -d --rm --network healthcheck --name "${{ env.appContextPath }}.healthcheck.local" -e ENV=local ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }}
+        
+      # - name: Create healthcheck directory
+      #   run: rm -Rf healthcheck && mkdir healthcheck
+      
+      # - name: Set healthcheck flags
+      #   run: |
+      #     echo "hasHealth=false" >> $GITHUB_ENV
+      #     echo "hasInfo=false" >> $GITHUB_ENV
+      #     echo "hasMetrics=false" >> $GITHUB_ENV
+      #     echo "hasPrometheus=false" >> $GITHUB_ENV
+
+      - name: Load Variables
+        id: load_variables
+        run: |
+        
+          echo "AD_NAMESERVER_DEV=$(yq '.AD_NAMESERVER_DEV' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER_HOM=$(yq '.AD_NAMESERVER_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER_PROD_01=$(yq '.AD_NAMESERVER_PROD_01' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER_PROD_02=$(yq '.AD_NAMESERVER_PROD_02' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_NAMESERVER=$(yq '.AD_NAMESERVER' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_SEARCH_DEV_HOM=$(yq '.AD_SEARCH_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "AD_SEARCH_PROD=$(yq '.AD_SEARCH_PROD' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+          echo "HEALTH_CHECK_TIMEOUT_SECONDS=$(yq '.HEALTH_CHECK_TIMEOUT_SECONDS' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+    
+      # - name: Run Healthcheck
+      #   if: env.SKIP_BUILD == 'false'
+      #   run: |
+      
+      
+      #     # Execute o loop de health check com timeout
+      #     timeout ${{ steps.load_variables.outputs.HEALTH_CHECK_TIMEOUT_SECONDS }} bash -c "
+      #       until [[ \"\$hasInfo\" == true && \"\$hasMetrics\" == true && \"\$hasPrometheus\" == true ]]; do
+      #         echo 'Running health check validation...'
+              
+      #         # Execute o comando Docker e capture a saída
+      #         stdout=\$(docker run --rm --network healthcheck \
+      #           -v \$(pwd)/template_repo/scripts/healthcheck.sh:/app/template_repo/scripts/healthcheck.sh \
+      #           ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }} \
+      #           bash /app/template_repo/scripts/healthcheck.sh ${{ steps.app_context_config.outputs.appContextPath }})
+              
+      #         # Exiba a saída no console para depuração
+      #         echo \"\$stdout\"
+              
+      #         # Atualize as variáveis com base na saída do comando
+      #         if [[ \"\$stdout\" == *\"UP\"* ]]; then
+      #           echo \"Health check passed!\" 
+      #           hasHealth=true
+      #         fi
+              
+      #         if [[ \"\$stdout\" == *\"version\"* ]]; then
+      #           echo \"Info check passed!\" 
+      #           hasInfo=true
+      #         fi
+              
+      #         if [[ \"\$stdout\" == *\"http.server.requests\"* ]]; then
+      #           echo \"Metrics check passed!\" 
+      #           hasMetrics=true
+      #         fi
+              
+      #         if [[ \"\$stdout\" == *\"http_server_requests_seconds_count\"* ]]; then
+      #           echo \"Prometheus check passed!\" 
+      #           hasPrometheus=true
+      #         fi
+              
+      #         # Aguarde antes de tentar novamente
+      #         sleep 5
+      #       done
+      
+      #       # Exporta variáveis para o ambiente do GitHub
+      #       echo \"hasHealth=\$hasHealth\" >> $GITHUB_ENV
+      #       echo \"hasInfo=\$hasInfo\" >> $GITHUB_ENV
+      #       echo \"hasMetrics=\$hasMetrics\" >> $GITHUB_ENV
+      #       echo \"hasPrometheus=\$hasPrometheus\" >> $GITHUB_ENV
+      #     "
+
+      - name: Push Docker image with version tag
+        if: ${{ env.SKIP_BUILD == 'false' }}
+        run: docker push ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.VERSION }}
+
+      - name: Push Docker image with latest tag
+        if: ${{ env.SKIP_BUILD == 'false' }}
+        run: docker push ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+  Veracode:
+    name: Veracode
+    needs: Build
+    uses: embracon-br/pipeline-templates/.github/workflows/veracode-template-oficial-v1.yml@main
+    secrets: inherit
+    with:
+      build-id: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+      environment: ${{ inputs.environment }}
+      project_veracode: ${{ inputs.project }} 
+      veracode_policy_name: ${{ inputs.veracode_policy_name }}
+      
+  Deploy:
+    name: Deploy
+    runs-on: self-hosted
+    needs: 
+    - Build
+    - Veracode
+    outputs:
+     REPLICAS: ${{ needs.Build.outputs.REPLICAS }}
+     REPLICAS_MAX: ${{ needs.Build.outputs.REPLICAS_MAX }}
+     SKIP_BUILD: ${{ needs.Build.outputs.SKIP_BUILD }}
+     CONFIGMAP_DEPLOY: ${{ needs.Build.outputs.CONFIGMAP_DEPLOY }}
+     SECRETS_DEPLOY: ${{ needs.Build.outputs.SECRETS_DEPLOY }}
+    env: 
+     REPLICAS: ${{ needs.Build.outputs.REPLICAS }}
+     REPLICAS_MAX: ${{ needs.Build.outputs.REPLICAS_MAX }}
+     SKIP_BUILD: ${{ needs.Build.outputs.SKIP_BUILD }}
+     SKIP_DEPLOY: ${{ needs.Build.outputs.SKIP_DEPLOY }}
+     CONFIGMAP_DEPLOY: ${{ needs.Build.outputs.CONFIGMAP_DEPLOY }}
+     SECRETS_DEPLOY: ${{ needs.Build.outputs.SECRETS_DEPLOY }}
+    steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Generate GitHub App JWT Token
+          id: generate_jwt
+          env:
+            APP_ID: "1039452"  
+            PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+          run: |
+            # Instalação do openssl e dependências
+            # sudo apt-get update && sudo apt-get install -y jq openssl
+  
+            # Gerando o token JWT
+            header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            unsigned_token="$header.$payload"
+            signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            jwt="$unsigned_token.$signature"
+  
+            echo "JWT=$jwt" >> $GITHUB_OUTPUT
+
+        - name: Get Installation Access Token
+          id: get_install_token
+          env:
+            JWT: "${{ steps.generate_jwt.outputs.JWT }}"
+          run: |
+            response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+            token=$(echo "$response" | jq -r '.token')
+            echo "INSTALLATION_TOKEN=$token" >> $GITHUB_OUTPUT
+
+        - name: Clone Template Repository
+              
+          run: |
+            git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+
+        - name: Config appContextPath condition
+          id: app_context_path_config
+          run: |
+            if [ -z "${{ inputs.appContextPath }}" ]; then
+              echo "appContextPath=${{ inputs.project }}" >> $GITHUB_OUTPUT
+            else
+              echo "appContextPath=${{ inputs.appContextPath }}" >> $GITHUB_OUTPUT
+            fi
+
+        - name: Load Variables
+          id: load-variables
+          run: |
+          
+            echo "AD_NAMESERVER_DEV=$(yq '.AD_NAMESERVER_DEV' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "AD_NAMESERVER_HOM=$(yq '.AD_NAMESERVER_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "AD_NAMESERVER_PROD_01=$(yq '.AD_NAMESERVER_PROD_01' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "AD_NAMESERVER_PROD_02=$(yq '.AD_NAMESERVER_PROD_02' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "AD_NAMESERVER=$(yq '.AD_NAMESERVER' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "AD_SEARCH_DEV_HOM=$(yq '.AD_SEARCH_DEV_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "AD_SEARCH_PROD=$(yq '.AD_SEARCH_PROD' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "HEALTH_CHECK_ENDPOINT_PROD=$(yq '.HEALTH_CHECK_ENDPOINT_PROD' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "HEALTH_CHECK_ENDPOINT_HOM=$(yq '.HEALTH_CHECK_ENDPOINT_HOM' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "HEALTH_CHECK_ENDPOINT_DES=$(yq '.HEALTH_CHECK_ENDPOINT_DES' template_repo/vars.yml)" >> $GITHUB_OUTPUT
+            echo "OKE_DEV_HOM_CLUSTER_HOST=$(yq '.OKE_DEV_HOM_CLUSTER_HOST' template_repo/vars.yml)" >> "$GITHUB_OUTPUT"
+            echo "OKE_PROD_CLUSTER_HOST=$(yq '.OKE_PROD_CLUSTER_HOST' template_repo/vars.yml)" >> "$GITHUB_OUTPUT"
+            echo "OKE_PROD_KAFKA_CLUSTER_HOST=$(yq '.OKE_PROD_KAFKA_CLUSTER_HOST' template_repo/vars.yml)" >> "$GITHUB_OUTPUT"
+
+
+
+        - name: Seds Apllication And Envs
+          run: |
+            sed -i 's/#APPLICATION_NAME#/${{ inputs.project }}/g' oci/kubernetes.yml
+            sed -i 's/#APPLICATION_IMAGE_NAME#/${{ inputs.project }}/g' oci/kubernetes.yml
+            sed -i 's/#ENV#/${{ inputs.environment }}/g' oci/kubernetes.yml
+            sed -i 's/#REPLICAS#/${{ env.REPLICAS }}/g' oci/kubernetes.yml
+            sed -i 's/#APP_VERSION#/${{ env.VERSION }}/g' oci/kubernetes.yml
+            sed -i 's|#REGISTRY#|${{ env.REGISTRY }}|g' oci/kubernetes.yml
+            sed -i 's/#REPLICAS_MAX#/${{ env.REPLICAS_MAX }}/g' oci/kubernetes.yml
+            sed -i 's/#APPLICATION_ENDPOINT#/${{ steps.app_context_path_config.outputs.appContextPath }}/g' oci/kubernetes.yml
+
+            cat oci/kubernetes.yml
+      
+        - name: Seds Name Servers and Searchs - prod
+          if: ${{ inputs.environment == 'prod' }}
+          run: |
+            sed -i 's/#OKE_NAMESERVER_01#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_01 }}/g' oci/kubernetes.yml
+            sed -i 's/#OKE_NAMESERVER_02#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_02 }}/g' oci/kubernetes.yml
+            sed -i 's/#OKE_NAMESERVER_03#/${{ steps.load-variables.outputs.AD_NAMESERVER_HOM }}/g' oci/kubernetes.yml
+            sed -i 's/#OKE_SEARCH#/${{ steps.load-variables.outputs.AD_SEARCH_PROD }}/g' oci/kubernetes.yml
+            
+            
+        - name: Seds Name Servers and Searchs - non prod
+          if: ${{ inputs.environment != 'prod' }}
+          run: |
+            sed -i 's/#OKE_NAMESERVER_01#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_01 }}/g' oci/kubernetes.yml
+            sed -i 's/#OKE_NAMESERVER_02#/${{ steps.load-variables.outputs.AD_NAMESERVER_PROD_02 }}/g' oci/kubernetes.yml
+            sed -i 's/#OKE_NAMESERVER_03#/${{ steps.load-variables.outputs.AD_NAMESERVER_HOM }}/g' oci/kubernetes.yml
+            sed -i 's/#OKE_SEARCH#/${{ steps.load-variables.outputs.AD_SEARCH_DEV_HOM }}/g' oci/kubernetes.yml
+
+        - name: Seds EndpointHealthCheck - prod
+          if: ${{ inputs.environment == 'prod' }}
+          run: |
+            sed -i 's|#HEALTH_CHECK_ENDPOINT#|${{ steps.load-variables.outputs.HEALTH_CHECK_ENDPOINT_PROD }}|g' oci/kubernetes.yml
+
+        - name: Seds EndpointHealthCheck - homolog
+          if: ${{ inputs.environment == 'hom' }}
+          run: |
+            sed -i 's|#HEALTH_CHECK_ENDPOINT#|${{ steps.load-variables.outputs.HEALTH_CHECK_ENDPOINT_HOM }}|g' oci/kubernetes.yml
+
+        - name: Seds EndpointHealthCheck - develop
+          if: ${{ inputs.environment == 'dev' }}
+          run: |
+            sed -i 's|#HEALTH_CHECK_ENDPOINT#|${{ steps.load-variables.outputs.HEALTH_CHECK_ENDPOINT_DES }}|g' oci/kubernetes.yml
+
+        
+        - name: Apply Config Map
+          if: ${{ env.CONFIGMAP_DEPLOY == 'true' }}
+          run: kubectl apply -f k8s/configmap-${{ inputs.environment }}.yml
+
+        - name: Apply Secrets
+          if: ${{ env.SECRETS_DEPLOY =='true' }}
+          run: kubectl apply -f k8s/secrets-${{ inputs.environment }}.yml
+
+        - name: Apply in Cluster PROD 
+          if: env.SKIP_DEPLOY == 'false' && inputs.environment == 'prod' && (inputs.k8sCluster == 'oke-prod' || inputs.k8sCluster == '' || inputs.k8sCluster == null) 
+          run: |
+            > $HOME/.kube/config
+            kubectl config set-cluster context-csdszlbgqyt --server=${{ steps.load-variables.outputs.OKE_PROD_CLUSTER_HOST }} --insecure-skip-tls-verify=true
+            kubectl config set-credentials jenkins-sa --token=${{ secrets.OCI_OKE_TOKEN_PROD }}
+            kubectl config set-context context-csdszlbgqyt --cluster=context-csdszlbgqyt --user=jenkins-sa
+            kubectl config use-context context-csdszlbgqyt
+            kubectl get namespaces
+            kubectl apply -f oci/kubernetes.yml
+            
+        - name: Apply in Cluster OKE-PROD-KAFKA
+          if: env.SKIP_DEPLOY == 'false' && inputs.environment == 'prod' && inputs.k8sCluster == 'oke-prod-kafka'
+          run: |
+            > $HOME/.kube/config
+            kubectl config set-cluster context-csdszlbgqyt --server=${{ steps.load-variables.outputs.OKE_PROD_KAFKA_CLUSTER_HOST }} --insecure-skip-tls-verify=true
+            kubectl config set-credentials oke-admin --token=${{ secrets.OCI_OKE_KAFKA_TOKEN_PROD }}
+            kubectl config set-context context-csdszlbgqyt --cluster=context-csdszlbgqyt --user=jenkins-sa
+            kubectl config use-context context-csdszlbgqyt
+            kubectl config set-context --current --user=oke-admin
+            kubectl get namespaces
+            cat oci/kubernetes.yml
+            kubectl apply -f oci/kubernetes.yml
+
+        - name: Apply in Cluster OKE-DEV-HOM 
+          if: env.SKIP_DEPLOY == 'false' && (inputs.environment == 'dev' || inputs.environment == 'hom')
+          run: |
+            > $HOME/.kube/config
+            kubectl config set-cluster context-csdszlbgqyt --server=${{ steps.load-variables.outputs.OKE_DEV_HOM_CLUSTER_HOST }} --insecure-skip-tls-verify=true
+            kubectl config set-context --cluster=context-csdszlbgqyt context-csdszlbgqyt
+            kubectl config set-credentials oke-admin --token=${{ secrets.OCI_OKE_TOKEN }} --context=context-csdszlbgqyt
+            kubectl config use-context context-csdszlbgqyt
+            kubectl config set-context --current --user=oke-admin
+            cat oci/kubernetes.yml
+            kubectl apply -f oci/kubernetes.yml

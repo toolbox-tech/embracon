@@ -1,0 +1,88 @@
+name: Build Template
+
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        description: 'ID da build'
+        required: true
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+      namespace:
+        description: 'Namespace'
+        required: true
+        type: string
+      project:
+        description: 'Project'
+        required: true
+        type: string
+      registry:
+        description: 'Registry'
+        required: true
+        type: string
+
+env:
+  environment: ${{ inputs.environment }}
+  namespace: ${{ inputs.namespace }}
+  project: ${{ inputs.project }}
+  registry: ${{ inputs.registry }}
+  dockerImage: ''
+jobs:
+  Build_And_Push_to_Registry:
+    name: Build and Push to Registry
+    runs-on: ubuntu-latest
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ env.registry }}/${{ env.environment }}/${{ env.project }}:0.0.${{ env.BUILD_NUMBER }} \
+            --build-arg ENVIRONMENT=${{ env.environment }} -f Dockerfile .
+          docker tag ${{ env.registry }}/${{ env.environment }}/${{ env.project }}:0.0.${{ env.BUILD_NUMBER }} \
+            ${{ env.registry }}/${{ env.environment }}/${{ env.project }}:latest
+            
+      - name: Login no Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.registry }}
+          username: ${{ secrets.ACR_ENTRA_CLIENT_ID }}
+          password: ${{ secrets.ACR_ENTRA_SECRET }}
+
+      - name: Push Docker Image para o Registry
+        run: |
+          docker push ${{ env.registry }}/${{ env.environment }}/${{ env.project }}:0.0.${{ env.BUILD_NUMBER }}
+          docker push ${{ env.registry }}/${{ env.environment }}/${{ env.project }}:latest
+
+      - name: Definir Versão Anterior
+        run: |
+          previousVersion=$(docker images | grep ${{ env.registry }}/${{ env.namespace }}/${{ env.project }} | awk 'NR==2{print $2}')
+          echo "previousVersion=${previousVersion:-undefined}" >> $GITHUB_ENV
+
+      #- name: Remover Imagem Docker Antiga
+        #shell: bash
+        #run: |
+          #if [ "${{ env.previousVersion }}" != "undefined" ]; then
+            #docker rmi ${{ env.registry }}/${{ env.namespace }}/${{ env.project }}:${{ env.previousVersion }} -f || true
+          #else
+            #echo "Nenhuma versão anterior encontrada para remover."
+
+      - name: Instalar CLI do Veracode e Autopack-Veracode
+        run: |
+          curl -fsS https://tools.veracode.com/veracode-cli/install | sh
+          #export PATH="./veracode:$PATH"
+          mkdir -p ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+          ./veracode package --source . --output ${{ github.workspace }}/artifacts/${{ inputs.build-id }} --trust
+          mv ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/*.zip ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip
+
+      - name: Publicar Artefato para Análise
+        uses: actions/upload-artifact@v3
+        with:
+          name: analysisPack
+          path: ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip

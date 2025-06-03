@@ -1,0 +1,181 @@
+name: Deploy Kafka Conector Confluent v1
+
+on:
+  workflow_call:
+    inputs:
+      # Variaveis que os projetos podem sobrescrever
+      environment:
+        description: 'Ambiente de execução do build'
+        required: true
+        type: string
+      project:
+        description: 'Nome do projeto'
+        required: true
+        type: string
+     
+env:
+  REGISTRY: sa-saopaulo-1.ocir.io/grxpv7i9yybu
+  VERSION: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+
+jobs:
+
+  Build:
+     name: Build
+     runs-on: self-hosted
+     outputs:
+      TEMPLATE_ID: ${{ steps.template_export.outputs.TEMPLATE_ID }}
+     steps:
+
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Generate GitHub App JWT Token
+          id: generate_jwt
+          env:
+            APP_ID: "1039452"  
+            PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+          run: |
+            # Instalação do openssl e dependências
+            # sudo apt-get update && sudo apt-get install -y jq openssl
+  
+            # Gerando o token JWT
+            header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            unsigned_token="$header.$payload"
+            signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            jwt="$unsigned_token.$signature"
+  
+            echo "JWT=$jwt" >> $GITHUB_OUTPUT
+
+        - name: Get Installation Access Token
+          id: get_install_token
+          env:
+            JWT: "${{ steps.generate_jwt.outputs.JWT }}"
+          run: |
+            response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+            token=$(echo "$response" | jq -r '.token')
+            echo "INSTALLATION_TOKEN=$token" >> "$GITHUB_OUTPUT"
+        
+        - name: Clone Template Repository
+          run: |
+            git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+
+        - name: Load Variables
+          id: load-variables
+          run: |
+
+            echo "OKE_DEV_HOM_CLUSTER_HOST=$(yq '.OKE_DEV_HOM_CLUSTER_HOST' template_repo/vars.yml)" >> "$GITHUB_OUTPUT"
+            echo "OKE_PROD_KAFKA_CLUSTER_HOST=$(yq '.OKE_PROD_KAFKA_CLUSTER_HOST' template_repo/vars.yml)" >> "$GITHUB_OUTPUT"
+
+
+        - name: Configure Cluster NonProd
+          if: ${{ inputs.environment == 'dev' || inputs.environment == 'hom'}}
+          run: |
+            kubectl config set-cluster context-csdszlbgqyt --server=${{ steps.load-variables.outputs.OKE_DEV_HOM_CLUSTER_HOST }} --insecure-skip-tls-verify=true
+            kubectl config set-credentials oke-admin --token=${{ secrets.OCI_OKE_TOKEN_DEV_HOM }}
+            kubectl config set-context context-csdszlbgqyt --cluster=context-csdszlbgqyt --user=jenkins-sa
+            kubectl config use-context context-csdszlbgqyt
+            kubectl config set-context --current --user=oke-admin
+
+        - name: Configure Cluster Prod
+          if: ${{ inputs.environment == 'prod'}}
+          run: |
+            kubectl config set-cluster context-csdszlbgqyt --server=${{ steps.load-variables.outputs.OKE_PROD_KAFKA_CLUSTER_HOST }} --insecure-skip-tls-verify=true
+            kubectl config set-credentials oke-admin --token=${{ secrets.OCI_OKE_KAFKA_TOKEN_PROD }}
+            kubectl config set-context context-csdszlbgqyt --cluster=context-csdszlbgqyt --user=jenkins-sa
+            kubectl config use-context context-csdszlbgqyt
+            kubectl config set-context --current --user=oke-admin
+
+        - name: Generate Templates
+          run: |
+            bash ./connector/config/${{ inputs.environment }}/deploy.sh ${{ inputs.project }} ${{ inputs.environment }} template
+
+        - name: Upload Templates
+          uses: actions/upload-artifact@v4
+          id: template_upload
+          with:
+            name: ${{ inputs.project }}
+            path: |
+              connector/config/${{ inputs.environment }}/*.tfvars
+            retention-days: 1
+            overwrite: true
+            include-hidden-files: true
+
+
+        - name: Export Templates Id
+          id: template_export
+          run: |
+             echo "TEMPLATE_ID=${{ steps.template_upload.outputs.artifact-id }}" >> "$GITHUB_OUTPUT"
+            
+  
+  Deploy:
+    name: Deploy
+    runs-on: ubuntu-24.04
+    needs: Build
+    env:
+      TEMPLATE_ID: ${{ needs.Build.outputs.TEMPLATE_ID }}
+    steps:
+
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Generate GitHub App JWT Token
+          id: generate_jwt
+          env:
+            APP_ID: "1039452"  
+            PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+          run: |
+            # Instalação do openssl e dependências
+            # sudo apt-get update && sudo apt-get install -y jq openssl
+  
+            # Gerando o token JWT
+            header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            unsigned_token="$header.$payload"
+            signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            jwt="$unsigned_token.$signature"
+  
+            echo "JWT=$jwt" >> $GITHUB_OUTPUT
+
+        - name: Get Installation Access Token
+          id: get_install_token
+          env:
+            JWT: "${{ steps.generate_jwt.outputs.JWT }}"
+          run: |
+            response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+            token=$(echo "$response" | jq -r '.token')
+            echo "INSTALLATION_TOKEN=$token" >> "$GITHUB_OUTPUT"
+        
+        - name: Clone Template Repository
+          run: |
+            git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+
+    
+        - name: Download Templates
+          uses: actions/download-artifact@v4
+          with:
+            name: ${{ inputs.project }}
+
+        - name: Configure Terraform
+          uses: hashicorp/setup-terraform@v3
+          with:
+            terraform_version: "1.9.3"
+
+        # - name: UnDeploy 
+        #   run: |
+        #     bash ./connector/config/${{ inputs.environment }}/undeploy.sh ${{ inputs.project }} ${{ inputs.environment }}
+
+        - name: Deploy 
+          run: |
+            bash ./connector/config/${{ inputs.environment }}/deploy.sh ${{ inputs.project }} ${{ inputs.environment }} deploy
+
+        - name: Delete Template
+          uses: actions/github-script@v7
+          with:
+            script: |
+              github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: ${{ env.TEMPLATE_ID }}
+              });
+

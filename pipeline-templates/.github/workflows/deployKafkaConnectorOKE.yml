@@ -1,0 +1,268 @@
+name: Deploy Java OKE
+env:
+  registry: sa-saopaulo-1.ocir.io/grxpv7i9yybu
+  version: 2.0.${{ github.run_number }}
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      project:
+        required: true
+        type: string
+      dockerfile:
+        required: false
+        type: string
+      buildArgs:
+        required: false
+        type: string
+      copyPreBuildDir:
+        required: false
+        type: string
+      copyBuildDir:
+        required: false
+        type: string
+     
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App JWT Token
+        id: generate_jwt
+        env:
+          APP_ID: "1039452"  
+          PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+        run: |
+         
+          header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          unsigned_token="$header.$payload"
+          signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          jwt="$unsigned_token.$signature"
+
+          echo "JWT=$jwt" >> $GITHUB_ENV
+      - name: Get Installation Access Token
+        id: get_install_token
+        env:
+          JWT: "${{ env.JWT }}"
+        run: |
+          response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+          token=$(echo "$response" | jq -r '.token')
+          echo "INSTALLATION_TOKEN=$token" >> $GITHUB_ENV
+      
+      - name: Checkout code with submodules
+        uses: actions/checkout@v3
+        with:
+          token: ${{ env.INSTALLATION_TOKEN }}
+          submodules: true
+          fetch-depth: 0
+          
+      - name: get inputs
+        run: |
+          
+          echo "REPLICAS=$(yq '.REPLICAS' inputs.yml)" >> $GITHUB_ENV
+          echo "SKIP_BUILD=$(yq '.SKIP_BUILD' inputs.yml)" >> $GITHUB_ENV
+          echo "CONFIGMAP_DEPLOY=$(yq '.CONFIGMAP_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+          echo "SECRETS_DEPLOY=$(yq '.SECRETS_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+
+     
+ 
+      - name: Force Load environment variables
+        run: |
+          echo "Loading environment variables from .env file"
+          source $GITHUB_ENV
+        
+
+      - name: Include Submodules
+        run: |
+          git submodule init
+      - name: Clone Template Repository
+              
+        run: |
+          git clone --depth 1 https://x-access-token:${{ env.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+
+      - name: Verificar existência de pre_build_copy
+        run: |
+          if [ -f "pre_build_copy" ]; then
+            echo "prebuild=true" >> $GITHUB_ENV
+          else
+            echo "prebuild=false" >> $GITHUB_ENV
+          fi
+
+      - name: Construindo PreBuildDir
+        if: env.prebuild == 'true'
+        run: |
+          DOCKERFILE="template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile"
+          PREBUILD_CONTENT=$(cat pre_build_copy)
+          echo "$PREBUILD_CONTENT" > temp_prebuild.txt
+          sed -i "s|#PREBUILD_COPY#|$(printf '%s' "$PREBUILD_CONTENT" | sed 's/[&/\]/\\&/g' | sed ':a;N;$!ba;s/\n/\\n/g')|g" "$DOCKERFILE"
+          cat template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile
+
+      - name: Verificar existência de build_copy
+        run: |
+          if [ -f "build_copy" ]; then
+            echo "build=true" >> $GITHUB_ENV
+          else
+            echo "build=false" >> $GITHUB_ENV
+          fi
+
+      - name: Construindo BuildDir
+        if: env.build == 'true'
+        run: |
+          DOCKERFILE="template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile"
+          BUILD_CONTENT=$(cat build_copy)
+          echo "$BUILD_CONTENT" > temp_build.txt
+          sed -i "s|#BUILD_COPY#|$(printf '%s' "$BUILD_CONTENT" | sed 's/[&/\]/\\&/g' | sed ':a;N;$!ba;s/\n/\\n/g')|g" "$DOCKERFILE"
+          cat template_repo/dockerfiles/${{ inputs.dockerfile }}/Dockerfile
+
+      - name: Login to Oracle Container Registry
+        run: echo "${{ secrets.OCI_PASSWORD }}" | docker login ${{ env.registry }} --username ${{ secrets.OCI_USERNAME }} --password-stdin    
+        
+      - name: Build Image
+        if: env.SKIP_BUILD == 'false'
+        run: |
+         if [[ "${{ inputs.environment }}" == "prod" || "${{ inputs.environment }}" == "hom" ]]; then
+            dockerfilePath=${{ inputs.dockerfile }}
+         if [[ -z "${{ inputs.dockerfile }}" ]]; then
+              echo "Erro: Para o ambiente '${{ inputs.environment }}', é obrigatório especificar o Dockerfile corporativo."
+              exit 1
+         fi
+         elif [[ "${{ inputs.environment }}" == "dev" ]]; then
+           
+            dockerfilePath=${{ inputs.dockerfile }}
+         else
+           
+            echo "Ambiente não especificado. Usando Dockerfile padrão no caminho 'Dockerfile'."
+            
+         fi
+          
+          buildCmd="docker build -t ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }} --build-arg ENVIRONMENT=${{ inputs.environment }} --build-arg TNSADMIN=/usr/lib/oracle/18.3/client64/lib/network/admin"
+
+          if [ -n "${{ inputs.buildArgs }}" ]; then
+            echo "BuildArgs definidos. Adicionando ao comando de build."
+            buildCmd+=" --build-arg BUILD_ARGS=${{ inputs.buildArgs }}"
+          else
+            echo "buildArgs não definidos. Executando build sem buildArgs adicionais."
+          fi
+          
+          # Verificar se dockerArgs estão definidos e adicioná-los ao comando
+          if [ -n "${{ inputs.dockerArgs }}" ]; then
+            echo "DockerArgs definidos. Adicionando ao comando de build."
+            IFS=',' read -ra argsArray <<< "${{ inputs.dockerArgs }}"
+            for arg in "${argsArray[@]}"; do
+              buildCmd+=" --build-arg $arg"
+            done
+          else
+            echo "dockerArgs não definidos. Executando build sem dockerArgs adicionais."
+          fi
+          
+          # Completar o comando com o caminho do Dockerfile e executar
+          if [[ -n "${{ inputs.dockerfile }}" ]]; then
+            buildCmd+=" -f template_repo/dockerfiles/${dockerfilePath}/Dockerfile ."
+          else
+            buildCmd+=" -f Dockerfile ."
+          fi
+          echo "Executando comando: $buildCmd"
+          eval "$buildCmd"
+          
+          # Tag para 'latest'
+          docker tag ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }} ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+      
+      - name: Push Docker image with version tag
+        if: env.SKIP_BUILD == 'false'
+        run: docker push ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.version }}
+      - name: Push Docker image with latest tag
+        if: env.SKIP_BUILD == 'false'
+        run: docker push ${{ env.registry }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+
+      
+  Change_Envs_Apply_in_Cluster:
+     name: Change Envs & Apply in Cluster
+     runs-on: self-hosted
+     needs: Build
+     steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+        - name: Generate GitHub App JWT Token
+          id: generate_jwt
+          env:
+            APP_ID: "1039452"  
+            PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+          run: |
+            # Instalação do openssl e dependências
+            # sudo apt-get update && sudo apt-get install -y jq openssl
+  
+            # Gerando o token JWT
+            header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            unsigned_token="$header.$payload"
+            signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+            jwt="$unsigned_token.$signature"
+  
+            echo "JWT=$jwt" >> $GITHUB_ENV
+        - name: Get Installation Access Token
+          id: get_install_token
+          env:
+            JWT: "${{ env.JWT }}"
+          run: |
+            response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+            token=$(echo "$response" | jq -r '.token')
+            echo "INSTALLATION_TOKEN=$token" >> $GITHUB_ENV
+        - name: Clone Template Repository
+              
+          run: |
+            git clone --depth 1 https://x-access-token:${{ env.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo
+
+        - name: get inputs
+          run: |
+            echo "REPLICAS=$(yq '.REPLICAS' inputs.yml)" >> $GITHUB_ENV
+            echo "SKIP_BUILD=$(yq '.SKIP_BUILD' inputs.yml)" >> $GITHUB_ENV
+            echo "CONFIGMAP_DEPLOY=$(yq '.CONFIGMAP_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+            echo "SECRETS_DEPLOY=$(yq '.SECRETS_DEPLOY' inputs.yml)" >> $GITHUB_ENV
+
+
+        - name: Seds Apllication And Envs
+          env:
+            version: 2.0.${{ github.run_number }}
+          run: |
+            sed -i 's/#APPLICATION_NAME#/${{ inputs.project }}/g' oci/kubernetes.yml
+            sed -i 's/#APPLICATION_IMAGE_NAME#/${{ inputs.project }}/g' oci/kubernetes.yml
+            sed -i 's/#ENV#/${{ inputs.environment }}/g' oci/kubernetes.yml
+            sed -i 's/#REPLICAS#/${{ env.REPLICAS }}/g' oci/kubernetes.yml
+            sed -i 's/#APP_VERSION#/${{ env.version }}/g' oci/kubernetes.yml
+            sed -i 's|#REGISTRY#|${{ env.registry }}|g' oci/kubernetes.yml
+            cat oci/kubernetes.yml
+  
+        - name: Apply Config Map
+          if: ${{ env.CONFIGMAP_DEPLOY == 'true' }}
+          run: kubectl apply -f oci/configmap-${{ inputs.environment }}.yml
+
+        - name: Apply Secrets
+          if: ${{ env.SECRETS_DEPLOY =='true' }}
+          run: kubectl apply -f oci/secrets-${{ inputs.environment }}.yml
+
+        - name: Apply in Cluster PROD 
+          if: env.SKIP_BUILD == 'false' && inputs.environment == 'prod'
+          run: |
+            > $HOME/.kube/config
+            kubectl config set-cluster context-csdszlbgqyt --server=https://10.60.156.190:6443 --insecure-skip-tls-verify=true
+            kubectl config set-credentials jenkins-sa --token=${{ secrets.OCI_OKE_TOKEN_PROD }}
+            kubectl config set-context context-csdszlbgqyt --cluster=context-csdszlbgqyt --user=jenkins-sa
+            kubectl config use-context context-csdszlbgqyt
+            kubectl get namespaces
+            kubectl apply -f oci/kubernetes.yml
+            
+        - name: Apply in Cluster NonPROD
+          if: env.SKIP_BUILD == 'false' && inputs.environment != 'prod'
+          run: |
+            > $HOME/.kube/config
+            kubectl config set-cluster context-csdszlbgqyt --server=https://10.60.142.72:6443 --insecure-skip-tls-verify=true
+            kubectl config set-context --cluster=context-csdszlbgqyt context-csdszlbgqyt
+            kubectl config set-credentials oke-admin --token=${{ secrets.OCI_OKE_TOKEN }} --context=context-csdszlbgqyt
+            kubectl config use-context context-csdszlbgqyt
+            kubectl config set-context --current --user=oke-admin
+            cat oci/kubernetes.yml
+            kubectl apply -f oci/kubernetes.yml

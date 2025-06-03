@@ -1,0 +1,190 @@
+#Para instrução de uso
+ #INcluir esses itens no projeto\.github\workflows\ambiente.yml
+#veracode:
+    #uses: embracon-br/pipeline-templates/.github/workflows/veracode-template-temp2.yml@main
+    #secrets: inherit
+    #with:
+      #build-id: ${{ github.run_id }}
+      #environment: dev ## ajustar de acordo com a app
+      #project_veracode: file-service ## nome da sua app 
+      
+name: Veracode Template
+
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        description: 'ID da build'
+        required: true
+        type: string
+
+     #testes com project name# #jose victor#
+      project_veracode:
+        description: 'Project'
+        required: true
+        type: string
+
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+
+jobs:
+  AutoPack:
+    name: AutoPack
+    runs-on:  ubuntu-latest
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4      
+        
+      - name: Instalar CLI do Veracode e Autopack-Veracode
+        run: |
+          curl -fsS https://tools.veracode.com/veracode-cli/install | sh
+          #export PATH="./veracode:$PATH"
+          mkdir -p ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+          ./veracode package --source . --output ${{ github.workspace }}/artifacts/${{ inputs.build-id }} --trust
+            find ${{ github.workspace }}/artifacts/${{ inputs.build-id }} -name "*.zip" | while read filename; do unzip -o -d "`dirname "$filename"`" "$filename"; done;
+            rm -rf ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/*.zip
+            zip analysisPack.zip -r ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+            mv analysisPack.zip ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/
+            ls -la ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+          ## zip -j ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/*.zip
+    
+      - name: Publicar Artefato para Análise
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysisPack
+          path: ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip  
+    
+      
+      
+  SCA:
+    name: SCA
+    runs-on: ubuntu-latest
+
+    steps:
+       - uses: actions/checkout@v3
+
+       - name: Executar Veracode SCA
+         continue-on-error: true
+         env:
+          SRCCLR_API_TOKEN: ${{ secrets.SCA }}
+         run: |
+          curl -sSL https://download.sourceclear.com/ci.sh | bash -s – scan --update-advisor --allow-dirty
+
+  Scan:
+    name: Scan
+    runs-on: ubuntu-latest
+    needs: AutoPack
+    
+    steps:
+    
+      - name: Baixar Artefato para Análise
+        uses: actions/download-artifact@v4
+        with:
+          name: analysisPack
+      
+      - name: Baixar Veracode Pipeline Scanner
+        run: curl -O -L https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
+
+      - name: Extrair Veracode Pipeline Scanner
+        run: unzip pipeline-scan-LATEST.zip -d ${{ github.workspace }}/scanner
+
+      #- name: Listar arquivos
+      #  run: ls -la ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+  
+
+      #- name: Ajustar permissões do arquivo
+      #  run: chmod 644 ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip  
+
+      - name: Executar Veracode Pipeline Scan
+        id: pipeline_scan
+        continue-on-error: true
+        env:
+          VID: ${{ secrets.APIID_VERACODE }}
+          VKEY: ${{ secrets.APIKEY_VERACODE }}
+        run: |
+          java -jar ${{ github.workspace }}/scanner/pipeline-scan.jar \
+            -vid $VID -vkey $VKEY \
+            --file analysisPack.zip --issue_details true --fail_on_severity="Very High, High"
+           
+            
+            
+            
+      #- name: Check de vulnerabilidades
+        #if: ${{steps.pipeline_scan.outcome=='failure'}}
+        #run: |
+          #echo "::warning ::O seu código será entregue, porém existem vulnerabilidades de segurança que devem ser corrigidas!!! Saiba mais: https://web.analysiscenter.veracode.com/login"     
+
+  Sast:
+    name: Sast
+    runs-on: ubuntu-latest
+    needs: AutoPack
+    steps:
+      - name: Baixar Artefato para Análise SAST
+        uses: actions/download-artifact@v4
+        with:
+          name: analysisPack
+
+      - name: Baixar Veracode SAST Wrapper
+        run: |
+          curl -O -L https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/24.7.14.0/vosp-api-wrappers-java-24.7.14.0.jar
+
+      - name: Project Name Substitution
+        id: project-name-sub
+        run: |
+
+          # Caso projeto nao esteja no map utilizar o nome que está vindo por default
+          echo "project_veracode_sub=${{ inputs.project_veracode }}" >> "$GITHUB_OUTPUT"
+
+          
+          # Criar o mapemento de nome dos projetos conforme abaixo
+          declare -A PROJECT_MAP
+          PROJECT_MAP["nomeprojetozuado"]="novonomeprojeto"
+          PROJECT_MAP["nomeprojetozuado02"]="novonomeprojeto02"
+
+          # Setar o nome do projeto
+          if [[ ${PROJECT_MAP[${{ inputs.project_veracode }}]} != "" && ${PROJECT_MAP[${{ inputs.project_veracode }}]} != null ]]; then
+            echo "Definindo novo nome projeto de ${{ inputs.project_veracode }} para ${PROJECT_MAP[${{ inputs.project_veracode }}]}"
+            echo "project_veracode_sub=${PROJECT_MAP[${{ inputs.project_veracode }}]}" >> "$GITHUB_OUTPUT"
+          fi
+         
+          
+      - name: Read Project Name Substitution
+        run: |
+
+          echo "${{ steps.project-name-sub.outputs.project_veracode_sub}}"
+
+            
+      - name: Executar Veracode SAST
+        continue-on-error: true
+        env:
+          VID: ${{ secrets.APIID_VERACODE }}
+          VKEY: ${{ secrets.APIKEY_VERACODE }}
+          ENVIRONMENT: ${{ inputs.environment }}  # Variável carregada do arquivo
+        run: |
+
+          if [ "$ENVIRONMENT" == "prod" ]; then
+            java -jar vosp-api-wrappers-java-24.7.14.0.jar \
+              -vid $VID -vkey $VKEY \
+              -action uploadandscan \
+              -appname "${{ steps.project-name-sub.outputs.project_veracode_sub }}" \
+              -version "${{ inputs.build-id }}" \
+              -filepath analysisPack.zip \
+              -createprofile true \
+              -deleteincompletescan 2 \
+              -createsandbox false
+          else
+            java -jar vosp-api-wrappers-java-24.7.14.0.jar \
+              -vid $VID -vkey $VKEY \
+              -action uploadandscan \
+              -appname "${{ steps.project-name-sub.outputs.project_veracode_sub }}" \
+              -version "${{ inputs.build-id }}" \
+              -filepath analysisPack.zip \
+              -createprofile true \
+              -deleteincompletescan 2 \
+              -createsandbox true \
+              -sandboxname "$ENVIRONMENT"
+          fi
+

@@ -1,0 +1,149 @@
+name: Deploy Node Azure WebApp Oficial
+
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        description: 'ID da build'
+        required: false
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+      namespace:
+        description: 'Namespace'
+        required: true
+        type: string
+      project:
+        description: 'Project'
+        required: true
+        type: string
+      dockerFile:
+        description: 'Imagem docker corporativa'
+        required: false
+        type: string 
+      registry:
+        description: 'Registry'
+        required: false
+        type: string
+      veracode_policy_name:
+        description: 'Nome da policy do Veracode'
+        required: false
+        type: string
+        default: 'Embracon-Corporativa'
+
+
+env:
+  REGISTRY: azrsrvpcrg01.azurecr.io
+  BUILD_NUMBER: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+
+jobs:
+  Veracode:
+    name: Veracode
+    uses: embracon-br/pipeline-templates/.github/workflows/veracode-template-oficial-v1.yml@main
+    secrets: inherit
+    with:
+      build-id: ${{ github.run_id }}.${{ github.run_number }}.${{ github.run_attempt }}
+      environment: ${{ inputs.environment }}
+      project_veracode: ${{ inputs.project }}
+      veracode_policy_name: ${{ inputs.veracode_policy_name }}
+
+  Build_And_Push_Registry:
+    name: Build and Push to Registry
+    runs-on: ubuntu-24.04
+    needs: Veracode
+    steps:
+      - name: Generate GitHub App JWT Token
+        id: generate_jwt
+        env:
+          APP_ID: "1039452"  
+          PRIVATE_KEY: "${{ secrets.ORG_APP_PEM }}"
+        run: |
+         
+          header=$(echo -n '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          payload=$(echo -n "{\"iat\":$(date +%s),\"exp\":$(( $(date +%s) + 600 )),\"iss\":$APP_ID}" | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          unsigned_token="$header.$payload"
+          signature=$(echo -n "$unsigned_token" | openssl dgst -sha256 -sign <(echo "$PRIVATE_KEY") | openssl base64 -A | tr -d '=' | tr '/+' '_-')
+          jwt="$unsigned_token.$signature"
+
+          echo "JWT=$jwt" >> $GITHUB_OUTPUT
+
+      - name: Get Installation Access Token
+        id: get_install_token
+        env:
+          JWT: "${{ steps.generate_jwt.outputs.JWT }}"
+        run: |
+          response=$(curl -s -X POST -H "Authorization: Bearer $JWT" -H "Accept: application/vnd.github.v3+json" https://api.github.com/app/installations/56507526/access_tokens)
+          token=$(echo "$response" | jq -r '.token')
+          echo "INSTALLATION_TOKEN=$token" >> $GITHUB_OUTPUT
+        
+      - name: Checkout code with submodules
+        uses: actions/checkout@v3
+        with:
+          token: ${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}
+          submodules: true
+   
+      - name: Force Load environment variables
+        run: |
+          echo "Loading environment variables from .env file"
+          source $GITHUB_ENV
+        
+      - name: Include Submodules
+        run: |
+          git submodule init
+  
+      - name: Clone Template Repository  
+        run: |
+          git clone --depth 1 https://x-access-token:${{ steps.get_install_token.outputs.INSTALLATION_TOKEN }}@github.com/embracon-br/pipeline-templates.git template_repo          
+
+      # - name: Set Build Image
+      #   run: |
+      #     if [[ "${{ inputs.environment }}" == "prod" || "${{ inputs.environment }}" == "hom" ]]; then
+      #       dockerfilePath=${{ inputs.dockerFile }}
+      #       if [[ -z "${{ inputs.dockerFile }}" ]]; then
+      #         echo "Erro: Para o ambiente '${{ inputs.environment }}', é obrigatório especificar o Dockerfile corporativo."
+      #         exit 1
+      #       fi
+      #       cp template_repo/dockerfiles/${dockerfilePath}/Dockerfile .
+      #     fi
+
+      #     if [[ "${{ inputs.environment }}" == "dev" ]]; then
+      #       dockerfilePath=${{ inputs.dockerFile }}
+      #       if [[ -n "${{ inputs.dockerFile }}" ]]; then
+      #           cp template_repo/dockerfiles/${dockerfilePath}/Dockerfile .
+      #       fi
+      #     fi
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.BUILD_NUMBER }} \
+            --build-arg ENVIRONMENT=${{ inputs.environment }} -f Dockerfile .
+          docker tag ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.BUILD_NUMBER }} \
+            ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+            
+      - name: Login no Azure Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.ACR_ENTRA_CLIENT_ID }}
+          password: ${{ secrets.ACR_ENTRA_SECRET }}
+
+      - name: Push Docker Image para o Registry
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:${{ env.BUILD_NUMBER }}
+          docker push ${{ env.REGISTRY }}/${{ inputs.environment }}/${{ inputs.project }}:latest
+
+    #   - name: Definir Versão Anterior
+    #     run: |
+    #       previousVersion=$(docker images | grep ${{ env.REGISTRY }}/${{ inputs.namespace }}/${{ inputs.project }} | awk 'NR==2{print $2}')
+    #       echo "previousVersion=${previousVersion:-undefined}" >> $GITHUB_ENV
+
+      #- name: Remover Imagem Docker Antiga
+        #shell: bash
+        #run: |
+          #if [ "${{ env.previousVersion }}" != "undefined" ]; then
+            #docker rmi ${{ env.registry }}/${{ env.namespace }}/${{ inputs.project }}:${{ env.previousVersion }} -f || true
+          #else
+            #echo "Nenhuma versão anterior encontrada para remover."
+  

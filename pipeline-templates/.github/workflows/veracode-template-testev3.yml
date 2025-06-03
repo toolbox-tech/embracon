@@ -1,0 +1,297 @@
+name: Veracode Template
+
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        description: 'ID da build'
+        required: true
+        type: string
+      project_veracode:
+        description: 'Project'
+        required: true
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+
+env:
+  project: ${{ inputs.project_veracode }}
+  environment: ${{ inputs.environment }}
+
+jobs:
+  autopack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      # Detecta se o projeto utiliza Maven ou Gradle.
+      # Se existir o arquivo de build no diretório específico, define esse caminho.
+      - name: Detectar Ferramenta de Build
+        id: detect_build
+        run: |
+          if [ -f "pom.xml" ]; then
+            echo "build_tool=maven" >> $GITHUB_ENV
+          elif [ -f "webatendimento-embracon-autoatendimento-salesforce-lib/build.gradle" ]; then
+            echo "build_tool=gradle" >> $GITHUB_ENV
+            echo "GRADLE_PATH=webatendimento-embracon-autoatendimento-salesforce-lib/build.gradle" >> $GITHUB_ENV 
+          elif [ -f "build.gradle" ] || [ -f "gradlew" ]; then 
+            echo "build_tool=gradle" >> $GITHUB_ENV
+          else
+            echo "Nenhum arquivo de build encontrado (pom.xml ou build.gradle*). Abortando."
+            exit 1
+          fi
+
+      # Desabilita a limpeza automática do cache do Gradle para evitar execução duplicada
+      - name: Disable Gradle Cleanup
+        if: env.build_tool == 'gradle'
+        run: echo "GRADLE_BUILD_ACTION_CACHE_CLEANUP=false" >> $GITHUB_ENV
+
+      # Configura o JDK (independente da ferramenta de build)
+      - name: Configurar JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # Build para projetos Maven
+      - name: Detectar versão do Java no pom.xml
+        if: env.java_maven == 'true'
+        id: detect_java
+        run: |
+          # Tenta extrair o valor de <maven.compiler.source> do pom.xml
+          JAVA_VERSION=$(grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" pom.xml || echo "11")
+          echo "Versão do Java detectada: $JAVA_VERSION"
+          echo "java_version=$JAVA_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Configurar JDK e Maven
+        if: env.java_maven == 'true'
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ steps.detect_java.outputs.java_version }}
+          distribution: 'temurin'
+          cache: maven
+          
+      - name: Compilar Projeto Maven
+        if: env.java_maven == 'true'
+        run: mvn clean package
+
+      # Para projetos Gradle, detectar automaticamente a versão do Gradle a partir do gradle-wrapper.properties
+      - name: Detectar versão do Gradle
+        if: env.build_tool == 'gradle'
+        id: detect_gradle_version
+        run: |
+          if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
+            gradle_version=$(grep distributionUrl gradle/wrapper/gradle-wrapper.properties | sed -E 's/.*gradle-([^-]+)-.*/\1/')
+            echo "gradle_version=$gradle_version" >> $GITHUB_ENV
+            echo "Versão do Gradle detectada: $gradle_version"
+          else
+            echo "gradle_version=8.12.1" >> $GITHUB_ENV
+            echo "Arquivo gradle-wrapper.properties não encontrado. Usando Gradle 8.12.1 por padrão."
+          fi
+
+      # Ajustar a versão do JDK para builds Gradle, conforme a versão do Gradle detectada
+      - name: Ajustar JDK para Gradle
+        if: env.build_tool == 'gradle'
+        run: |
+          if [ "${{ env.gradle_version }}" = "5.5.1" ]; then
+            echo "Gradle 5.5.1 detectado, usando JDK 11 para compatibilidade."
+            echo "gradle_jdk=11" >> $GITHUB_ENV
+          else
+            echo "Usando JDK 17 para build Gradle."
+            echo "gradle_jdk=17" >> $GITHUB_ENV
+          fi
+
+      # Configurar o JDK para projetos Gradle, usando a variável ajustada
+      - name: Configurar JDK para Gradle
+        if: env.build_tool == 'gradle'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.gradle_jdk }}
+          distribution: 'temurin'
+
+      # Setup do Gradle utilizando a versão detectada
+      - name: Setup Gradle
+        if: env.build_tool == 'gradle' && env.gradle_setup_done != 'true'
+        uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582
+        with:
+          gradle-version: ${{ env.gradle_version }}
+      - run: echo "gradle_setup_done=true" >> $GITHUB_ENV
+
+      # Build para projetos Gradle
+      - name: Build com Gradle
+        if: env.build_tool == 'gradle'
+        run: |
+          # Se a variável GRADLE_PATH estiver definida, entra no diretório específico
+          if [ -n "${GRADLE_PATH}" ]; then
+            cd $GRADLE_PATH
+            echo "Entrou no diretório: $(pwd)"
+          fi
+          if [ -f "./gradlew" ]; then
+            chmod +x gradlew
+            ./gradlew clean build
+          else
+            gradle clean build
+          fi
+
+      # Instalar CLI do Veracode e empacotar artefatos para análise
+      - name: Instalar CLI do Veracode e Autopack-Veracode
+        run: |
+          mkdir -p ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+
+          # Procura por arquivos WAR, JAR ou ZIP na pasta target ou para projetos Gradle, procurar na pasta build/libs
+          if [ "${{ env.build_tool }}" = "gradle" ]; then
+            WAR_FILE=$(find build/libs/ -maxdepth 1 -name "*.war" | head -n 1)
+            JAR_FILE=$(find build/libs/ -maxdepth 1 -name "*.jar" | head -n 1)
+          else
+            # Para projetos Maven, procurar na pasta target
+            WAR_FILE=$(find target/ -maxdepth 1 -name "*.war" | head -n 1)
+            JAR_FILE=$(find target/ -maxdepth 1 -name "*.jar" | head -n 1)
+          fi
+
+          if [ -f "$WAR_FILE" ]; then
+            echo "WAR encontrado: $WAR_FILE"
+            cp "$WAR_FILE" ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/application.war
+          elif [ -f "$JAR_FILE" ]; then
+            echo "JAR encontrado: $JAR_FILE"
+            cp "$JAR_FILE" ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/application.jar
+          else
+            echo "Nenhum WAR, JAR ou ZIP encontrado. Rodando Autopack..."
+            curl -fsS https://tools.veracode.com/veracode-cli/install | sh
+            ./veracode package --source . --output ${{ github.workspace }}/artifacts/${{ inputs.build-id }} --trust
+
+            find ${{ github.workspace }}/artifacts/${{ inputs.build-id }} -name "*.zip" |
+            while read filename; do unzip -o -d "$(dirname "$filename")" "$filename"; done
+
+            rm -rf ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/*.zip
+            zip analysisPack.zip -r ${{ github.workspace }}/artifacts/${{ inputs.build-id }}
+            mv analysisPack.zip ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip
+          fi
+
+      - name: Publicar Artefato para Análise
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysisPack
+          path: |
+            ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/analysisPack.zip
+            ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/application.jar
+            ${{ github.workspace }}/artifacts/${{ inputs.build-id }}/application.war
+          retention-days: 1
+
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Executar Veracode SCA
+        continue-on-error: true
+        env:
+          SRCCLR_API_TOKEN: ${{ secrets.SCA }}
+        run: |
+          curl -sSL https://download.sourceclear.com/ci.sh | bash -s – scan --update-advisor --allow-dirty
+
+  pipeline_scan:
+    runs-on: ubuntu-latest
+    needs: autopack
+    steps:
+      - name: Baixar Artefato para Análise
+        uses: actions/download-artifact@v4
+        with:
+          name: analysisPack
+
+      - name: Baixar Veracode Pipeline Scanner
+        run: curl -O -L https://downloads.veracode.com/securityscan/pipeline-scan-LATEST.zip
+
+      - name: Extrair Veracode Pipeline Scanner
+        run: unzip pipeline-scan-LATEST.zip -d ${{ github.workspace }}/scanner
+
+      - name: Executar Veracode Pipeline Scan
+        id: pipeline_scan
+        env:
+          VID: ${{ secrets.APIID_VERACODE }}
+          VKEY: ${{ secrets.APIKEY_VERACODE }}
+        run: |
+          # Procura pelo arquivo WAR
+          WAR_FILE=$(find . -name "*.war" | head -n 1)
+          # Procura pelo arquivo JAR (excluindo o pipeline-scan.jar)
+          JAR_FILE=$(find . -name "*.jar" -not -name "pipeline-scan.jar" | head -n 1)
+          
+          if [ -f "$WAR_FILE" ]; then
+            echo "Aplicação WAR detectada. Usando arquivo: $WAR_FILE"
+            java -jar ${{ github.workspace }}/scanner/pipeline-scan.jar \
+              -vid $VID -vkey $VKEY \
+              --file "$WAR_FILE" --issue_details true --fail_on_severity="Very High, High"
+          elif [ -f "$JAR_FILE" ]; then
+            echo "Java build detectado. Usando arquivo: $JAR_FILE"
+            java -jar ${{ github.workspace }}/scanner/pipeline-scan.jar \
+              -vid $VID -vkey $VKEY \
+              --file "$JAR_FILE" --issue_details true --fail_on_severity="Very High, High"
+          else
+            echo "Nenhum WAR ou JAR encontrado. Usando analysisPack.zip."
+            java -jar ${{ github.workspace }}/scanner/pipeline-scan.jar \
+              -vid $VID -vkey $VKEY \
+              --file analysisPack.zip --issue_details true --fail_on_severity="Very High, High"
+          fi
+
+  sast:
+    runs-on: ubuntu-latest
+    needs: autopack
+    steps:
+      - name: Baixar Artefato para Análise SAST
+        uses: actions/download-artifact@v4
+        with:
+          name: analysisPack
+
+      - name: Baixar Veracode SAST Wrapper
+        run: |
+          curl -O -L https://repo1.maven.org/maven2/com/veracode/vosp/api/wrappers/vosp-api-wrappers-java/24.7.14.0/vosp-api-wrappers-java-24.7.14.0.jar
+
+      - name: Executar Veracode SAST
+        env:
+          VID: ${{ secrets.APIID_VERACODE }}
+          VKEY: ${{ secrets.APIKEY_VERACODE }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          # Verifica se existe um WAR
+          WAR_FILE=$(find . -maxdepth 2 -name "*.war" | head -n 1)
+          if [ -f "$WAR_FILE" ]; then
+            echo "Aplicação WAR detectada. Usando arquivo: $WAR_FILE"
+            ARTIFACT="$WAR_FILE"
+          else
+            # Se não houver WAR, procura por um JAR (excluindo o vosp-api-wrappers)
+            JAR_FILE=$(find . -maxdepth 2 -name "*.jar" -not -name "vosp-api-wrappers*.jar" | head -n 1)
+            if [ -f "$JAR_FILE" ]; then
+              echo "Java build detectado. Usando arquivo: $JAR_FILE"
+              ARTIFACT="$JAR_FILE"
+            else
+              echo "Nenhum WAR ou JAR encontrado. Usando analysisPack.zip."
+              ARTIFACT="analysisPack.zip"
+            fi
+          fi
+      
+          if [ "$ENVIRONMENT" == "prod" ]; then
+            echo "Executando SAST em ambiente de produção..."
+            java -jar vosp-api-wrappers-java-24.7.14.0.jar \
+              -vid $VID -vkey $VKEY \
+              -action uploadandscan \
+              -appname "${{ inputs.project_veracode }}" \
+              -version "${{ github.run_id }}" \
+              -filepath "$ARTIFACT" \
+              -createprofile true \
+              -deleteincompletescan 2 \
+              -createsandbox false
+          else
+            echo "Executando SAST em ambiente de sandbox..."
+            java -jar vosp-api-wrappers-java-24.7.14.0.jar \
+              -vid $VID -vkey $VKEY \
+              -action uploadandscan \
+              -appname "${{ inputs.project_veracode }}" \
+              -version "${{ github.run_id }}" \
+              -filepath "$ARTIFACT" \
+              -createprofile true \
+              -deleteincompletescan 2 \
+              -createsandbox true \
+              -sandboxname "$ENVIRONMENT"
+          fi

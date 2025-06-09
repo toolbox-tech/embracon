@@ -1,0 +1,33 @@
+# Conteúdo do arquivo: docker-standards/security/scan-policy.yml
+
+version: '1.0'
+
+policies:
+  - name: Vulnerability Scan
+    description: Verifica vulnerabilidades conhecidas nas imagens Docker.
+    severity_levels:
+      - critical
+      - high
+      - medium
+      - low
+    actions:
+      - action: alert
+        message: "Vulnerabilidades críticas encontradas. A imagem não pode ser aprovada."
+      - action: warn
+        message: "Vulnerabilidades de alta gravidade encontradas. Revisar antes da aprovação."
+
+  - name: Compliance Check
+    description: Verifica se a imagem está em conformidade com as políticas internas.
+    required_checks:
+      - base_image_check
+      - package_check
+    actions:
+      - action: alert
+        message: "Imagem não está em conformidade com as políticas internas."
+
+  - name: Size Check
+    description: Verifica o tamanho da imagem Docker.
+    max_size: 200MB
+    actions:
+      - action: warn
+        message: "A imagem excede o tamanho máximo recomendado."

@@ -35,7 +35,7 @@ jobs:
     steps:
       - name: checkout repo
         uses: actions/checkout@v4
-      
+
       # get the compiled binary from a previous job
       - name: get archive
         uses: actions/download-artifact@v4

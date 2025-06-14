@@ -20,8 +20,8 @@ jobs:
     with:
       gitleaks-version: 'latest'
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Only required for Organizations, not personal accounts.
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Only required for Organizations, not personal accounts.
   build:
     runs-on: ubuntu-latest
 

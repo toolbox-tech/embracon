@@ -1,18 +1,6 @@
 name: Node CI
 
-# on:
-#   pull_request:
-#     branches:
-#       - main
-#     paths:
-#       - 'app/nodejs/**'
-#   workflow_dispatch:
-#     inputs:
-#       gitleaks-version:
-#         description: 'Version of Gitleaks to use'
-#         required: false
-#         default: 'latest'
-on: [pull_request, push, workflow_dispatch]
+on: [pull_request, workflow_dispatch]
 
 jobs:
 

@@ -6,8 +6,22 @@ on:
       - main
     paths:
       - 'app/nodejs/**'
+  workflow_dispatch:
+    inputs:
+      gitleaks-version:
+        description: 'Version of Gitleaks to use'
+        required: false
+        default: 'latest'
 
 jobs:
+
+  test:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      gitleaks-version: 'latest'
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Only required for Organizations, not personal accounts.
   build:
     runs-on: ubuntu-latest
 
@@ -19,13 +33,9 @@ jobs:
       working-directory: app/nodejs  # Ensure you are in the right directory
       run: npm install
 
-    - name: Executar o GitLeaks com Docker
-      run: docker run -v ${{ github.workspace }}:/path ghcr.io/gitleaks/gitleaks:latest detect --source="/path/app/nodejs" -v
-
     - name: Build Docker image
-      run: |
-        cd app/nodejs
-        docker build -t nodejs-ci-cd .
+      working-directory: app/nodejs
+      run: docker build -t nodejs-ci-cd .
 
     - name: Install Trivy
       run: |

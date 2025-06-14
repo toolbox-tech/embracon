@@ -41,7 +41,7 @@ jobs:
       run: |
         curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
         sudo mv ./bin/trivy /usr/local/bin/trivy  # Move Trivy to a location in the PATH
-  
+
     - name: Run Trivy to scan Docker image for vulnerabilities
       run: |
         trivy image nodejs-ci-cd

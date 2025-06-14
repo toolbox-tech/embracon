@@ -49,3 +49,13 @@ Want to contribute to act? Awesome! Check out the [contributing guidelines](CONT
 - Clone this repo `git clone git@github.com:nektos/act.git`
 - Run unit tests with `make test`
 - Build and install: `make install`
+
+## Uso
+
+Para testar um workflow específico, você pode usar o comando `act` seguido do nome do evento. Por exemplo, para testar o evento `workflow_dispatch`, você pode usar:
+
+```bash
+act workflow_dispatch -P ubuntu-latest=catthehacker/ubuntu:act-latest -s secrets.GITHUB_TOKEN=teste -e .\CI-CD\ACT\event.json
+```
+
+O -P especifica a imagem do runner a ser usada, e o -s define um segredo necessário para o teste. O -e permite especificar um arquivo de evento JSON que simula o evento disparador.

@@ -1,36 +1,63 @@
-name: Node CI
+name: Node CI  # Nome do workflow exibido no GitHub
 
-on: [pull_request, workflow_dispatch]
+on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução manual
 
 jobs:
 
-  test:
-    uses: ./.github/workflows/reusable.yml
+  test:  # Job chamado 'test'
+    uses: ./.github/workflows/reusable.yml  # Usa um workflow reutilizável local
     with:
-      gitleaks-version: 'latest'
+      gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
     secrets:
-      TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Only required for Organizations, not personal accounts.
-  build:
-    runs-on: ubuntu-latest
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
+      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
+
+  build:  # Job chamado 'build'
+    runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
 
     steps:
-    - name: Checkout code
+    - name: Checkout code  # Passo para baixar o código do repositório
       uses: actions/checkout@v2
 
-    - name: Install Dependencies
-      working-directory: app/nodejs  # Ensure you are in the right directory
+    - name: Cache npm dependencies  # Passo para cachear dependências do npm
+      uses: actions/cache@v3
+      with:
+        path: app/nodejs/node_modules  # Caminho das dependências
+        key: ${{ runner.os }}-node-${{ hashFiles('app/nodejs/package-lock.json') }}  # Chave única baseada no SO e no hash do package-lock.json
+        restore-keys: |
+          ${{ runner.os }}-node-  # Chave de fallback para restaurar cache parcial
+
+    - name: Install Dependencies  # Instala as dependências do Node.js
+      working-directory: app/nodejs  # Define o diretório de trabalho
       run: npm install
 
-    - name: Build Docker image
+    - name: Cache Docker layers  # Cache das camadas do Docker para builds mais rápidos
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache  # Caminho do cache das camadas
+        key: ${{ runner.os }}-buildx-${{ github.sha }}  # Chave baseada no SO e SHA do commit
+        restore-keys: |
+          ${{ runner.os }}-buildx-  # Chave de fallback
+
+    - name: Build Docker image  # Constrói a imagem Docker
       working-directory: app/nodejs
-      run: docker build -t nodejs-ci-cd .
-
-    - name: Install Trivy
       run: |
-        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-        sudo mv ./bin/trivy /usr/local/bin/trivy  # Move Trivy to a location in the PATH
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \  # Habilita cache inline do BuildKit
+          --cache-from=type=local,src=/tmp/.buildx-cache \  # Usa cache existente
+          --cache-to=type=local,dest=/tmp/.buildx-cache-new \  # Salva novo cache
+          -t nodejs-ci-cd .  # Nomeia a imagem como 'nodejs-ci-cd'
 
-    - name: Run Trivy to scan Docker image for vulnerabilities
+    - name: Move Docker cache  # Move o novo cache para o local padrão
       run: |
-        trivy image nodejs-ci-cd
+        rm -rf /tmp/.buildx-cache  # Remove cache antigo
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache  # Move novo cache para o local correto
+
+    - name: Install Trivy  # Instala o Trivy (scanner de vulnerabilidades)
+      run: |
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh  # Baixa e executa o instalador
+        sudo mv ./bin/trivy /usr/local/bin/trivy  # Move o binário para o PATH
+
+    - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
+      run: |
+        trivy image nodejs-ci-cd  # Escaneia a imagem 'nodejs-ci-cd'

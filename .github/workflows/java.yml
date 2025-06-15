@@ -1,0 +1,89 @@
+name: Java CI  # Nome do workflow exibido no GitHub
+
+on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução manual
+
+jobs:
+
+  test:
+    runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
+    steps:
+      - name: Checkout code  # Baixa o código do repositório
+        uses: actions/checkout@v2
+
+      - name: Cache Maven dependencies  # Cache das dependências do Maven
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('app/java/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Set up JDK 17  # Configura o Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven  # Compila o projeto e gera o WAR/JAR
+        working-directory: app/java
+        run: mvn clean package
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('app/java/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        working-directory: app/java
+        run: mvn clean package
+
+      - name: Cache Docker layers  # Cache das camadas do Docker
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build Docker image  # Constrói a imagem Docker
+        working-directory: app/java
+        run: |
+          docker build \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from=type=local,src=/tmp/.buildx-cache \
+            --cache-to=type=local,dest=/tmp/.buildx-cache-new \
+            -t java-ci-cd .
+
+      - name: Move Docker cache  # Move o novo cache para o local padrão
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: Install Trivy  # Instala o Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+          sudo mv ./bin/trivy /usr/local/bin/trivy
+
+      - name: Run Trivy to scan Docker image for vulnerabilities  # Escaneia a imagem Docker
+        run: |
+          trivy image java-ci-cd  # Escaneia a imagem 'java-ci-cd'

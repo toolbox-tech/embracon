@@ -4,10 +4,6 @@ inputs:
   language:
     required: true
     description: 'Language for which to cache dependencies (e.g., python, nodejs, java)'
-  path_app:
-    required: false
-    default: ''
-    description: 'Custom path for caching dependencies'
 
 runs:
   using: "composite"
@@ -38,7 +34,7 @@ runs:
     - name: Cache dependencies
       uses: actions/cache@v3
       with:
-        path: ${{ steps.cache-key.outputs.path || inputs.path_app }}
+        path: ${{ steps.cache-key.outputs.path }}
         key: ${{ steps.cache-key.outputs.key }}
         restore-keys: |
           ${{ inputs.language }}-

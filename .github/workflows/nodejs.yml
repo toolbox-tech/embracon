@@ -4,13 +4,13 @@ on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução 
 
 jobs:
 
-  # test:  # Job chamado 'test'
-  #   uses: ./.github/workflows/reusable.yml  # Usa um workflow reutilizável local
-  #   with:
-  #     gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
-  #   secrets:
-  #     TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
-  #     LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
+  test:  # Job chamado 'test'
+    uses: ./.github/workflows/reusable.yml  # Usa um workflow reutilizável local
+    with:
+      gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
+    secrets:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
+      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
 
   build:  # Job chamado 'build'
     runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
@@ -20,33 +20,36 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Cache npm dependencies  # Passo para cachear dependências do npm
-      uses: actions/cache@v3
+      uses: ./.github/actions/cache-deps  # Usa uma ação personalizada para cache
       with:
-        path: app/nodejs/node_modules  # Caminho das dependências
-        key: ${{ runner.os }}-node-${{ hashFiles('app/nodejs/package-lock.json') }}  # Chave única baseada no SO e no hash do package-lock.json
-        restore-keys: |
-          ${{ runner.os }}-node-  # Chave de fallback para restaurar cache parcial
+        language: nodejs  # Especifica que é para Node.js
+        # path: app/nodejs/node_modules  # Caminho das dependências
+        # key: ${{ runner.os }}-node-${{ hashFiles('app/nodejs/package-lock.json') }}  # Chave única baseada no SO e no hash do package-lock.json
+        # restore-keys: |
+        #   ${{ runner.os }}-node-  # Chave de fallback para restaurar cache parcial
 
     - name: Install Dependencies  # Instala as dependências do Node.js
       working-directory: app/nodejs  # Define o diretório de trabalho
       run: npm install
 
-    - name: Cache Docker layers  # Cache das camadas do Docker para builds mais rápidos
-      uses: actions/cache@v3
-      with:
-        path: /tmp/.buildx-cache  # Caminho do cache das camadas
-        key: ${{ runner.os }}-buildx-${{ github.sha }}  # Chave baseada no SO e SHA do commit
-        restore-keys: |
-          ${{ runner.os }}-buildx-  # Chave de fallback
+    # - name: Cache Docker layers  # Cache das camadas do Docker para builds mais rápidos
+    #   uses: actions/cache@v3
+    #   with:
+    #     path: /tmp/.buildx-cache  # Caminho do cache das camadas
+    #     key: ${{ runner.os }}-buildx-${{ github.sha }}  # Chave baseada no SO e SHA do commit
+    #     restore-keys: |
+    #       ${{ runner.os }}-buildx-  # Chave de fallback
 
-    # - name: Build Docker image  # Constrói a imagem Docker
-    #   working-directory: app/nodejs
-    #   run: |
-    #     docker build \
-    #       --build-arg BUILDKIT_INLINE_CACHE=1 \  # Habilita cache inline do BuildKit
-    #       --cache-from=type=local,src=/tmp/.buildx-cache \  # Usa cache existente
-    #       --cache-to=type=local,dest=/tmp/.buildx-cache-new \  # Salva novo cache
-    #       -t nodejs-ci-cd .  # Nomeia a imagem como 'nodejs-ci-cd'
+    - name: Build Docker image  # Constrói a imagem Docker
+      working-directory: app/nodejs
+      run: docker build -t nodejs-ci-cd .  
+      # working-directory: app/nodejs
+      # run: |
+      #   docker build \
+      #     --build-arg BUILDKIT_INLINE_CACHE=1 \  # Habilita cache inline do BuildKit
+      #     --cache-from=type=local,src=/tmp/.buildx-cache \  # Usa cache existente
+      #     --cache-to=type=local,dest=/tmp/.buildx-cache-new \  # Salva novo cache
+      #     -t nodejs-ci-cd .  # Nomeia a imagem como 'nodejs-ci-cd'
 
     # - name: Move Docker cache  # Move o novo cache para o local padrão
     #   run: |

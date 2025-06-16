@@ -1,0 +1,50 @@
+name: Reusable Cache
+
+on:
+    workflow_call:
+        inputs:
+            language:
+                required: true
+                type: string
+                description: Language for which to cache dependencies (e.g., python, nodejs, java)
+            path:
+                required: false
+                type: string
+                default: ''
+                description: Custom path for caching dependencies
+
+jobs:
+    cache-deps:
+        runs-on: ubuntu-latest
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - name: Set up cache key
+          id: cache-key
+          run: |
+            case "${{ inputs.language }}" in python)
+                    echo "key=python-${{ hashFiles('**/requirements*.txt') }}" >> $GITHUB_OUTPUT
+                    echo "path=~/.cache/pip" >> $GITHUB_OUTPUT
+                    ;;
+                nodejs)
+                    echo "key=node-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}" >> $GITHUB_OUTPUT
+                    echo "path=~/.npm" >> $GITHUB_OUTPUT
+                    ;;
+                java)
+                    echo "key=java-${{ hashFiles('**/pom.xml', '**/build.gradle*') }}" >> $GITHUB_OUTPUT
+                    echo "path=~/.m2/repository" >> $GITHUB_OUTPUT
+                    ;;
+                *)
+                    echo "Unsupported language: ${{ inputs.language }}"
+                    exit 1
+                    ;;
+            esac
+
+        - name: Cache dependencies
+          uses: actions/cache@v4
+          with:
+           path: ${{ steps.cache-key.outputs.path }}
+           key: ${{ steps.cache-key.outputs.key }}
+           restore-keys: |
+                    ${{ inputs.language }}-

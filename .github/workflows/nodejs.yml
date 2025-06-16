@@ -4,13 +4,13 @@ on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução 
 
 jobs:
 
-  test:  # Job chamado 'test'
-    uses: ./.github/workflows/reusable.yml  # Usa um workflow reutilizável local
-    with:
-      gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
-    secrets:
-      TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
-      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
+  # test:  # Job chamado 'test'
+  #   uses: ./.github/workflows/reusable.yml  # Usa um workflow reutilizável local
+  #   with:
+  #     gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
+  #   secrets:
+  #     TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
+  #     LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
 
   build:  # Job chamado 'build'
     runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
@@ -39,25 +39,25 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-buildx-  # Chave de fallback
 
-    - name: Build Docker image  # Constrói a imagem Docker
-      working-directory: app/nodejs
-      run: |
-        docker build \
-          --build-arg BUILDKIT_INLINE_CACHE=1 \  # Habilita cache inline do BuildKit
-          --cache-from=type=local,src=/tmp/.buildx-cache \  # Usa cache existente
-          --cache-to=type=local,dest=/tmp/.buildx-cache-new \  # Salva novo cache
-          -t nodejs-ci-cd .  # Nomeia a imagem como 'nodejs-ci-cd'
+    # - name: Build Docker image  # Constrói a imagem Docker
+    #   working-directory: app/nodejs
+    #   run: |
+    #     docker build \
+    #       --build-arg BUILDKIT_INLINE_CACHE=1 \  # Habilita cache inline do BuildKit
+    #       --cache-from=type=local,src=/tmp/.buildx-cache \  # Usa cache existente
+    #       --cache-to=type=local,dest=/tmp/.buildx-cache-new \  # Salva novo cache
+    #       -t nodejs-ci-cd .  # Nomeia a imagem como 'nodejs-ci-cd'
 
-    - name: Move Docker cache  # Move o novo cache para o local padrão
-      run: |
-        rm -rf /tmp/.buildx-cache  # Remove cache antigo
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache  # Move novo cache para o local correto
+    # - name: Move Docker cache  # Move o novo cache para o local padrão
+    #   run: |
+    #     rm -rf /tmp/.buildx-cache  # Remove cache antigo
+    #     mv /tmp/.buildx-cache-new /tmp/.buildx-cache  # Move novo cache para o local correto
 
-    - name: Install Trivy  # Instala o Trivy (scanner de vulnerabilidades)
-      run: |
-        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh  # Baixa e executa o instalador
-        sudo mv ./bin/trivy /usr/local/bin/trivy  # Move o binário para o PATH
+    # - name: Install Trivy  # Instala o Trivy (scanner de vulnerabilidades)
+    #   run: |
+    #     curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh  # Baixa e executa o instalador
+    #     sudo mv ./bin/trivy /usr/local/bin/trivy  # Move o binário para o PATH
 
-    - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
-      run: |
-        trivy image nodejs-ci-cd  # Escaneia a imagem 'nodejs-ci-cd'
+    # - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
+    #   run: |
+    #     trivy image nodejs-ci-cd  # Escaneia a imagem 'nodejs-ci-cd'

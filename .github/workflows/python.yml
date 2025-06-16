@@ -1,0 +1,72 @@
+name: Python CI
+
+on: [pull_request, workflow_dispatch]
+
+jobs:
+
+  test:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      gitleaks-version: 'latest'
+    secrets:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/python/.venv
+        key: ${{ runner.os }}-pip-${{ hashFiles('app/python/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Dependencies
+      working-directory: app/python
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+
+    - name: Build Docker image
+      working-directory: app/python
+      run: |
+        docker build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from=type=local,src=/tmp/.buildx-cache \
+          --cache-to=type=local,dest=/tmp/.buildx-cache-new \
+          -t python-ci-cd .
+
+    - name: Move Docker cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+    - name: Install Trivy
+      run: |
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+        sudo mv ./bin/trivy /usr/local/bin/trivy
+
+    - name: Run Trivy to scan Docker image for vulnerabilities
+      run: |
+        trivy image python-ci-cd

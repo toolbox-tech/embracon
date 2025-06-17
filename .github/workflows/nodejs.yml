@@ -23,10 +23,6 @@ jobs:
       uses: ./.github/actions/cache-deps  # Usa uma ação personalizada para cache
       with:
         language: nodejs  # Especifica que é para Node.js
-        # path: app/nodejs/node_modules  # Caminho das dependências
-        # key: ${{ runner.os }}-node-${{ hashFiles('app/nodejs/package-lock.json') }}  # Chave única baseada no SO e no hash do package-lock.json
-        # restore-keys: |
-        #   ${{ runner.os }}-node-  # Chave de fallback para restaurar cache parcial
 
     - name: Install Dependencies  # Instala as dependências do Node.js
       working-directory: app/nodejs  # Define o diretório de trabalho

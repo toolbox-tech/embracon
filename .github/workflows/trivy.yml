@@ -1,0 +1,30 @@
+name: Reusable Trivy Workflow
+
+on:
+    workflow_call:
+        inputs:
+            docker_image:
+                required: true
+                type: string
+        
+jobs:
+    trivy:
+        runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
+
+        steps:
+        - name: Checkout code  # Passo para baixar o código do repositório
+          uses: actions/checkout@v3
+
+        - name: Cache npm dependencies  # Passo para cachear dependências do npm
+          uses: ./.github/actions/cache-deps  # Usa uma ação personalizada para cache
+          with:
+            language: nodejs  # Especifica que é para Node.js
+
+        - name: Install Trivy  # Instala o Trivy (scanner de vulnerabilidades)
+          run: |
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh  # Baixa e executa o instalador
+            sudo mv ./bin/trivy /usr/local/bin/trivy  # Move o binário para o PATH
+
+        - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
+          run: |
+            trivy image ${{ inputs.docker_image }}  # Escaneia a imagem especificada

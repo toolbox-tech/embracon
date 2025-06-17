@@ -17,7 +17,7 @@ jobs:
 
     steps:
     - name: Checkout code  # Passo para baixar o código do repositório
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Cache npm dependencies  # Passo para cachear dependências do npm
       uses: ./.github/actions/cache-deps  # Usa uma ação personalizada para cache
@@ -32,30 +32,50 @@ jobs:
       working-directory: app/nodejs  # Define o diretório de trabalho
       run: npm install
 
-    # - name: Cache Docker layers  # Cache das camadas do Docker para builds mais rápidos
-    #   uses: actions/cache@v3
+    # - name: Set up Docker Buildx
+    #   uses: docker/setup-buildx-action@v3
+
+    # - name: Build and push Docker image
+    #   uses: docker/build-push-action@v5
     #   with:
-    #     path: /tmp/.buildx-cache  # Caminho do cache das camadas
-    #     key: ${{ runner.os }}-buildx-${{ github.sha }}  # Chave baseada no SO e SHA do commit
-    #     restore-keys: |
-    #       ${{ runner.os }}-buildx-  # Chave de fallback
+    #     context: app/nodejs  # Define o contexto de construção do Docker
+    #     push: false # Não faz push da imagem para um registro
+    #     load: true  # Carrega a imagem no ambiente atual
+    #     tags: nodejs:latest
+    #     cache-from: type=local,src=/tmp/.buildx-cache
+    #     # cache-from: type=gha
+    #     cache-to: type=local,dest=/tmp/.buildx-cache-new
+    #     # cache-to: type=gha,mode=max
+    - name: Restore Docker cache
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
 
-    - name: Build Docker image  # Constrói a imagem Docker
-      working-directory: app/nodejs
-      run: docker build -t nodejs-ci-cd .  
-      # working-directory: app/nodejs
-      # run: |
-      #   docker build \
-      #     --build-arg BUILDKIT_INLINE_CACHE=1 \  # Habilita cache inline do BuildKit
-      #     --cache-from=type=local,src=/tmp/.buildx-cache \  # Usa cache existente
-      #     --cache-to=type=local,dest=/tmp/.buildx-cache-new \  # Salva novo cache
-      #     -t nodejs-ci-cd .  # Nomeia a imagem como 'nodejs-ci-cd'
+    - name: Build Docker image
+      working-directory: app/nodejs  # Define o diretório de trabalho
+      run: |
+        docker buildx build \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          --cache-from=type=local,src=/tmp/.buildx-cache \
+          --cache-to=type=local,dest=/tmp/.buildx-cache-new \
+          -t nodejs-ci-cd .
 
-    # - name: Move Docker cache  # Move o novo cache para o local padrão
-    #   run: |
-    #     rm -rf /tmp/.buildx-cache  # Remove cache antigo
-    #     mv /tmp/.buildx-cache-new /tmp/.buildx-cache  # Move novo cache para o local correto
 
+    - name: Save Docker cache
+      uses: actions/cache@v3
+      with:
+        path: /tmp/.buildx-cache-new
+        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildx-
+    - name: Move Docker cache
+      run: |
+        rm -rf /tmp/.buildx-cache
+        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+        
     # - name: Install Trivy  # Instala o Trivy (scanner de vulnerabilidades)
     #   run: |
     #     curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh  # Baixa e executa o instalador

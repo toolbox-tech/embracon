@@ -1,6 +1,6 @@
 name: Node CI  # Nome do workflow exibido no GitHub
 
-on: [pull_request, workflow_dispatch, push]  # Dispara em pull requests ou execução manual
+on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução manual
 
 jobs:
 
@@ -46,7 +46,7 @@ jobs:
       with:
         context: app/nodejs  # Define o contexto de construção do Docker
         push: true  # Faz push da imagem para um registro
-        load: true  # Carrega a imagem no ambiente atual
+        # load: true  # Carrega a imagem no ambiente atual
         tags: toolboxplayground/embracon:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max

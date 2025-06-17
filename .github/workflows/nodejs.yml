@@ -1,6 +1,6 @@
 name: Node CI  # Nome do workflow exibido no GitHub
 
-on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução manual
+on: [pull_request, workflow_dispatch, push]  # Dispara em pull requests ou execução manual
 
 jobs:
 

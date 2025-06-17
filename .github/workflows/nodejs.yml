@@ -47,7 +47,7 @@ jobs:
         context: app/nodejs  # Define o contexto de construção do Docker
         push: true  # Faz push da imagem para um registro
         # load: true  # Carrega a imagem no ambiente atual
-        tags: toolboxplayground/embracon:latest
+        tags: toolboxplayground/embracon:node-latest  # Define a tag da imagem Docker
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
@@ -58,4 +58,4 @@ jobs:
 
     - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
       run: |
-        trivy image toolboxplayground/embracon:latest  # Escaneia a imagem 'toolboxplayground/embracon:latest'
+        trivy image toolboxplayground/embracon:node-latest  # Escaneia a imagem 'toolboxplayground/embracon:node-latest'

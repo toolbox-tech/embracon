@@ -12,21 +12,12 @@ jobs:
         runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
 
         steps:
-        - name: Checkout code  # Passo para baixar o código do repositório
-          uses: actions/checkout@v3
-
-        - name: Cache Trivy binary  # Cacheia o binário do Trivy
-          id: cache-trivy
-          uses: actions/cache@v3
-          with:
-            path: ./bin/trivy
-            key: trivy-${{ runner.os }}-v0.50.2  # Atualize a versão conforme necessário
-
-        - name: Install Trivy  # Instala o Trivy se não estiver em cache
-          if: steps.cache-trivy.outputs.cache-hit != 'true'
-          run: |
-            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-
-        - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
-          run: |
-            trivy image ${{ inputs.docker_image }}  # Escaneia a imagem especificada
+         - name: Run Trivy vulnerability scanner
+           uses: aquasecurity/trivy-action@0.28.0
+           with:
+             image-ref: ${{ inputs.docker_image }}
+             format: 'table'
+             exit-code: '1'
+             ignore-unfixed: true
+             vuln-type: 'os,library'
+             severity: 'CRITICAL,HIGH'

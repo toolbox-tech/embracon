@@ -15,15 +15,17 @@ jobs:
         - name: Checkout code  # Passo para baixar o código do repositório
           uses: actions/checkout@v3
 
-        - name: Cache npm dependencies  # Passo para cachear dependências do npm
-          uses: ./.github/actions/cache-deps  # Usa uma ação personalizada para cache
+        - name: Cache Trivy binary  # Cacheia o binário do Trivy
+          id: cache-trivy
+          uses: actions/cache@v3
           with:
-            language: nodejs  # Especifica que é para Node.js
+            path: ./bin/trivy
+            key: trivy-${{ runner.os }}-v0.50.2  # Atualize a versão conforme necessário
 
-        - name: Install Trivy  # Instala o Trivy (scanner de vulnerabilidades)
+        - name: Install Trivy  # Instala o Trivy se não estiver em cache
+          if: steps.cache-trivy.outputs.cache-hit != 'true'
           run: |
-            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh  # Baixa e executa o instalador
-            sudo mv ./bin/trivy /usr/local/bin/trivy  # Move o binário para o PATH
+            curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
 
         - name: Run Trivy to scan Docker image for vulnerabilities  # Executa o Trivy para escanear a imagem Docker
           run: |

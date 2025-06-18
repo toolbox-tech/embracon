@@ -5,7 +5,7 @@ on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução 
 jobs:
 
   gitleaks:  # Job chamado 'gitleaks'
-    uses: ./.github/workflows/reusable.yml  # Usa um workflow reutilizável local
+    uses: ./.github/workflows/security/gitleaks.yml  # Usa um workflow reutilizável local
     with:
       gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
     secrets:
@@ -35,21 +35,14 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
+    - name: Build and push Docker image  # Passo para construir e enviar a imagem Docker
+      uses: ./.github/actions/build  # Usa uma ação personalizada para construir e enviar a imagem Docker
       with:
-        context: app/nodejs  # Define o contexto de construção do Docker
-        push: true  # Faz push da imagem para um registro
-        # load: true  # Carrega a imagem no ambiente atual
-        tags: toolboxplayground/embracon:node-latest  # Define a tag da imagem Docker
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        app_context: app/nodejs
+        app_tags: toolboxplayground/embracon:node-latest
 
   trivy:  # Executa o Trivy para escanear a imagem Docker
-    uses: ./.github/workflows/trivy.yml  # Usa um workflow reutilizável para o Trivy
+    uses: ./.github/workflows/security/trivy.yml  # Usa um workflow reutilizável para o Trivy
     needs: build  # Garante que o job 'build' seja concluído antes de executar este job
     with:
-      docker_image: toolboxplayground/embracon:java-latest  # Especifica a imagem Docker a ser escaneada
+      docker_image: toolboxplayground/embracon:node-latest  # Especifica a imagem Docker a ser escaneada

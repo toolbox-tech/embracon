@@ -17,6 +17,9 @@ jobs:
     with:
       app_context: 'app/java'  # Caminho para o contexto da aplicação Java
       app_tags: 'toolboxplayground/embracon:java-latest,toolboxplayground/embracon:java'  # Tags para a imagem Docker
+      dck_username: ${{ vars.DOCKERHUB_USERNAME }}  # Nome de usuário do Docker Hub para autenticação
+    secrets:
+      dck_token: ${{ secrets.DOCKERHUB_TOKEN }}  # Token do
     needs: gitleaks  # Garante que o job 'gitleaks' seja concluído antes de executar este job
 
    trivy:  # Executa o Trivy para escanear a imagem Docker

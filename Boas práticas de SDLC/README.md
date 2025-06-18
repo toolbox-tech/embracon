@@ -98,7 +98,10 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 # Boas Práticas para SDLC (Software Development Life Cycle)
 
-## 1. Padrão de Commits com Commitizen
+## 1. Pre-commit e Commitizen
+Uso do [Pre-commit](./pre-commit/README.md) para automatizar validações de código antes do commit, usando o Gitleaks para detectar segredos e o Commitizen para padronizar mensagens de commit.
+
+## 2. Padrão de Commits com Commitizen
 ### Ferramenta
 - Uso do [Commitizen](./commitizen/README.md) para padronizar mensagens de commit via CLI interativa.
 
@@ -120,7 +123,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 2. Padrão de Política de Pull Request (PR)
+## 3. Padrão de Política de Pull Request (PR)
 ### Requisitos Mínimos
 - **Título**: Descritivo (ex: `[FEAT] Login com OAuth`).
 - **Descrição**: Contexto, motivação e testes realizados.
@@ -139,7 +142,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 3. Padrão de Branches e Commits
+## 4. Padrão de Branches e Commits
 ### Estratégia de Branching
 - **[GitFlow](./gitflow/README.md)** (para releases planejadas) ou **Trunk-Based** (para CI/CD).
 - **Nomes de branches**:
@@ -155,7 +158,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 4. Treinamento em SCM (GitFlow vs. Trunk-Based)
+## 5. Treinamento em SCM (GitFlow vs. Trunk-Based)
 ### GitFlow
 - **Branches**: `main`, `develop`, `feature/*`, `release/*`, `hotfix/*`.
 - **Uso**: Projetos com versões estáveis (ex: enterprise).
@@ -169,7 +172,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 5. Linter e Code Quality
+## 6. Linter e Code Quality
 ### Ferramentas
 - **[SonarQube](./sonarqube_codesense/README.md)**: Análise estática e cobertura de testes.
 - **[CodeScene](./sonarqube_codesense/README.md)**: Análise de hotspots e colaboração.
@@ -183,7 +186,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 6. API Design (Swagger/Stoplight)
+## 7. API Design (Swagger/Stoplight)
 ### Documentação
 - **[Swagger/OpenAPI](./swagger_stoplight/README.md)**: Especificação contratual.
 - **[Stoplight](./swagger_stoplight/README.md)**: Design colaborativo.
@@ -193,7 +196,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 7. Documentação e Treinamento
+## 8. Documentação e Treinamento
 ### Arquitetura
 - **Diagramas**: C4 Model ou UML (usando Draw.io).
 - **ADRs**: Registro de decisões técnicas.
@@ -205,7 +208,7 @@ Fonte: [GitLab - Quais são as melhores práticas de controle de versão do Git?
 
 ---
 
-## 8. Políticas de Segurança no GitHub
+## 9. Políticas de Segurança no GitHub
 ### Mínimo Recomendado
 - **Branch Protection**:
     - Bloquear `force push` em `main`.

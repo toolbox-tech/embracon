@@ -1,0 +1,48 @@
+name: Node CI  # Nome do workflow exibido no GitHub
+
+on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução manual
+
+jobs:
+
+  gitleaks:  # Job chamado 'gitleaks'
+    uses: ./.github/workflows/gitleaks.yml  # Usa um workflow reutilizável local
+    with:
+      gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
+    secrets:
+      TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
+      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
+
+  build:  # Job chamado 'build'
+    runs-on: ubuntu-latest  # Executa em uma VM Ubuntu mais recente
+    needs: gitleaks  # Garante que o job 'gitleaks' seja concluído antes de executar este job
+
+    steps:
+    - name: Checkout code  # Passo para baixar o código do repositório
+      uses: actions/checkout@v3
+
+    - name: Cache npm dependencies  # Passo para cachear dependências do npm
+      uses: ./.github/actions/cache-deps  # Usa uma ação personalizada para cache
+      with:
+        language: nodejs  # Especifica que é para Node.js
+
+    - name: Install Dependencies  # Instala as dependências do Node.js
+      working-directory: app/nodejs  # Define o diretório de trabalho
+      run: npm install
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image  # Passo para construir e enviar a imagem Docker
+      uses: ./.github/actions/build  # Usa uma ação personalizada para construir e enviar a imagem Docker
+      with:
+        app_context: app/nodejs
+        app_tags: toolboxplayground/embracon:node-latest
+
+  trivy:  # Executa o Trivy para escanear a imagem Docker
+    uses: ./.github/workflows/trivy.yml  # Usa um workflow reutilizável para o Trivy
+    needs: build  # Garante que o job 'build' seja concluído antes de executar este job
+    with:
+      docker_image: toolboxplayground/embracon:node-latest  # Especifica a imagem Docker a ser escaneada

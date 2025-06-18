@@ -1,14 +1,30 @@
-name: gitleaks
-on: [pull_request, push, workflow_dispatch]
+name: Reusable Gitleaks Workflow
+
+on:
+    workflow_call:
+        inputs:
+            gitleaks-version:
+                required: false
+                type: string
+                default: "latest"
+        secrets:
+            TOKEN:
+                required: true
+            LICENSE:
+                required: false
+
 jobs:
-  scan:
-    name: gitleaks
+  gitleaks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}} # Only required for Organizations, not personal accounts.
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.LICENSE }} # Only required for Organizations, not personal accounts.

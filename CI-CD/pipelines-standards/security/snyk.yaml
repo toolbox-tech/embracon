@@ -1,39 +1,40 @@
 name: Security Check with Snyk
+
 on:
-  push:
-    branches:
-      - main  # Aciona o fluxo de trabalho quando houver push na brach main
-    paths:
-      - 'snyk/python/**'  # Aciona o fluxo de trabalho quando houver alterações no diretório 'snyk/python'
-  pull_request:
-    branches:
-      - main # Aciona o fluxo de trabalho quando houver PR na brach main
-    paths:
-      - 'snyk/python/**'  # Aciona o fluxo de trabalho quando houver alterações no diretório 'snyk/python'
-  workflow_dispatch:  # Aciona manualmente o fluxo de trabalho
-    inputs:  # Define entradas para o fluxo de trabalho
-      name:  # Define a entrada "name"
-        description: 'Acionador manual do fluxo de trabalho'  # Descrição da entrada
+  workflow_call:
+    inputs:
+      dockerfile-path:
+        required: true
+        type: string
+      context-path:
+        required: true
+        type: string
+      project-name:
+        required: true
+        type: string
+    secrets:
+      SNYK_TOKEN:
+        required: true
 
 jobs:
   snyk-scan:
-    name: Snyk Security Check # Nome do trabalho
-    runs-on: ubuntu-latest # Sistema operacional em que o trabalho será executado (no caso, Ubuntu)
-    steps: # Passos a serem executados no trabalho
-      - uses: actions/checkout@master # Passo para fazer o checkout do repositório
+    name: Snyk Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Docker Build
-        run: docker build -t snyk-python:latest -f snyk/python/Dockerfile snyk/python # Constrói a imagem Docker
+        run: docker build -t snyk-python:latest -f ${{ inputs.dockerfile-path }} ${{ inputs.context-path }}
 
-      - name: Install Snyk CLI # Instala a CLI do Snyk
-        run: npm install -g snyk # Instala a CLI do Snyk
+      - name: Install Snyk CLI
+        run: npm install -g snyk
 
-      - name: Authenticate with Snyk # Autentica com o Snyk
-        run: snyk auth ${{ secrets.SNYK_TOKEN }} # Autenica com o Snyk usando o token
-      
-      - name: Run Snyk test # Executa o teste de segurança com o Snyk
-        run: snyk container test --docker snyk-python:latest --file=snyk/python/Dockerfile
-        continue-on-error: true # Continua mesmo com erro
+      - name: Authenticate with Snyk
+        run: snyk auth ${{ secrets.SNYK_TOKEN }}
 
-      - name: Generate Snyk report # Gera o relatório do Snyk
-        run: snyk container monitor --docker snyk-python:latest --file=snyk/python/Dockerfile --project-name=snyk-python
+      - name: Run Snyk test
+        run: snyk container test --docker snyk-python:latest --file=${{ inputs.dockerfile-path }}
+        continue-on-error: true
+
+      - name: Generate Snyk report
+        run: snyk container monitor --docker snyk-python:latest --file=${{ inputs.dockerfile-path }} --project-name=${{ inputs.project-name }}

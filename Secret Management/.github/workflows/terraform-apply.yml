@@ -1,0 +1,46 @@
+# .github/workflows/terraform-apply.yml
+name: Terraform Apply
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente (dev, hml, prod)'
+        required: true
+        default: 'dev'
+      tf_command:
+        description: 'Comando Terraform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    defaults:
+      run:
+        working-directory: ./environments/${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        if: github.event.inputs.tf_command == 'apply'
+        run: terraform apply -auto-approve -var-file="terraform.tfvars"
+
+      - name: Terraform Destroy
+        if: github.event.inputs.tf_command == 'destroy'
+        run: |
+          echo "Destroy requires manual approval"
+          terraform destroy -auto-approve -var-file="terraform.tfvars"

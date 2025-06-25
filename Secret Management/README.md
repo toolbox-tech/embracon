@@ -1,5 +1,14 @@
 # Gerenciamento de Azure Key Vault com Terraform e GitHub Actions
 
+## Observações
+
+Ao conceder uma política de acesso a um Key Vault, você pode definir permissões específicas para segredos, chaves e certificados de forma independente. Sempre revise cuidadosamente as permissões concedidas e aplique o princípio do menor privilégio, garantindo que cada identidade tenha acesso apenas ao necessário para sua função. 
+
+Ao fornecer acesso aos segredos, você estará fornecendo acesso a todos os segredos dentro do Key Vault. Não é possível fornecer acesso somente a um grupo específico de segredos. Isso é válido para chaves e certificados também.
+
+Por padrão, o acesso ao Key Vault é permitido de qualquer rede, mas você pode configurar regras de firewall para restringir o acesso.
+
+
 ## Visão Geral do Fluxo Automatizado
 
 1. **Estrutura do Repositório Terraform**

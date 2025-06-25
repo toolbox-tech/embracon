@@ -4,9 +4,16 @@
 
 Ao conceder uma política de acesso a um Key Vault, você pode definir permissões específicas para segredos, chaves e certificados de forma independente. Sempre revise cuidadosamente as permissões concedidas e aplique o princípio do menor privilégio, garantindo que cada identidade tenha acesso apenas ao necessário para sua função. 
 
+ A política de acesso é uma por Key Vault, e não por segredo. Portanto, ao conceder acesso a um usuário ou grupo, você está concedendo acesso a todos os segredos dentro do Key Vault. Isso significa que não é possível restringir o acesso a um único segredo ou a um grupo específico de segredos.
+
 Ao fornecer acesso aos segredos, você estará fornecendo acesso a todos os segredos dentro do Key Vault. Não é possível fornecer acesso somente a um grupo específico de segredos. Isso é válido para chaves e certificados também.
 
 Por padrão, o acesso ao Key Vault é permitido de qualquer rede, mas você pode configurar regras de firewall para restringir o acesso.
+
+É necessário habilitar o monitoramento (logging e metrics) para o Key Vault para garantir que todas as operações sejam auditadas. Armazenar esses logs em uma conta de armazenamento, para que sejam armazenados de acordo com a política da empresa, e enviar para Log Analytics.
+
+Criar alertas para monitorar eventos críticos, como falhas de autenticação, acesso não autorizado ou exclusão de segredos.
+
 
 
 ## Visão Geral do Fluxo Automatizado

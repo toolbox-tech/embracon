@@ -1,3 +1,5 @@
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_key_vault" "kv" {
   name                        = var.key_vault_name
   location                    = var.location
@@ -25,14 +27,6 @@ resource "azurerm_key_vault" "kv" {
       "Get", "List", "Create", "Delete", "Recover", "Backup", "Restore", "Purge"
     ]
   }
-}
 
-resource "azurerm_key_vault_secret" "secrets" {
-  for_each     = var.secrets
-  name         = each.key
-  value        = each.value
-  key_vault_id = azurerm_key_vault.kv.id
-  content_type = "secret"
-
-  depends_on = [azurerm_key_vault.kv]
+  tags = var.tags
 }

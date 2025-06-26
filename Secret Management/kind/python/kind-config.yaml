@@ -1,0 +1,7 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4 # Esta linha define a versão da API do Kind (Kubernetes in Docker) que está sendo usada.
+nodes: # Esta linha inicia a definição dos nós (nodes) no cluster.
+- role: control-plane # Esta linha define um nó com o papel de "control-plane" (plano de controle). O control-plane é responsável por gerenciar o cluster Kubernetes.
+  extraPortMappings: # Esta linha inicia a definição de mapeamentos de portas adicionais para o nó.
+  - containerPort: 30000 # Esta linha define a porta do contêiner que será mapeada.
+    hostPort: 30000 # Esta linha define a porta do host (máquina onde o cluster está sendo executado) para a qual a porta do contêiner será mapeada.

@@ -2,138 +2,40 @@
 
 ## Observações
 
-Ao conceder uma política de acesso a um Key Vault, você pode definir permissões específicas para segredos, chaves e certificados de forma independente. Sempre revise cuidadosamente as permissões concedidas e aplique o princípio do menor privilégio, garantindo que cada identidade tenha acesso apenas ao necessário para sua função. 
+Ao conceder uma política de acesso a um Key Vault, você pode definir permissões específicas para segredos, chaves e certificados de forma independente. Sempre revise cuidadosamente as permissões concedidas e aplique o princípio do menor privilégio, garantindo que cada identidade tenha acesso apenas ao necessário para sua função.
 
- A política de acesso é uma por Key Vault, e não por segredo. Portanto, ao conceder acesso a um usuário ou grupo, você está concedendo acesso a todos os segredos dentro do Key Vault. Isso significa que não é possível restringir o acesso a um único segredo ou a um grupo específico de segredos.
-
-Ao fornecer acesso aos segredos, você estará fornecendo acesso a todos os segredos dentro do Key Vault. Não é possível fornecer acesso somente a um grupo específico de segredos. Isso é válido para chaves e certificados também.
+A política de acesso é uma por Key Vault, e não por segredo. Portanto, ao conceder acesso a um usuário ou grupo, você está concedendo acesso a todos os segredos dentro do Key Vault. Isso significa que não é possível restringir o acesso a um único segredo ou a um grupo específico de segredos.
 
 Por padrão, o acesso ao Key Vault é permitido de qualquer rede, mas você pode configurar regras de firewall para restringir o acesso.
 
-É necessário habilitar o monitoramento (logging e metrics) para o Key Vault para garantir que todas as operações sejam auditadas. Armazenar esses logs em uma conta de armazenamento, para que sejam armazenados de acordo com a política da empresa, e enviar para Log Analytics.
+É necessário habilitar o monitoramento (logging e metrics) para o Key Vault para garantir que todas as operações sejam auditadas.
 
-Criar alertas para monitorar eventos críticos, como falhas de autenticação, acesso não autorizado ou exclusão de segredos.
+## Estrutura do Repositório Terraform
 
-
-
-## Visão Geral do Fluxo Automatizado
-
-1. **Estrutura do Repositório Terraform**
 ```
 infra-secrets/
 ├── .github/
 │   └── workflows/
 │       ├── terraform-apply.yml
 │       └── terraform-plan.yml
-├── environments/
-│   ├── dev/
-│   │   ├── main.tf
-│   │   ├── variables.tf
-│   │   └── terraform.tfvars
-│   ├── hml/
-│   └── prod/
 ├── modules/
 │   └── keyvault/
 │       ├── main.tf
 │       ├── variables.tf
-│       └── outputs.tf
+│       ├── outputs.tf
+│       ├── access_policy.tf
+│       └── diagnostics.tf
 └── README.md
 ```
 
-2. **Configuração do GitHub Actions para CI/CD**
+## Módulo Terraform para Azure Key Vault
 
-```yaml
-# .github/workflows/terraform-plan.yml
-name: Terraform Plan
-on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'environments/**'
-      - 'modules/**'
-
-jobs:
-  terraform-plan:
-    name: Terraform Plan
-    runs-on: ubuntu-latest
-    environment: dev
-    defaults:
-      run:
-        working-directory: ./environments/${{ github.event.inputs.environment || 'dev' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Validate
-        run: terraform validate
-
-      - name: Terraform Plan
-        run: terraform plan -var-file="terraform.tfvars"
-```
-
-```yaml
-# .github/workflows/terraform-apply.yml
-name: Terraform Apply
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Ambiente (dev, hml, prod)'
-        required: true
-        default: 'dev'
-      tf_command:
-        description: 'Comando Terraform'
-        required: true
-        default: 'apply'
-        type: choice
-        options:
-          - apply
-          - destroy
-
-jobs:
-  terraform-apply:
-    name: Terraform Apply
-    runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
-    defaults:
-      run:
-        working-directory: ./environments/${{ github.event.inputs.environment || 'dev' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-
-      - name: Terraform Init
-        run: terraform init
-
-      - name: Terraform Apply
-        if: github.event.inputs.tf_command == 'apply'
-        run: terraform apply -auto-approve -var-file="terraform.tfvars"
-
-      - name: Terraform Destroy
-        if: github.event.inputs.tf_command == 'destroy'
-        run: |
-          echo "Destroy requires manual approval"
-          terraform destroy -auto-approve -var-file="terraform.tfvars"
-```
-
-3. **Módulo Terraform para Azure Key Vault**
+### Recursos Principais (main.tf)
 
 ```hcl
 # modules/keyvault/main.tf
+data "azurerm_client_config" "current" {}
+
 resource "azurerm_key_vault" "kv" {
   name                        = var.key_vault_name
   location                    = var.location
@@ -161,90 +63,18 @@ resource "azurerm_key_vault" "kv" {
       "Get", "List", "Create", "Delete", "Recover", "Backup", "Restore", "Purge"
     ]
   }
-}
 
-resource "azurerm_key_vault_secret" "secrets" {
-  for_each     = var.secrets
-  name         = each.key
-  value        = each.value
-  key_vault_id = azurerm_key_vault.kv.id
-  content_type = "secret"
-
-  depends_on = [azurerm_key_vault.kv]
+  tags = var.tags
 }
 ```
 
-4. **Configuração por Ambiente**
-
-```hcl
-# environments/dev/main.tf
-module "key_vault" {
-  source = "../../modules/keyvault"
-
-  key_vault_name          = "kv-${var.environment}-${var.application_name}"
-  location                = var.location
-  resource_group_name     = var.resource_group_name
-  purge_protection_enabled = false
-  secrets                 = var.secrets
-
-  additional_access_policies = [
-    {
-      object_id = data.azurerm_client_config.current.object_id
-      tenant_id = data.azurerm_client_config.current.tenant_id
-      secret_permissions = ["Get", "List"]
-    }
-  ]
-}
-```
-
-5. **Autenticação Segura via Workload Identity Federation**
-
-```yaml
-# Configuração adicional no GitHub Actions
-- name: Azure Login
-  uses: azure/login@v1
-  with:
-    client-id: ${{ secrets.AZURE_CLIENT_ID }}
-    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-    enable-oidc: true
-```
-
-6. **Processo de Aprovação para Ambientes Produtivos**
-
-```yaml
-# Adicionar ao workflow de apply
-- name: Require approval for production
-  if: github.event.inputs.environment == 'prod'
-  uses: trstringer/manual-approval@v1
-  with:
-    secret: ${{ secrets.APPROVER_TOKEN }}
-    approvers: 'security-team,devops-lead'
-    minimum-approvals: 2
-    issue-title: "Approval required for production changes"
-```
-
-## Implementação Detalhada
-
-### 1. Configuração Inicial
-
-1. **Crie um Service Principal para o Terraform**:
-```bash
-az ad sp create-for-rbac --name "terraform-github-actions" --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>
-```
-
-2. **Configure Workload Identity Federation**:
-```bash
-az ad app federated-credential create \
-  --id <APPLICATION_ID> \
-  --parameters @./federated-credential.json
-```
-
-### 2. Módulos Avançados de Key Vault
+### Políticas de Acesso (access_policy.tf)
 
 ```hcl
 # modules/keyvault/access_policy.tf
 resource "azurerm_key_vault_access_policy" "github_actions" {
+  count = var.github_actions_object_id != null ? 1 : 0
+
   key_vault_id = azurerm_key_vault.kv.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = var.github_actions_object_id
@@ -265,35 +95,159 @@ resource "azurerm_key_vault_access_policy" "managed_identities" {
     "Get", "List"
   ]
 }
+
+resource "azurerm_key_vault_access_policy" "users" {
+  for_each = { for idx, policy in var.user_access_policies : idx => policy }
+
+  key_vault_id = azurerm_key_vault.kv.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = each.value.object_id
+
+  key_permissions         = lookup(each.value, "key_permissions", [])
+  secret_permissions      = lookup(each.value, "secret_permissions", [])
+  certificate_permissions = lookup(each.value, "certificate_permissions", [])
+}
 ```
 
-### 3. Pipeline de Atualização de Secrets
+### Variáveis (variables.tf)
+
+```hcl
+# modules/keyvault/variables.tf
+variable "key_vault_name" {
+  description = "Nome do Azure Key Vault"
+  type        = string
+}
+
+variable "location" {
+  description = "Localização do recurso"
+  type        = string
+}
+
+variable "resource_group_name" {
+  description = "Nome do Resource Group"
+  type        = string
+}
+
+variable "purge_protection_enabled" {
+  description = "Habilita purge protection no Key Vault"
+  type        = bool
+  default     = true
+}
+
+variable "github_actions_object_id" {
+  description = "Object ID do GitHub Actions para acesso ao Key Vault"
+  type        = string
+  default     = null
+}
+
+variable "managed_identities" {
+  description = "Lista de Object IDs das Managed Identities com acesso ao Vault"
+  type        = list(string)
+  default     = []
+}
+
+variable "user_access_policies" {
+  description = "Lista de políticas de acesso para usuários/grupos"
+  type = list(object({
+    object_id               = string
+    key_permissions         = optional(list(string), [])
+    secret_permissions      = optional(list(string), [])
+    certificate_permissions = optional(list(string), [])
+  }))
+  default = []
+}
+
+variable "tags" {
+  description = "Tags para os recursos"
+  type        = map(string)
+  default     = {}
+}
+```
+
+### Outputs (outputs.tf)
+
+```hcl
+# modules/keyvault/outputs.tf
+output "key_vault_id" {
+  description = "ID do Key Vault criado"
+  value       = azurerm_key_vault.kv.id
+}
+
+output "key_vault_name" {
+  description = "Nome do Key Vault"
+  value       = azurerm_key_vault.kv.name
+}
+
+output "key_vault_uri" {
+  description = "URI do Key Vault"
+  value       = azurerm_key_vault.kv.vault_uri
+}
+```
+
+## Como Usar o Módulo
+
+### Exemplo de uso em environments/dev/main.tf
+
+```hcl
+module "key_vault" {
+  source = "../../modules/keyvault"
+
+  key_vault_name          = "kv-dev-myapp"
+  resource_group_name     = var.resource_group_name
+  location                = var.location
+  purge_protection_enabled = false
+
+  # Acesso para GitHub Actions
+  github_actions_object_id = var.github_actions_object_id
+
+  # Managed Identities com acesso de leitura
+  managed_identities = [
+    var.app_managed_identity_id
+  ]
+
+  # Usuários/grupos com acesso específico
+  user_access_policies = [
+    {
+      object_id = var.dev_team_group_id
+      secret_permissions = ["Get", "List", "Set"]
+    },
+    {
+      object_id = var.security_team_group_id
+      secret_permissions = ["Get", "List", "Set", "Delete", "Recover", "Backup", "Restore"]
+      key_permissions = ["Get", "List"]
+      certificate_permissions = ["Get", "List"]
+    }
+  ]
+
+  tags = {
+    Environment = "Development"
+    Project     = "MyApp"
+  }
+}
+```
+
+## Configuração de CI/CD com GitHub Actions
+
+### terraform-plan.yml
 
 ```yaml
-# .github/workflows/update-secret.yml
-name: Update Key Vault Secret
+name: Terraform Plan
 on:
-  workflow_dispatch:
-    inputs:
-      secret_name:
-        description: 'Nome do Secret'
-        required: true
-      secret_value:
-        description: 'Valor do Secret'
-        required: true
-      environment:
-        description: 'Ambiente'
-        required: true
-        default: 'dev'
+  pull_request:
+    branches: [main]
+    paths: ['environments/**', 'modules/**']
 
 jobs:
-  update-secret:
+  terraform-plan:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'dev' }}
-    
+    environment: dev
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
 
       - name: Azure Login
         uses: azure/login@v1
@@ -301,222 +255,69 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          enable-oidc: true
 
-      - name: Update Secret
-        run: |
-          az keyvault secret set \
-            --name "${{ inputs.secret_name }}" \
-            --vault-name "kv-${{ inputs.environment }}-myapp" \
-            --value "${{ inputs.secret_value }}" \
-            --output none
-        env:
-          AZURE_KEYVAULT_SKIP_CREDENTIAL_VALIDATION: true
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./environments/dev
+
+      - name: Terraform Plan
+        run: terraform plan -var-file="terraform.tfvars"
+        working-directory: ./environments/dev
 ```
 
-### 4. Monitoramento e Auditoria
+### terraform-apply.yml
 
-```hcl
-# modules/keyvault/diagnostics.tf
-resource "azurerm_monitor_diagnostic_setting" "kv_diag" {
-  name               = "kv-diag-logs"
-  target_resource_id = azurerm_key_vault.kv.id
-  storage_account_id = var.diagnostics_storage_account_id
+```yaml
+name: Terraform Apply
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Ambiente (dev, hml, prod)'
+        required: true
+        default: 'dev'
 
-  log {
-    category = "AuditEvent"
-    enabled  = true
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
-  }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  metric {
-    category = "AllMetrics"
-    enabled  = true
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
 
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
-  }
-}
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./environments/${{ inputs.environment }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var-file="terraform.tfvars"
+        working-directory: ./environments/${{ inputs.environment }}
 ```
 
 ## Boas Práticas Implementadas
 
 1. **Segurança**:
-   - Uso de Workload Identity Federation para autenticação sem segredos
-   - RBAC granular com políticas de acesso mínimas necessárias
-   - Habilitar purge protection e soft delete
-   - Auditoria completa de todas as operações
-
-2. **Governança**:
-   - Estrutura de módulos Terraform reutilizáveis
-   - Separação clara por ambientes
-   - Pipeline de CI/CD com aprovações manuais para produção
-   - Versionamento de toda infraestrutura como código
-
-3. **Automatização**:
-   - Provisionamento completo via GitHub Actions
-   - Atualização de secrets via pipeline automatizado
-   - Integração com sistemas existentes
-   - Notificações e monitoramento
-
-4. **Resiliência**:
-   - Configurações de backup e recuperação
-   - Proteção contra exclusão acidental
-   - Rotação automática de credenciais (opcional)
-   - Múltiplas camadas de aprovação para mudanças críticas
-
-Esta implementação fornece um sistema completo para gerenciamento seguro de Azure Key Vault usando Terraform e GitHub Actions, seguindo as melhores práticas de segurança e governança em nuvem.
-
-# Módulo Terraform para Azure Key Vault
-
-## Visão Geral
-
-Este módulo Terraform provisiona e gerencia um Azure Key Vault (AKV) com configurações seguras e boas práticas incorporadas. O módulo é projetado para ser reutilizável em diferentes ambientes (dev, hml, prod) e projetos.
-
-## Estrutura do Módulo
-
-```
-modules/keyvault/
-├── main.tf          # Recursos principais do Key Vault
-├── variables.tf     # Variáveis de entrada do módulo
-├── outputs.tf       # Saídas do módulo
-├── access_policy.tf # Políticas de acesso
-└── diagnostics.tf   # Configurações de diagnóstico e monitoramento
-```
-
-## Recursos Provisionados
-
-1. **Azure Key Vault**:
-   - Habilitação de soft delete (90 dias)
-   - Proteção contra purge (configurável)
-   - SKU Standard
-   - Políticas de acesso básicas
-
-2. **Recursos Adicionais**:
-   - Secrets do Key Vault
-   - Políticas de acesso para identidades gerenciadas
-   - Configurações de diagnóstico para auditoria
-
-## Como Usar
-
-### Exemplo Básico
-
-```hcl
-module "key_vault" {
-  source = "../../modules/keyvault"
-
-  key_vault_name          = "kv-dev-myapp"
-  resource_group_name     = azurerm_resource_group.example.name
-  location                = "eastus"
-  purge_protection_enabled = false
-  secrets = {
-    "database-password" = "initial-password-value"
-    "api-key"          = "initial-api-key"
-  }
-}
-```
-
-### Exemplo Completo
-
-```hcl
-module "prod_key_vault" {
-  source = "../../modules/keyvault"
-
-  key_vault_name          = "kv-prod-myapp-001"
-  resource_group_name     = azurerm_resource_group.prod.name
-  location                = "eastus"
-  purge_protection_enabled = true
-  tags = {
-    Environment = "Production"
-    Critical   = "true"
-  }
-
-  secrets = {
-    "prod-db-password" = data.azurerm_key_vault_secret.db_password.value
-  }
-
-  managed_identities = [
-    azurerm_user_assigned_identity.app.id,
-    azurerm_user_assigned_identity.ci_cd.id
-  ]
-
-  additional_access_policies = [
-    {
-      object_id = "00000000-0000-0000-0000-000000000000" # ID do grupo de segurança
-      tenant_id = data.azurerm_client_config.current.tenant_id
-      secret_permissions = ["Get", "List"]
-    }
-  ]
-}
-```
-
-## Variáveis de Entrada
-
-| Nome | Tipo | Descrição | Valor Padrão | Obrigatório |
-|------|------|-----------|--------------|-------------|
-| `key_vault_name` | string | Nome do Azure Key Vault | - | Sim |
-| `resource_group_name` | string | Nome do resource group | - | Sim |
-| `location` | string | Região Azure | - | Sim |
-| `purge_protection_enabled` | bool | Habilita proteção contra purge | `false` | Não |
-| `secrets` | map(string) | Map de secrets para criar | `{}` | Não |
-| `managed_identities` | list(string) | Lista de IDs de Managed Identities para acesso | `[]` | Não |
-| `additional_access_policies` | list(object) | Políticas de acesso adicionais | `[]` | Não |
-| `tags` | map(string) | Tags para os recursos | `{}` | Não |
-
-## Outputs
-
-| Nome | Descrição |
-|------|-----------|
-| `key_vault_id` | ID do Key Vault criado |
-| `key_vault_name` | Nome do Key Vault |
-| `key_vault_uri` | URI do Key Vault |
-| `secret_ids` | Map de IDs dos secrets criados |
-
-## Boas Práticas Implementadas
-
-1. **Segurança**:
+   - Políticas de acesso granulares por tipo de recurso (segredos, chaves, certificados)
+   - Princípio do menor privilégio
    - Soft delete habilitado por padrão
    - Proteção contra purge configurável
-   - RBAC mínimo através de políticas de acesso granulares
 
-2. **Auditoria**:
-   - Logs de diagnóstico habilitados
+2. **Gerenciamento**:
+   - Separação clara entre diferentes tipos de identidades (usuários, managed identities, service principals)
+   - Configuração flexível através de variáveis
+   - Suporte a múltiplos ambientes
+
+3. **Auditoria**:
+   - Logs de diagnóstico configuráveis
    - Rastreamento de todas as operações
-
-3. **Gerenciamento**:
-   - Interface simples com valores sensíveis opcionais
-   - Suporte a múltiplas identidades gerenciadas
-   - Tags padrão para organização
-
-## Dependências
-
-- Provider AzureRM >= 3.0
-- Azure CLI configurado para autenticação (quando executado localmente)
-
-## Observações Importantes
-
-1. Para ambientes de produção, recomenda-se habilitar `purge_protection_enabled`
-2. Valores de secrets podem ser passados diretamente ou referenciados de outros data sources
-3. O módulo não gerencia rotacionamento automático de secrets - isso deve ser feito separadamente
-
-## Exemplo de Política de Acesso Adicional
-
-Para adicionar políticas de acesso customizadas:
-
-```hcl
-additional_access_policies = [
-  {
-    object_id = "00000000-0000-0000-0000-000000000000"
-    tenant_id = "00000000-0000-0000-0000-000000000000"
-    secret_permissions = ["Get", "List"]
-    key_permissions = []
-    certificate_permissions = []
-  }
-]
-```

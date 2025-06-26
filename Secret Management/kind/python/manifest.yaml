@@ -27,11 +27,11 @@ spec:
            cpu: "500m"
            memory: "512Mi"
        env:
-         - name: SEGREDO_AKV
+         - name: SEGREDO_GCP
            valueFrom:
              secretKeyRef:
-               name: minha-secret-no-k8s
-               key: minha-chave-no-k8s
+              name: minha-secret-no-k8s
+              key: minha-chave-no-k8s
 
 ---
 apiVersion: v1
@@ -46,23 +46,3 @@ spec:
  selector:
    app: python-hello-world
 
----
-# Este é um exemplo de manifesto do ExternalSecret para consumir uma secret do Azure Key Vault (AKV) e criar uma secret no Kubernetes.
-# Certifique-se de que o ClusterSecretStore já esteja configurado e referenciado corretamente.
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: exemplo-akv
-  namespace: default
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: azure-kv-store
-    kind: ClusterSecretStore
-  target:
-    name: minha-secret-no-k8s
-    creationPolicy: Owner
-  data:
-    - secretKey: minha-chave-no-k8s
-      remoteRef:
-        key: nome-da-secret-no-akv

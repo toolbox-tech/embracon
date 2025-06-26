@@ -13,10 +13,6 @@ spec:
      labels:
        app: python-hello-world
    spec:
-     volumes:
-      - name: secret-volume
-        secret:
-          secretName: minha-secret-no-k8s
      containers:
      - name: python-hello-world
        image: localhost/hello-world-python:latest
@@ -30,10 +26,12 @@ spec:
          limits:
            cpu: "500m"
            memory: "512Mi"
-       volumeMounts:
-       - name: secret-volume
-         mountPath: "/etc/secrets"
-         readOnly: true
+       env:
+         - name: SEGREDO_AKV
+           valueFrom:
+             secretKeyRef:
+               name: minha-secret-no-k8s
+               key: minha-chave-no-k8s
 
 ---
 apiVersion: v1

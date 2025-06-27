@@ -213,12 +213,170 @@ Após executar o comando copie o INTERNAL-IP e cole no navegador adicionando :30
 O arquivo [kind-config.yaml](kind-config.yaml) é um arquivo de configuração para o Kind (Kubernetes in Docker). Ele define como o cluster Kubernetes será configurado e quais são as características dos nós (nodes) que compõem o cluster. Nesse arquivo está sendo mapeada a porta 30000. Após terminar os passos [Deploy com Kubernetes](#deploy-com-kubernetes) é só acessar http://localhost:30000
 
 
-## Kind com External Secrets
+## Kind com External Secrets GCP
+
+Para usar o ExternalSecrets e buscar segredos do GCP Secret Manager em um cluster Kind local, você precisará configurar algumas coisas. O processo envolve a criação de uma conta de serviço no GCP, a obtenção de suas credenciais, a configuração do ExternalSecrets no seu cluster Kind e a criação dos recursos `SecretStore` e `ExternalSecret`.
+
+Vamos detalhar os passos:
+
+### 1\. Configuração no Google Cloud Platform (GCP)
+
+Primeiro, você precisa de uma **conta de serviço GCP** com permissões para acessar o Secret Manager.
+
+  * **Crie uma Conta de Serviço:**
+      * Vá para a seção "IAM & Admin" -\> "Service accounts" no console do GCP.
+      * Crie uma nova conta de serviço.
+  * **Conceda Permissões:**
+      * À essa conta de serviço, adicione o papel "Secret Manager Secret Accessor". Isso permitirá que ela leia os segredos.
+  * **Crie uma Chave JSON:**
+      * Após criar a conta de serviço, crie uma nova chave. Selecione o tipo "JSON".
+      * Faça o download deste arquivo JSON. Ele contém as credenciais que o ExternalSecrets usará.
+
+### 2\. Configuração do Cluster Kind
+
+Certifique-se de que seu cluster Kind esteja em execução. Se não estiver, você pode criá-lo com:
+
+```bash
+kind create cluster
+```
+
+### 3\. Instalação do ExternalSecrets
+
+Você pode instalar o ExternalSecrets em seu cluster Kind usando Helm:
+
+```bash
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
+```
+
+### 4\. Criando um Secret Kubernetes com as Credenciais GCP
+
+O ExternalSecrets precisa de uma forma segura de acessar suas credenciais GCP. Você fará isso criando um `Secret` no Kubernetes com o conteúdo do arquivo JSON que você baixou.
+
+  * **Codifique em Base64:**
+
+    ```bash
+    cat seu-arquivo-credenciais.json | base64
+    ```
+
+    Copie a saída.
+
+  * **Crie o Secret Kubernetes:**
+    Crie um arquivo YAML (ex: `gcp-credentials.yaml`):
+
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: gcp-secret-manager-credentials
+      namespace: default # Ou o namespace onde você planeja usar o ExternalSecret
+    type: Opaque
+    data:
+      credentials.json: SEU_CONTEUDO_BASE64_AQUI
+    ```
+
+    Substitua `SEU_CONTEUDO_BASE64_AQUI` pela saída do comando `base64`.
+
+    Aplique o Secret:
+
+    ```bash
+    kubectl apply -f gcp-credentials.yaml
+    ```
+
+### 5\. Criando um SecretStore
+
+O `SecretStore` é o recurso do ExternalSecrets que define como ele se conecta ao provedor de segredos (neste caso, o GCP Secret Manager).
+
+Crie um arquivo YAML (ex: `gcp-secretstore.yaml`):
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: gcp-secret-manager-store
+  namespace: default # Deve ser o mesmo namespace do seu ExternalSecret
+spec:
+  provider:
+    gcpsm:
+      projectID: SEU_PROJETO_GCP_ID # Substitua pelo ID do seu projeto GCP
+      auth:
+        secretRef:
+          secretRef:
+            name: gcp-secret-manager-credentials # Nome do Secret que criamos
+            key: credentials.json # Chave dentro do Secret que contém as credenciais
+```
+
+Substitua `SEU_PROJETO_GCP_ID` pelo ID real do seu projeto GCP.
+
+Aplique o SecretStore:
+
+```bash
+kubectl apply -f gcp-secretstore.yaml
+```
+
+### 6\. Criando um ExternalSecret
+
+Finalmente, o `ExternalSecret` é o recurso que especifica qual segredo do GCP Secret Manager você deseja buscar e como ele deve ser mapeado para um `Secret` do Kubernetes.
+
+Crie um arquivo YAML (ex: `my-external-secret.yaml`):
+
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: my-app-secret
+  namespace: default # Onde o Secret Kubernetes será criado
+spec:
+  refreshInterval: 1m # Opcional: frequência para verificar atualizações do segredo
+  secretStoreRef:
+    name: gcp-secret-manager-store # Nome do SecretStore que criamos
+    kind: SecretStore
+  target:
+    name: my-app-secret-k8s # Nome do Secret Kubernetes a ser criado
+  data:
+  - secretKey: my-gcp-secret-key # Nome da chave no Secret Kubernetes
+    remoteRef:
+      key: NOME_DO_SEGREDO_NO_GCP # Nome do segredo no GCP Secret Manager
+      # version: latest # Opcional: Especifique a versão do segredo (padrão é latest)
+```
+
+Substitua `NOME_DO_SEGREDO_NO_GCP` pelo nome do segredo que você tem no GCP Secret Manager.
+
+Aplique o ExternalSecret:
+
+```bash
+kubectl apply -f my-external-secret.yaml
+```
+
+### 7\. Verificando o Secret Criado
+
+Após alguns momentos, o ExternalSecrets deve criar um Secret no Kubernetes com os dados do seu segredo do GCP. Você pode verificar com:
+
+```bash
+kubectl get secret my-app-secret-k8s -o yaml
+```
+
+Você deverá ver o segredo decodificado nos dados.
+
+### Considerações Importantes para Teste Local:
+
+  * **Acessibilidade da Rede:** Certifique-se de que seu cluster Kind (e, por extensão, o pod do ExternalSecrets) pode acessar os endpoints da API do GCP. Em uma configuração local, isso geralmente não é um problema, mas é algo a se considerar em ambientes mais complexos.
+  * **Permissões:** Sempre revise as permissões da sua conta de serviço GCP para garantir o **princípio do menor privilégio**.
+  * **Depuração:** Se algo não funcionar, verifique os logs do pod do ExternalSecrets:
+    ```bash
+    kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets
+    ```
+    Isso pode fornecer pistas sobre quaisquer erros de configuração ou permissão.
+
+Com esses passos, você deverá conseguir buscar seus segredos do GCP Secret Manager em seu cluster Kind local usando o ExternalSecrets.
+
+
+# Annotations
+
 
 kind load docker-image localhost/hello-world-python --name <nome-do-cluster>
-kubectl create secret generic gcp-sa-secret --from-file=sa-key-secret-manager.json=sa-key-secret-manager.json  -n default
 kubectl apply -f .\bundle.yaml
 kubectl apply -f .\secretstore-gcp.yaml
 kubectl apply -f .\external-secret-gcp.yaml
-kubectl get pods -n external-secrets
 kubectl apply -f .\manifest.yaml
+

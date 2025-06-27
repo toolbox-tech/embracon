@@ -7,7 +7,7 @@ app = Flask(__name__)  # Crie uma aplicação Flask
 @app.route('/')  # Defina uma rota para a URL raiz ("/")
 def hello_world():  # Defina uma função para lidar com a requisição da URL raiz
     if segredo:  # Verifique se a variável de ambiente SEGREDO_AKV está definida
-        print(f"Segredo GCP: {segredo}")
+        return render_template('index.html', segredo=segredo)
     else:  # Se a variável de ambiente SEGREDO_AKV não estiver definida
         print("Segredo GCP não encontrado")
     # Renderize o template index.html

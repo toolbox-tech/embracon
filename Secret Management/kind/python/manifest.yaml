@@ -30,8 +30,8 @@ spec:
          - name: SEGREDO_GCP
            valueFrom:
              secretKeyRef:
-              name: minha-secret-no-k8s
-              key: minha-chave-no-k8s
+              name: my-app-secret-k8s
+              key: my-gcp-secret-key
 
 ---
 apiVersion: v1

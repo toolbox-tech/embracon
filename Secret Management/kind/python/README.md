@@ -216,9 +216,9 @@ O arquivo [kind-config.yaml](kind-config.yaml) é um arquivo de configuração p
 ## Kind com External Secrets
 
 kind load docker-image localhost/hello-world-python --name <nome-do-cluster>
+kubectl create secret generic gcp-sa-secret --from-file=sa-key-secret-manager.json=sa-key-secret-manager.json  -n default
 kubectl apply -f .\bundle.yaml
-kubectl create secret generic gcp-sa-secret --from-file=sa-key-secret-manager.json  -n default
 kubectl apply -f .\secretstore-gcp.yaml
-kubectl apply -f .\externalsecret.yaml
+kubectl apply -f .\external-secret-gcp.yaml
 kubectl get pods -n external-secrets
 kubectl apply -f .\manifest.yaml

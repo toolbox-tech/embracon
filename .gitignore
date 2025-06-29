@@ -24,3 +24,4 @@ override.tf.json
 terraform.rc
 .terraform.lock.hcl
 sa-key-secret-manager.json
+secret.yaml

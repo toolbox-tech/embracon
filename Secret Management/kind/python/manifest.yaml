@@ -13,6 +13,13 @@ spec:
      labels:
        app: python-hello-world
    spec:
+    #  initContainers:
+    #  - name: check-secret
+    #    image: busybox
+    #    command: ['sh', '-c', 'test -f /secrets/my-akv-secret-key']
+    #    volumeMounts:
+    #    - name: secret-volume
+    #      mountPath: /secrets
      containers:
      - name: python-hello-world
        image: localhost/hello-world-python:latest
@@ -32,6 +39,14 @@ spec:
              secretKeyRef:
               name: my-app-secret-k8s-akv
               key: my-akv-secret-key
+    #    volumeMounts:
+    #    - name: secret-volume
+    #      mountPath: /secrets
+    #      readOnly: true
+    #  volumes:
+    #  - name: secret-volume
+    #    secret:
+    #      secretName: my-app-secret-k8s-akv
 
 ---
 apiVersion: v1

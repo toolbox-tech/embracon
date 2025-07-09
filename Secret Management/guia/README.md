@@ -435,3 +435,22 @@ spec:
   * **Monitoramento:** Monitore os logs do pod do ExternalSecrets para quaisquer erros de sincronização ou problemas de permissão.
 
 Ao seguir este guia e as melhores práticas de segurança, a Embracon poderá gerenciar seus segredos de forma eficaz e segura usando ExternalSecrets e Azure Key Vault, independentemente de seus clusters estarem no Azure ou na Oracle Cloud.
+
+
+# Erro ao atualizar o secret usando como variavel de ambiente
+
+Isso acontece porque o Kubernetes não atualiza automaticamente as variáveis de ambiente dos pods quando um Secret é alterado. O pod só lê o valor do Secret no momento em que é criado.
+
+Como resolver
+Opção 1: Reinicie o deployment para recriar o pod
+
+```bash
+kubectl rollout restart deployment python-hello-world
+```
+
+Isso fará com que o pod seja recriado e leia o novo valor do Secret.
+
+Opção 2: Use volumes de Secret (hot reload) Se quiser que o pod veja atualizações automaticamente, monte o Secret como um volume em vez de variável de ambiente. Assim, o arquivo é atualizado automaticamente no pod, mas você precisa adaptar seu app para ler o arquivo em vez da env var.
+
+Resumo:
+Sempre que mudar o valor de um Secret usado como variável de ambiente, reinicie o deployment para que os pods usem o novo valor.

@@ -115,3 +115,63 @@ az ad app federated-credential list --id 5516b68c-297b-4132-ac9d-dd55ef1cba77
 ```
 
 Acessar [identidade empresarial](https://portal.azure.com/#view/Microsoft_AAD_IAM/ManagedAppMenuBlade/~/Users/objectId/42569e6b-97c7-4bd8-a383-4fb79f858f11/appId/5516b68c-297b-4132-ac9d-dd55ef1cba77/preferredSingleSignOnMode~/null/servicePrincipalType/Application/fromNav/)
+
+# Explicação dos Conceitos no README: Acesso ao Azure Key Vault (AKV) via AKS
+
+Este README descreve uma abordagem segura para acessar segredos armazenados no Azure Key Vault (AKV) a partir de um cluster Azure Kubernetes Service (AKS). Vamos decompor os principais conceitos:
+
+## 1. Secret Zero
+- **Problema**: O "segredo zero" é a credencial inicial necessária para obter outros segredos, criando um ponto único de falha.
+- **Solução proposta**: Eliminar a necessidade de armazenar qualquer segredo fixo no cluster usando Federação de Identidade.
+
+## 2. Métodos de Acesso AKV → AKS
+### Driver CSI do Azure Key Vault
+- **Funcionamento**: Monta segredos do AKV como volumes nos pods.
+- **Limitações**:
+  - Não atualiza automaticamente quando segredos mudam (requer reinício do pod)
+  - Cria identidade gerenciada no grupo de recursos do nó
+
+### External Secrets Operator
+- **Vantagem**: Solução mais flexível que sincroniza segredos do AKV para Secrets nativos do Kubernetes
+- **Integração**: Usa Workload Identity Federation com OIDC para acesso seguro
+
+## 3. OpenID Connect (OIDC) e Federação de Identidade
+- **O que é**: Protocolo de autenticação baseado em OAuth 2.0
+- **Benefícios**:
+  - Elimina necessidade de armazenar secrets no cluster
+  - Usa tokens JWT temporários e de curta duração
+  - Permite autenticação direta no Azure AD
+
+## 4. Workload Identity Federation
+- **Como funciona**: Estabelece confiança entre o AKS e Azure AD
+- **Fluxo**:
+  1. Cluster AKS emite tokens OIDC
+  2. Azure AD valida esses tokens
+  3. Pods podem assumir identidade do Azure AD sem secrets
+
+## 5. Componentes Principais
+### Azure AD Application
+- Atua como identidade central para acesso ao AKV
+- Configurado com credenciais federadas para aceitar tokens do AKS
+
+### Kubernetes ServiceAccount
+- Vinculada ao aplicativo do Azure AD via anotações
+- Pods usam esta ServiceAccount para obter tokens de acesso
+
+### RBAC no Azure
+- Controle granular de acesso aos segredos no AKV
+- Grupos do Azure AD definem quem tem acesso
+
+## 6. Ferramentas Utilizadas
+- **azwi**: CLI para configurar Workload Identity
+- **External Secrets Operator**: Operador Kubernetes que sincroniza segredos externos
+
+## Fluxo Completo
+1. Pod inicia com ServiceAccount configurada
+2. OIDC emite token JWT para o pod
+3. Pod usa token para autenticar no Azure AD
+4. Azure AD valida token contra aplicativo registrado
+5. Pod recebe token de acesso para AKV
+6. External Secrets sincroniza segredos para o cluster
+
+Esta abordagem oferece segurança superior ao eliminar a necessidade de armazenar credenciais fixas, enquanto mantém a praticidade de acesso aos segredos necessários para as aplicações.

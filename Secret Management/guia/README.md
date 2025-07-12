@@ -66,6 +66,8 @@ A Azur fornece um tutorial para [Criar um provedor do OpenID Connect no Serviço
 
 [External Secrets AKV](https://external-secrets.io/v0.6.1/provider/azure-key-vault/)
 
+[Azure AD Workload Identity](https://azure.github.io/azure-workload-identity/docs/quick-start.html#5-create-a-kubernetes-service-account)
+
 Será utilizados o [azwi](https://azure.github.io/azure-workload-identity/docs/introduction.html)
 
 Comandos para executar a associação entre a ServiceAccount do Kubernetes e o aplicativo do Azure AD, utilize o comando abaixo:

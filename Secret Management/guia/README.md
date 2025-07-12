@@ -64,6 +64,8 @@ Dessa forma, o acesso aos secrets é controlado centralmente pelo Azure AD, faci
 
 A Azur fornece um tutorial para [Criar um provedor do OpenID Connect no Serviço de Kubernetes do Azure (AKS)](https://learn.microsoft.com/pt-br/azure/aks/use-oidc-issuer). O Workload Identity Federation (WIF) utiliza o OIDC (OpenID Connect) como mecanismo de autenticação. O OIDC é um protocolo de identidade baseado em OAuth 2.0, que permite que o AKS emita tokens de identidade para workloads (pods) sem a necessidade de armazenar secrets sensíveis no cluster. Com o WIF, o Azure AD confia nos tokens OIDC emitidos pelo cluster Kubernetes, permitindo que workloads autenticadas acessem recursos do Azure (como o Key Vault) de forma segura e automatizada, eliminando o "Secret Zero" e facilitando o gerenciamento de identidades.
 
+Será utilizados o [azwi](https://azure.github.io/azure-workload-identity/docs/introduction.html)
+
 Comandos para executar a associação entre a ServiceAccount do Kubernetes e o aplicativo do Azure AD, utilize o comando abaixo:
 
 ```bash

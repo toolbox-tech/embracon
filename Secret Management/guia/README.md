@@ -319,5 +319,3 @@ az ad app federated-credential list --id $APP_OBJECT_ID
 - O comando `azwi` faz parte da [Azure Workload Identity CLI](https://azure.github.io/azure-workload-identity/docs/installation/cli.html).
 - O grupo é usado para facilitar o gerenciamento de permissões no Key Vault via RBAC.
 - O OIDC issuer é obrigatório para workload identity federation.
-
-Se quiser um resumo mais enxuto, ou um script único para um desses cenários, só pedir!

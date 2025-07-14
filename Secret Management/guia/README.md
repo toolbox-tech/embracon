@@ -188,7 +188,8 @@ Esta abordagem oferece segurança superior ao eliminar a necessidade de armazena
 ```bash
 # 1. Criar a Azure AD Application
 az ad app create --display-name "akv-test"
-APP_OBJECT_ID=$(az ad app show --id "akv-test" --query id -o tsv)
+
+APP_OBJECT_ID=$(az ad app list --query "[?displayName=='akv-test'].appId" -o tsv)
 
 # 2. Criar um grupo no Azure AD e adicionar o app
 az ad group create --display-name "kv-access-group" --mail-nickname "kv-access-group"
@@ -200,7 +201,7 @@ az keyvault create \
   --name <SEU_KEYVAULT_NAME> \
   --resource-group <SEU_RESOURCE_GROUP> \
   --location <SUA_LOCALIZACAO> \
-  --enable-rbac-authorization true
+  --enable-rbac-authorization trueecho 
 
 # 4. Conceder acesso ao grupo no Key Vault via RBAC
 az role assignment create \

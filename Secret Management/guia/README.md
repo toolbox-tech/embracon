@@ -186,28 +186,48 @@ Esta abordagem oferece segurança superior ao eliminar a necessidade de armazena
 ## Cenário 1: Criando tudo do zero (incluindo o AKS com OIDC já habilitado)
 
 ```bash
-# 1. Criar a Azure AD Application
-az ad app create --display-name "akv-test"
-
-APP_OBJECT_ID=$(az ad app list --query "[?displayName=='akv-test'].appId" -o tsv)
-
-# 2. Criar um grupo no Azure AD e adicionar o app
+az identity create --name teste-aks-akv --resource-group Embracon
+az identity show --name $IDENTITY_NAME --resource-group $IDENTITY_RESOURCE_GROUP --query principalId -o tsv
+az identity show --name IDENTITY_NAME --resource-group $IDENTITY_RESOURCE_GROUP --query principalId -o tsv
+az identity show --name teste-aks-akv --resource-group Embracon --query principalId -o tsv
+IDENTITY_NAME="teste-aks-akv"
+IDENTITY_RESOURCE_GROUP="Embracon"
+az identity show --name $IDENTITY_NAME --resource-group $IDENTITY_RESOURCE_GROUP --query principalId -o tsv
+IDENTITY_PRINCIPAL_ID="$(az identity show --name teste-aks-akv --resource-group Embracon --query principalId -o tsv)"
+echo $IDENTITY_PRINCIPAL_ID
+az ad group member add --group "kv-access-group" --member-id $IDENTITY_PRINCIPAL_ID
 az ad group create --display-name "kv-access-group" --mail-nickname "kv-access-group"
-GROUP_OBJECT_ID=$(az ad group show --group "kv-access-group" --query id -o tsv)
-az ad group member add --group "kv-access-group" --member-id $APP_OBJECT_ID
+az ad group member add --group "kv-access-group" --member-id $IDENTITY_PRINCIPAL_ID
+AKS_CLUSTER_NAME="akv-test"
+AKS_RESOURCE_GROUP="Embracon"
+AKS_OIDC_ISSUER="$(az aks show --name $AKS_CLUSTER_NAME --resource-group $AKS_RESOURCE_GROUP --query "oidcIssuerProfile.issuerUrl" -o tsv)"
+echo $AKS_OIDC_ISSUER
+az account show --query tenantId -o tsv
+az identity federated-credential create --name "kubernetes-federated-credential" \
+  --identity-name "teste-aks-akv" \
+  --resource-group "Embracon" \
+  --issuer $AKS_OIDC_ISSUER \
+  --subject system:serviceaccount:default:my-app-sa
+```
 
-# 3. Criar o Key Vault habilitando RBAC
+
+```bash
+# 1. Criar o grupo
+az ad group create --display-name "<SEU_GROUP_NAME>" --mail-nickname "<SEU_GROUP_NAME>"
+
+# 2. Criar a Identity Managed
+az identity create --name <SEU_IDENTITY_MANAGED_NAME> --resource-group <SEU_RESOURCE_GROUP>
+
+# 3. Adiciona a Identity Managed ao Grupo
+IDENTITY_PRINCIPAL_ID="$(az identity show --name <SEU_IDENTITY_MANAGED_NAME> --resource-group <SEU_RESOURCE_GROUP> --query principalId -o tsv)"
+az ad group member add --group "<SEU_GROUP_NAME>" --member-id $IDENTITY_PRINCIPAL_ID
+
+# 4. Criar o Key Vault habilitando RBAC
 az keyvault create \
   --name <SEU_KEYVAULT_NAME> \
   --resource-group <SEU_RESOURCE_GROUP> \
   --location <SUA_LOCALIZACAO> \
-  --enable-rbac-authorization trueecho 
-
-# 4. Conceder acesso ao grupo no Key Vault via RBAC
-az role assignment create \
-  --assignee-object-id $GROUP_OBJECT_ID \
-  --role "Key Vault Secrets User" \
-  --scope $(az keyvault show --name <SEU_KEYVAULT_NAME> --query id -o tsv)
+  --enable-rbac-authorization true 
 
 # 5. Criar o cluster AKS Free Tier com OIDC já habilitado, autoscaler entre 1 e 3 nós
 az aks create \
@@ -226,22 +246,17 @@ az aks create \
 az aks get-credentials --name <SEU_AKS_NAME> --resource-group <SEU_RESOURCE_GROUP>
 
 # 7. Descobrir o issuer URL do OIDC (necessário para federated identity)
-OIDC_ISSUER_URL=$(az aks show --name <SEU_AKS_NAME> --resource-group <SEU_RESOURCE_GROUP> --query "oidcIssuerProfile.issuerUrl" -o tsv)
+AKS_OIDC_ISSUER=$(az aks show --name <SEU_AKS_NAME> --resource-group <SEU_RESOURCE_GROUP> --query "oidcIssuerProfile.issuerUrl" -o tsv)
 
 # 8. Criar a ServiceAccount Kubernetes associada ao AAD Application
-azwi serviceaccount create phase sa \
-  --aad-application-name "akv-test" \
-  --service-account-namespace "default" \
-  --service-account-name "workload-identity-sa"
+az identity federated-credential create --name "kubernetes-federated-credential" \
+  --identity-name "<SEU_IDENTITY_MANAGED_NAME>" \
+  --resource-group "<SEU_RESOURCE_GROUP>" \
+  --issuer $AKS_OIDC_ISSUER \
+  --subject system:serviceaccount:default:workload-identity-sa
+  #--subject system:serviceaccount:$NAMESPACE:$SERVICE_ACCOUNT_NAME
 
-# 9. Criar a identidade federada no Azure AD Application
-azwi serviceaccount create phase federated-identity \
-  --aad-application-name "akv-test" \
-  --service-account-namespace "default" \
-  --service-account-name "workload-identity-sa" \
-  --service-account-issuer-url "$OIDC_ISSUER_URL"
-
-# 10. Conferir ServiceAccount e federated credential
+# 9. Conferir ServiceAccount e federated credential
 kubectl get serviceaccount workload-identity-sa -n default
 kubectl describe serviceaccount workload-identity-sa -n default
 az ad app federated-credential list --id $APP_OBJECT_ID

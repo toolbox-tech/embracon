@@ -45,7 +45,18 @@ Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (A
 
 ## 4. Passo a Passo
 
-### 4.1. Defina Variáveis
+### 4.1. Faça login e defina a subscription
+
+Antes de iniciar, faça login no Azure CLI e defina a subscription correta:
+
+```bash
+az login
+az account set --subscription "<SUA_SUBSCRIPTION_ID>"
+```
+
+Substitua `<SUA_SUBSCRIPTION_ID>` pelo ID da subscription desejada.
+
+### 4.2. Defina Variáveis
 
 ```bash
 SEU_GROUP_NAME="akv-access-group"
@@ -59,7 +70,7 @@ NAMESPACE="default"
 TENANT_ID="$(az account show --query tenantId -o tsv)"
 ```
 
-### 4.2. Crie os Recursos no Azure
+### 4.3. Crie os Recursos no Azure
 
 ```bash
 # Grupo de acesso
@@ -82,7 +93,7 @@ az keyvault create \
 KEY_VAULT_URL="$(az keyvault show --name "$SEU_KEYVAULT_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query properties.vaultUri -o tsv)"
 ```
 
-### 4.3. Crie ou Atualize o AKS com OIDC
+### 4.4. Crie ou Atualize o AKS com OIDC
 
 **Novo cluster:**
 ```bash
@@ -114,7 +125,7 @@ Descubra o issuer URL do OIDC:
 AKS_OIDC_ISSUER=$(az aks show --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query "oidcIssuerProfile.issuerUrl" -o tsv)
 ```
 
-### 4.4. Configure a Federação de Identidade
+### 4.5. Configure a Federação de Identidade
 
 ```bash
 az identity federated-credential create --name "kubernetes-federated-credential" \
@@ -124,14 +135,14 @@ az identity federated-credential create --name "kubernetes-federated-credential"
   --subject system:serviceaccount:$NAMESPACE:$SERVICE_ACCOUNT_NAME
 ```
 
-### 4.5. Instale o External Secrets Operator
+### 4.6. Instale o External Secrets Operator
 
 ```bash
 helm repo add external-secrets https://charts.external-secrets.io
 helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
 ```
 
-### 4.6. Crie a ServiceAccount no Kubernetes
+### 4.7. Crie a ServiceAccount no Kubernetes
 
 Crie um arquivo `service-account.yaml` com as anotações necessárias (client-id, tenant-id).
 (substitua pelos valores das variáveis que você obteve anteriormente):
@@ -153,7 +164,9 @@ metadata:
 ```bash
 kubectl apply -f service-account.yaml
 ```
-### 4.7 Crie o Secret Store
+
+### 4.8. Crie o Secret Store
+
 Crie um arquivo `secretstore-az.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
 
 ```yaml
@@ -177,10 +190,10 @@ spec:
 Aplique o recurso:
 
 ```bash
-kubectl apply -f secretstore.yaml
+kubectl apply -f secretstore-az.yaml
 ```
 
-### 4.8. Conceda Permissões no Key Vault
+### 4.9. Conceda Permissões no Key Vault
 
 No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME` no Key Vault.
 

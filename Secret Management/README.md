@@ -33,13 +33,15 @@ Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (A
 
 1. Crie um grupo no Azure AD para controle de acesso.
 2. Crie uma Managed Identity para workloads do AKS.
-3. Crie o Key Vault com RBAC habilitado.
-4. Crie ou atualize o cluster AKS com OIDC habilitado.
-5. Configure a federação de identidade entre o AKS e a Managed Identity.
-6. Instale o External Secrets Operator no cluster.
-7. Crie a ServiceAccount no Kubernetes com as anotações necessárias.
-8. Conceda permissões de acesso ao grupo no Key Vault.
-9. Sincronize segredos do AKV para o Kubernetes usando External Secrets.
+3. Adicione a Managed Identity ao grupo criado.
+4. Crie o Key Vault com RBAC habilitado.
+5. Crie ou atualize o cluster AKS com OIDC habilitado.
+6. Configure a federação de identidade entre o AKS e a Managed Identity.
+7. Instale o External Secrets Operator no cluster.
+8. Crie a ServiceAccount no Kubernetes com as anotações necessárias.
+9. Crie o SecretStore apontando para o Key Vault.
+10. Conceda permissões de acesso ao grupo no Key Vault.
+11. Crie o recurso ExternalSecret para sincronizar segredos do AKV para o Kubernetes.
 
 ---
 

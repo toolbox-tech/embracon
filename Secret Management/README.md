@@ -1,323 +1,218 @@
-# Gerenciamento de Azure Key Vault com Terraform e GitHub Actions
+# Guia para acessar um segredo no Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS)
 
-## Observações
+Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS) de forma segura, utilizando a Federação de Identidade de Carga de Trabalho (Workload Identity Federation) via OIDC, External Secrets Operator e RBAC do Azure.
 
-Ao conceder uma política de acesso a um Key Vault, você pode definir permissões específicas para segredos, chaves e certificados de forma independente. Sempre revise cuidadosamente as permissões concedidas e aplique o princípio do menor privilégio, garantindo que cada identidade tenha acesso apenas ao necessário para sua função.
+## Visão Geral
 
-A política de acesso é uma por Key Vault, e não por segredo. Portanto, ao conceder acesso a um usuário ou grupo, você está concedendo acesso a todos os segredos dentro do Key Vault. Isso significa que não é possível restringir o acesso a um único segredo ou a um grupo específico de segredos.
+- **Elimina o "Secret Zero"**: Não é necessário armazenar secrets fixos no cluster.
+- **Segurança aprimorada**: O acesso é feito por tokens temporários emitidos via OIDC.
+- **Automação**: Permissões dinâmicas para workloads, sem rotacionar secrets manualmente.
+- **Gerenciamento centralizado**: RBAC do Azure AD controla o acesso aos segredos.
 
-Por padrão, o acesso ao Key Vault é permitido de qualquer rede, mas você pode configurar regras de firewall para restringir o acesso.
+---
 
-É necessário habilitar o monitoramento (logging e metrics) para o Key Vault para garantir que todas as operações sejam auditadas.
+## 1. Conceitos-Chave
 
-## Estrutura do Repositório Terraform
+- **Secret Zero**: Segredo inicial que, se exposto, compromete todo o acesso. Eliminado com OIDC.
+- **OIDC (OpenID Connect)**: Protocolo de autenticação que permite ao AKS emitir tokens para workloads.
+- **Workload Identity Federation**: Permite que pods do AKS assumam identidades do Azure AD sem secrets.
+- **External Secrets Operator**: Sincroniza segredos do AKV para o Kubernetes.
+- **RBAC do Azure**: Gerencia quem pode acessar quais segredos no AKV.
 
-```
-infra-secrets/
-├── .github/
-│   └── workflows/
-│       ├── terraform-apply.yml
-│       └── terraform-plan.yml
-├── modules/
-│   └── keyvault/
-│       ├── main.tf
-│       ├── variables.tf
-│       ├── outputs.tf
-│       ├── access_policy.tf
-│       └── diagnostics.tf
-└── README.md
-```
+---
 
-## Módulo Terraform para Azure Key Vault
+## 2. Pré-requisitos
 
-### Recursos Principais (main.tf)
+- Azure CLI configurado (`az login`)
+- Permissões para criar recursos no Azure (AKS, Key Vault, Managed Identity, Grupos)
+- Helm instalado para deploy do External Secrets Operator
 
-```hcl
-# modules/keyvault/main.tf
-data "azurerm_client_config" "current" {}
+---
 
-resource "azurerm_key_vault" "kv" {
-  name                        = var.key_vault_name
-  location                    = var.location
-  resource_group_name         = var.resource_group_name
-  enabled_for_disk_encryption = true
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  soft_delete_retention_days  = 90
-  purge_protection_enabled    = var.purge_protection_enabled
+## 3. Fluxo Resumido
 
-  sku_name = "standard"
+1. Crie um grupo no Azure AD para controle de acesso.
+2. Crie uma Managed Identity para workloads do AKS.
+3. Crie o Key Vault com RBAC habilitado.
+4. Crie ou atualize o cluster AKS com OIDC habilitado.
+5. Configure a federação de identidade entre o AKS e a Managed Identity.
+6. Instale o External Secrets Operator no cluster.
+7. Crie a ServiceAccount no Kubernetes com as anotações necessárias.
+8. Conceda permissões de acesso ao grupo no Key Vault.
+9. Sincronize segredos do AKV para o Kubernetes usando External Secrets.
 
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
+---
 
-    key_permissions = [
-      "Get", "List", "Create", "Delete", "Recover", "Backup", "Restore"
-    ]
+## 4. Passo a Passo
 
-    secret_permissions = [
-      "Get", "List", "Set", "Delete", "Recover", "Backup", "Restore", "Purge"
-    ]
+### 4.1. Defina Variáveis
 
-    certificate_permissions = [
-      "Get", "List", "Create", "Delete", "Recover", "Backup", "Restore", "Purge"
-    ]
-  }
-
-  tags = var.tags
-}
+```bash
+SEU_GROUP_NAME="akv-access-group"
+SEU_IDENTITY_MANAGED_NAME="test-aks-akv"
+SEU_RESOURCE_GROUP="Embracon"
+SEU_KEYVAULT_NAME="akv-test-embracon"
+SUA_LOCALIZACAO="brazilsouth"
+SEU_AKS_NAME="aks-test"
+SERVICE_ACCOUNT_NAME="workload-identity-sa"
+NAMESPACE="default"
+TENANT_ID="$(az account show --query tenantId -o tsv)"
 ```
 
-### Políticas de Acesso (access_policy.tf)
+### 4.2. Crie os Recursos no Azure
 
-```hcl
-# modules/keyvault/access_policy.tf
-resource "azurerm_key_vault_access_policy" "github_actions" {
-  count = var.github_actions_object_id != null ? 1 : 0
+```bash
+# Grupo de acesso
+az ad group create --display-name "$SEU_GROUP_NAME" --mail-nickname "$SEU_GROUP_NAME"
 
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = var.github_actions_object_id
+# Managed Identity
+az identity create --name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP" --location "$SUA_LOCALIZACAO"
+IDENTITY_PRINCIPAL_ID="$(az identity show --name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query principalId -o tsv)"
+CLIENT_ID="$(az identity show --name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query clientId -o tsv)"
 
-  secret_permissions = [
-    "Get", "List", "Set", "Delete", "Recover", "Backup", "Restore"
-  ]
-}
+# Adicione a Managed Identity ao grupo
+az ad group member add --group "$SEU_GROUP_NAME" --member-id "$IDENTITY_PRINCIPAL_ID"
 
-resource "azurerm_key_vault_access_policy" "managed_identities" {
-  for_each = toset(var.managed_identities)
-
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = each.value
-
-  secret_permissions = [
-    "Get", "List"
-  ]
-}
-
-resource "azurerm_key_vault_access_policy" "users" {
-  for_each = { for idx, policy in var.user_access_policies : idx => policy }
-
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = each.value.object_id
-
-  key_permissions         = lookup(each.value, "key_permissions", [])
-  secret_permissions      = lookup(each.value, "secret_permissions", [])
-  certificate_permissions = lookup(each.value, "certificate_permissions", [])
-}
+# Key Vault com RBAC
+az keyvault create \
+  --name "$SEU_KEYVAULT_NAME" \
+  --resource-group "$SEU_RESOURCE_GROUP" \
+  --location "$SUA_LOCALIZACAO" \
+  --enable-rbac-authorization true
+KEY_VAULT_URL="$(az keyvault show --name "$SEU_KEYVAULT_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query properties.vaultUri -o tsv)"
 ```
 
-### Variáveis (variables.tf)
+### 4.3. Crie ou Atualize o AKS com OIDC
 
-```hcl
-# modules/keyvault/variables.tf
-variable "key_vault_name" {
-  description = "Nome do Azure Key Vault"
-  type        = string
-}
-
-variable "location" {
-  description = "Localização do recurso"
-  type        = string
-}
-
-variable "resource_group_name" {
-  description = "Nome do Resource Group"
-  type        = string
-}
-
-variable "purge_protection_enabled" {
-  description = "Habilita purge protection no Key Vault"
-  type        = bool
-  default     = true
-}
-
-variable "github_actions_object_id" {
-  description = "Object ID do GitHub Actions para acesso ao Key Vault"
-  type        = string
-  default     = null
-}
-
-variable "managed_identities" {
-  description = "Lista de Object IDs das Managed Identities com acesso ao Vault"
-  type        = list(string)
-  default     = []
-}
-
-variable "user_access_policies" {
-  description = "Lista de políticas de acesso para usuários/grupos"
-  type = list(object({
-    object_id               = string
-    key_permissions         = optional(list(string), [])
-    secret_permissions      = optional(list(string), [])
-    certificate_permissions = optional(list(string), [])
-  }))
-  default = []
-}
-
-variable "tags" {
-  description = "Tags para os recursos"
-  type        = map(string)
-  default     = {}
-}
+**Novo cluster:**
+```bash
+az aks create \
+  --name "$SEU_AKS_NAME" \
+  --resource-group "$SEU_RESOURCE_GROUP" \
+  --location "$SUA_LOCALIZACAO" \
+  --enable-oidc-issuer \
+  --enable-managed-identity \
+  --node-count 1 \
+  --enable-cluster-autoscaler \
+  --min-count 1 \
+  --max-count 3 \
+  --tier free
 ```
 
-### Outputs (outputs.tf)
-
-```hcl
-# modules/keyvault/outputs.tf
-output "key_vault_id" {
-  description = "ID do Key Vault criado"
-  value       = azurerm_key_vault.kv.id
-}
-
-output "key_vault_name" {
-  description = "Nome do Key Vault"
-  value       = azurerm_key_vault.kv.name
-}
-
-output "key_vault_uri" {
-  description = "URI do Key Vault"
-  value       = azurerm_key_vault.kv.vault_uri
-}
+**Cluster existente:**
+```bash
+az aks update --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP" --enable-oidc-issuer
 ```
 
-## Como Usar o Módulo
-
-### Exemplo de uso em environments/dev/main.tf
-
-```hcl
-module "key_vault" {
-  source = "../../modules/keyvault"
-
-  key_vault_name          = "kv-dev-myapp"
-  resource_group_name     = var.resource_group_name
-  location                = var.location
-  purge_protection_enabled = false
-
-  # Acesso para GitHub Actions
-  github_actions_object_id = var.github_actions_object_id
-
-  # Managed Identities com acesso de leitura
-  managed_identities = [
-    var.app_managed_identity_id
-  ]
-
-  # Usuários/grupos com acesso específico
-  user_access_policies = [
-    {
-      object_id = var.dev_team_group_id
-      secret_permissions = ["Get", "List", "Set"]
-    },
-    {
-      object_id = var.security_team_group_id
-      secret_permissions = ["Get", "List", "Set", "Delete", "Recover", "Backup", "Restore"]
-      key_permissions = ["Get", "List"]
-      certificate_permissions = ["Get", "List"]
-    }
-  ]
-
-  tags = {
-    Environment = "Development"
-    Project     = "MyApp"
-  }
-}
+Obtenha as credenciais:
+```bash
+az aks get-credentials --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP"
 ```
 
-## Configuração de CI/CD com GitHub Actions
+Descubra o issuer URL do OIDC:
+```bash
+AKS_OIDC_ISSUER=$(az aks show --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query "oidcIssuerProfile.issuerUrl" -o tsv)
+```
 
-### terraform-plan.yml
+### 4.4. Configure a Federação de Identidade
+
+```bash
+az identity federated-credential create --name "kubernetes-federated-credential" \
+  --identity-name "$SEU_IDENTITY_MANAGED_NAME" \
+  --resource-group "$SEU_RESOURCE_GROUP" \
+  --issuer "$AKS_OIDC_ISSUER" \
+  --subject system:serviceaccount:$NAMESPACE:$SERVICE_ACCOUNT_NAME
+```
+
+### 4.5. Instale o External Secrets Operator
+
+```bash
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
+```
+
+### 4.6. Crie a ServiceAccount no Kubernetes
+
+Crie um arquivo `service-account.yaml` com as anotações necessárias (client-id, tenant-id).
+(substitua pelos valores das variáveis que você obteve anteriormente):
 
 ```yaml
-name: Terraform Plan
-on:
-  pull_request:
-    branches: [main]
-    paths: ['environments/**', 'modules/**']
-
-jobs:
-  terraform-plan:
-    runs-on: ubuntu-latest
-    environment: dev
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Terraform Init
-        run: terraform init
-        working-directory: ./environments/dev
-
-      - name: Terraform Plan
-        run: terraform plan -var-file="terraform.tfvars"
-        working-directory: ./environments/dev
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload-identity-sa
+  annotations:
+    azure.workload.identity/client-id: "<CLIENT_ID>"
+    azure.workload.identity/tenant-id: "<TENANT_ID>"
 ```
 
-### terraform-apply.yml
+> **Nota:**  
+> - Substitua `<CLIENT_ID>` pelo valor da variável `$CLIENT_ID`.
+> - Substitua `<TENANT_ID>` pelo valor da variável `$TENANT_ID`.
+
+```bash
+kubectl apply -f service-account.yaml
+```
+### 4.7 Crie o Secret Store
+Crie um arquivo `secretstore-az.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
 
 ```yaml
-name: Terraform Apply
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Ambiente (dev, hml, prod)'
-        required: true
-        default: 'dev'
-
-jobs:
-  terraform-apply:
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Terraform Init
-        run: terraform init
-        working-directory: ./environments/${{ inputs.environment }}
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve -var-file="terraform.tfvars"
-        working-directory: ./environments/${{ inputs.environment }}
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: akv-secret-manager-store
+  namespace: default
+spec:
+  provider:
+    azurekv:
+      authType: WorkloadIdentity
+      vaultUrl: "<KEY_VAULT_URL>"
+      serviceAccountRef:
+        name: workload-identity-sa
 ```
 
-## Boas Práticas Implementadas
+> **Nota:**  
+> - Substitua `<KEY_VAULT_URL>` pelo valor da variável `$KEY_VAULT_URL`.
 
-1. **Segurança**:
-   - Políticas de acesso granulares por tipo de recurso (segredos, chaves, certificados)
-   - Princípio do menor privilégio
-   - Soft delete habilitado por padrão
-   - Proteção contra purge configurável
+Aplique o recurso:
 
-2. **Gerenciamento**:
-   - Separação clara entre diferentes tipos de identidades (usuários, managed identities, service principals)
-   - Configuração flexível através de variáveis
-   - Suporte a múltiplos ambientes
+```bash
+kubectl apply -f secretstore.yaml
+```
 
-3. **Auditoria**:
-   - Logs de diagnóstico configuráveis
-   - Rastreamento de todas as operações
+### 4.8. Conceda Permissões no Key Vault
+
+No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME` no Key Vault.
+
+---
+
+## 5. Verificações
+
+- ServiceAccount criada:
+  ```bash
+  kubectl get serviceaccount "$SERVICE_ACCOUNT_NAME" -n "$NAMESPACE"
+  kubectl describe serviceaccount "$SERVICE_ACCOUNT_NAME" -n "$NAMESPACE"
+  ```
+- Federação criada:
+  ```bash
+  az identity federated-credential list --identity-name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP"
+  ```
+
+---
+
+## 6. Sincronize Segredos com External Secrets
+
+Siga a [documentação oficial](https://external-secrets.io/v0.6.1/provider/azure-key-vault/) para criar recursos `SecretStore` e `ExternalSecret` apontando para o Key Vault.
+
+---
+
+## 7. Referências
+
+- [Secret Zero](./anexos/secret-zero.md)
+- [Azure AKS OIDC](https://learn.microsoft.com/pt-br/azure/aks/use-oidc-issuer)
+- [External Secrets Operator](https://external-secrets.io/)
+- [Azure Workload Identity](https://azure.github.io/azure-workload-identity/docs/quick-start.html)
+
+---
+
+Esta abordagem elimina o uso de secrets fixos, centraliza o controle de acesso e automatiza a rotação de credenciais, tornando o acesso ao AKV via AKS mais seguro e gerenciável.

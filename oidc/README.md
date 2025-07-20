@@ -26,6 +26,42 @@ Para usar a ação Azure Login com OIDC, é necessário configurar uma credencia
 
 ![IAM](./img/IAM.png)
 
+#### Comandos para criar usando o az CLI
+
+```bash
+# Variáveis
+RG_NAME="meu-resource-group"
+MI_NAME="minha-managed-identity"
+LOCATION="brazilsouth"
+
+# 1. Criar Managed Identity atribuída pelo usuário
+az identity create --name $MI_NAME --resource-group $RG_NAME --location $LOCATION
+
+# 2. Obter informações da Managed Identity
+az identity show --name $MI_NAME --resource-group $RG_NAME --query "{clientId:clientId, principalId:principalId, tenantId:tenantId, id:id}"
+
+# 3. Atribuir uma role à Managed Identity (exemplo: Contributor no resource group)
+az role assignment create --assignee $(az identity show --name $MI_NAME --resource-group $RG_NAME --query clientId -o tsv) \
+  --role "Contributor" \
+  --scope $(az group show --name $RG_NAME --query id -o tsv)
+
+# 4. Criar credencial de identidade federada (exemplo para GitHub Actions)
+az identity federated-credential create \
+  --name github-actions \
+  --identity-name $MI_NAME \
+  --resource-group $RG_NAME \
+  --issuer "https://token.actions.githubusercontent.com" \
+  --subject "repo:<OWNER>/<REPO>:ref:refs/heads/<BRANCH>" \
+  --audiences "api://AzureADTokenExchange"
+
+# 5. Atribuir Role a Managed Identity, e.g Leitor
+az role assignment create \
+  --assignee $(az identity show --name $MI_NAME --resource-group $RG_NAME --query clientId -o tsv) \
+  --role "Reader" \
+  --scope $(az group show --name $RG_NAME --query id -o tsv)
+```
+> Substitua `<OWNER>`, `<REPO>` e `<BRANCH>` conforme seu repositório e branch.
+
 ## 🔒 Criar secrets no GitHub
 
 1. No seu repositório GitHub, vá em **Settings** ⚙️.

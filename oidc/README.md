@@ -132,3 +132,20 @@ jobs:
         audience: api://AzureADTokenExchangeUSGov
         enable-AzPSSession: true
 ```
+
+## 📚 Recursos adicionais e documentação oficial
+
+Para mais detalhes e cenários avançados, consulte a documentação oficial da Microsoft:
+
+- [Conectar-se ao Azure usando OpenID Connect do GitHub Actions](https://learn.microsoft.com/pt-br/azure/developer/github/connect-from-azure-openid-connect)
+- [Ação Azure/login no GitHub Marketplace](https://github.com/marketplace/actions/azure-login)
+
+### 🔎 Pontos importantes da documentação
+
+- O Azure Login com OIDC elimina a necessidade de armazenar secrets de senha ou certificados no GitHub, usando autenticação baseada em identidade federada.
+- O GitHub Actions solicita um token OIDC do provedor de identidade do GitHub e o troca por um token de acesso do Azure AD.
+- É possível restringir o escopo da credencial federada para branches, tags ou ambientes específicos do repositório.
+- O Azure Login suporta clouds públicas e clouds soberanas (Azure Government, Azure China, Azure Stack).
+
+> **Dica:**  
+> Sempre revise as permissões atribuídas à Managed Identity e limite o acesso apenas ao necessário para o seu workflow.

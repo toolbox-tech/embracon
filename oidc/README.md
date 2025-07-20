@@ -55,6 +55,7 @@ jobs:
   test:
     permissions:
       id-token: write # Permissão necessária para buscar o token OIDC.
+      contents: read # Permissão necessária para ler o conteúdo do repositório.
     runs-on: ubuntu-latest
     steps:
     - name: Azure CLI Login

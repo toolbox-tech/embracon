@@ -9,14 +9,7 @@ Neste tutorial, você aprenderá a:
 
 Para usar a ação Azure Login com OIDC, é necessário configurar uma credencial de identidade federada em uma aplicação Microsoft Entra ou em uma Managed Identity atribuída pelo usuário.
 
-### Opção 1: Aplicação Microsoft Entra
-
-1. Crie uma aplicação Microsoft Entra com um service principal pelo portal Azure, Azure CLI ou Azure PowerShell.
-2. Copie os valores de Client ID, Subscription ID e Directory (tenant) ID para usar depois no seu workflow do GitHub Actions.
-3. Atribua uma role apropriada ao seu service principal pelo portal Azure, Azure CLI ou Azure PowerShell.
-4. Configure uma credencial de identidade federada na aplicação Microsoft Entra para confiar em tokens emitidos pelo GitHub Actions para o seu repositório.
-
-### Opção 2: Managed Identity atribuída pelo usuário
+### Managed Identity atribuída pelo usuário
 
 1. Crie uma Managed Identity atribuída pelo usuário.
 2. Copie os valores de Client ID, Subscription ID e Directory (tenant) ID para usar depois no seu workflow do GitHub Actions.

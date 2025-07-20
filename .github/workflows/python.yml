@@ -1,11 +1,11 @@
 name: Python CI
 
-on: [pull_request, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
 
   test:
-    uses: ./.github/workflows/security/gitleaks.yml
+    uses: ./.github/workflows/gitleaks.yml
     with:
       gitleaks-version: 'latest'
     secrets:

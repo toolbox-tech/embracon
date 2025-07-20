@@ -16,6 +16,8 @@ Para usar a ação Azure Login com OIDC, é necessário configurar uma credencia
 3. 🛡️ Atribua uma role apropriada à sua Managed Identity.
 4. 🔗 Configure uma credencial de identidade federada na Managed Identity para confiar em tokens emitidos pelo GitHub Actions para o seu repositório.
 
+![Create Managed Identity](./img/create_managed_identity.png)
+
 ![Managed Identity](./img/managed_identity.png)
 
 ![Federated Credntials](./img/federated_credentials.png)

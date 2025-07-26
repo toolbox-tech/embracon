@@ -2,6 +2,39 @@
 
 No Oracle Kubernetes Engine (OKE), o processo de configuração do OIDC é diferente do AKS, pois o OKE já expõe um endpoint OIDC por padrão para autenticação de workloads. Esse endpoint pode ser utilizado para federação de identidade com provedores externos, como Azure ou OCI Vault.
 
+## Criar uma cluster OKE
+```bash
+# Defina as variáveis
+COMPARTMENT_ID="<OCID_DO_COMPARTIMENTO>"
+VCN_ID="<OCID_DA_VCN>"
+SUBNET_ID="<OCID_DA_SUBNET>"
+CLUSTER_NAME="meu-cluster-oke"
+
+# Crie o cluster OKE
+oci ce cluster create \
+  --name "$CLUSTER_NAME" \
+  --compartment-id "$COMPARTMENT_ID" \
+  --vcn-id "$VCN_ID" \
+  --kubernetes-version "v1.29.1" \
+  --endpoint-config '{"isPublicIpEnabled": true}' \
+  --options '{"serviceLbSubnetIds":["'"$SUBNET_ID"'"]}'
+
+# Aguarde o cluster ser criado e pegue o OCID do cluster
+# Agora crie o node pool com shape econômico
+NODE_POOL_NAME="meu-nodepool"
+CLUSTER_ID="<OCID_DO_CLUSTER_CRIADO>"
+
+oci ce node-pool create \
+  --compartment-id "$COMPARTMENT_ID" \
+  --cluster-id "$CLUSTER_ID" \
+  --name "$NODE_POOL_NAME" \
+  --kubernetes-version "v1.29.1" \
+  --node-shape "VM.Standard.E2.1.Micro" \
+  --node-metadata '{"ssh_authorized_keys":"'"$(cat ~/.ssh/id_rsa.pub)"'"}' \
+  --subnet-ids '["'"$SUBNET_ID"'"]' \
+  --quantity-per-subnet 1
+```
+
 ## Como fazer login usando o OCI CLI
 
 Para autenticar-se e usar o OCI CLI, siga os passos abaixo:
@@ -29,6 +62,7 @@ Para autenticar-se e usar o OCI CLI, siga os passos abaixo:
     ```sh
     oci iam compartment list --all
     ```
+    ![oci iam compartment list --all](./gif/render1753546934412.gif)
 
 > **Nota:** O login via OIDC é utilizado para workloads no cluster OKE, enquanto o OCI CLI usa autenticação baseada em chave.
 

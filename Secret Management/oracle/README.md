@@ -1,39 +1,8 @@
 # OIDC no Oracle Cloud (OKE)
 
-No Oracle Kubernetes Engine (OKE), o processo de configuração do OIDC é diferente do AKS, pois o OKE já expõe um endpoint OIDC por padrão para autenticação de workloads. Esse endpoint pode ser utilizado para federação de identidade com provedores externos, como Azure ou OCI Vault.
+No Oracle Kubernetes Engine (OKE), o processo de configuração do OIDC é diferente do AKS, pois o OKE não expõe um endpoint OIDC por padrão para autenticação de workloads. 
 
-## Criar uma cluster OKE
-```bash
-# Defina as variáveis
-COMPARTMENT_ID="<OCID_DO_COMPARTIMENTO>"
-VCN_ID="<OCID_DA_VCN>"
-SUBNET_ID="<OCID_DA_SUBNET>"
-CLUSTER_NAME="meu-cluster-oke"
-
-# Crie o cluster OKE
-oci ce cluster create \
-  --name "$CLUSTER_NAME" \
-  --compartment-id "$COMPARTMENT_ID" \
-  --vcn-id "$VCN_ID" \
-  --kubernetes-version "v1.29.1" \
-  --endpoint-config '{"isPublicIpEnabled": true}' \
-  --options '{"serviceLbSubnetIds":["'"$SUBNET_ID"'"]}'
-
-# Aguarde o cluster ser criado e pegue o OCID do cluster
-# Agora crie o node pool com shape econômico
-NODE_POOL_NAME="meu-nodepool"
-CLUSTER_ID="<OCID_DO_CLUSTER_CRIADO>"
-
-oci ce node-pool create \
-  --compartment-id "$COMPARTMENT_ID" \
-  --cluster-id "$CLUSTER_ID" \
-  --name "$NODE_POOL_NAME" \
-  --kubernetes-version "v1.29.1" \
-  --node-shape "VM.Standard.E2.1.Micro" \
-  --node-metadata '{"ssh_authorized_keys":"'"$(cat ~/.ssh/id_rsa.pub)"'"}' \
-  --subnet-ids '["'"$SUBNET_ID"'"]' \
-  --quantity-per-subnet 1
-```
+Para a utilização do OIDC é necessário que o cluster seja do tipo `ENHANCED_CLUSTER` e deve-se ativar o `Open Id Connect Discovery`.
 
 ## Como fazer login usando o OCI CLI
 
@@ -66,64 +35,183 @@ Para autenticar-se e usar o OCI CLI, siga os passos abaixo:
 
 > **Nota:** O login via OIDC é utilizado para workloads no cluster OKE, enquanto o OCI CLI usa autenticação baseada em chave.
 
-## Como criar um cluster Oracle Kubernetes Engine (OKE) 
+## Como criar um cluster OKE via CLI
+
+Para criar um cluster OKE do tipo `ENHANCED_CLUSTER` com todos os recursos de rede necessários, siga os passos abaixo usando o OCI CLI:
+
+
+### 1. Defina as variáveis necessárias
 
 ```bash
-# Defina as variáveis
-COMPARTMENT_ID="<OCID_DO_COMPARTIMENTO>"
-VCN_ID="<OCID_DA_VCN>"
-SUBNET_ID="<OCID_DA_SUBNET>"
-CLUSTER_NAME="meu-cluster-oke"
+COMPARTMENT_OCID="<OCID do compartimento>"
+VCN_OCID="<OCID da VCN>"
+OKE_PUBLIC_SUBNET_OCID="<OCID da sub-rede pública>"
+OKE_PRIVATE_SUBNET_OCID="<OCID da sub-rede privada>"
+CLUSTER_OCID="<OCID do cluster OKE>"
+K8S_VERSION="<versão do Kubernetes, ex: v1.27.2>"
+IMAGE_OCID="<OCID da imagem para os nós>"
+```
 
-# Crie o cluster OKE
+### 2. Crie os recursos no OKE
+
+```bash
+### 1. Crie uma VCN (Virtual Cloud Network)
+oci network vcn create \
+  --compartment-id <COMPARTMENT_OCID> \
+  --cidr-block 10.0.0.0/16 \
+  --display-name "OKE-VCN"
+
+
+### 2. Crie sub-redes públicas e privadas
+
+# Sub-rede pública (para Load Balancer, por exemplo)
+oci network subnet create \
+  --compartment-id <COMPARTMENT_OCID> \
+  --vcn-id <VCN_OCID> \
+  --cidr-block 10.0.1.0/24 \
+  --display-name "OKE-Public-Subnet" \
+  --prohibit-public-ip-on-vnic false
+
+# Sub-rede privada (para nós de trabalho)
+oci network subnet create \
+  --compartment-id <COMPARTMENT_OCID> \
+  --vcn-id <VCN_OCID> \
+  --cidr-block 10.0.2.0/24 \
+  --display-name "OKE-Private-Subnet" \
+  --prohibit-public-ip-on-vnic true
+
+### 3. Crie o Internet Gateway (IG)
+
+oci network internet-gateway create \
+  --compartment-id <COMPARTMENT_OCID> \
+  --vcn-id <VCN_OCID> \
+  --display-name "OKE-IG" \
+  --is-enabled true
+
+### 4. Crie o NAT Gateway
+
+oci network nat-gateway create \
+  --compartment-id <COMPARTMENT_OCID> \
+  --vcn-id <VCN_OCID> \
+  --display-name "OKE-NAT"
+
+### 5. Crie o Service Gateway (SGW)
+
+oci network service-gateway create \
+  --compartment-id <COMPARTMENT_OCID> \
+  --vcn-id <VCN_OCID> \
+  --services '[{"service-id":"all"}]' \
+  --display-name "OKE-SGW"
+
+### 6. Atualize as tabelas de rotas das sub-redes conforme necessário
+
+- Sub-rede pública: rotas para o Internet Gateway
+- Sub-rede privada: rotas para o NAT Gateway e Service Gateway
+
+### 7. Crie o cluster OKE do tipo ENHANCED
+
 oci ce cluster create \
-  --name "$CLUSTER_NAME" \
-  --compartment-id "$COMPARTMENT_ID" \
-  --vcn-id "$VCN_ID" \
-  --kubernetes-version "v1.29.1" \
-  --endpoint-config '{"isPublicIpEnabled": true}' \
-  --options '{"serviceLbSubnetIds":["'"$SUBNET_ID"'"]}'
+  --compartment-id <COMPARTMENT_OCID> \
+  --name "OKE-Enhanced-Cluster" \
+  --vcn-id <VCN_OCID> \
+  --kubernetes-version <K8S_VERSION> \
+  --cluster-type ENHANCED_CLUSTER \
+  --endpoint-config '{"isPublicIpEnabled": true, "subnetId": "<OKE-Public-Subnet_OCID>"}'
 
-# Aguarde o cluster ser criado e pegue o OCID do cluster
-# Agora crie o node pool com shape econômico
-NODE_POOL_NAME="meu-nodepool"
-CLUSTER_ID="<OCID_DO_CLUSTER_CRIADO>"
+### 8. Crie o pool de nós (Node Pool)
 
 oci ce node-pool create \
-  --compartment-id "$COMPARTMENT_ID" \
-  --cluster-id "$CLUSTER_ID" \
-  --name "$NODE_POOL_NAME" \
-  --kubernetes-version "v1.29.1" \
-  --node-shape "VM.Standard.E2.1.Micro" \
-  --node-metadata '{"ssh_authorized_keys":"'"$(cat ~/.ssh/id_rsa.pub)"'"}' \
-  --subnet-ids '["'"$SUBNET_ID"'"]' \
+  --compartment-id <COMPARTMENT_OCID> \
+  --cluster-id <CLUSTER_OCID> \
+  --name "OKE-NodePool" \
+  --kubernetes-version <K8S_VERSION> \
+  --node-shape "VM.Standard.E4.Flex" \
+  --node-shape-config '{"ocpus":1,"memoryInGBs":16}' \
+  --subnet-ids '["<OKE-Private-Subnet_OCID>"]' \
+  --node-source-details '{"imageId":"<IMAGE_OCID>","sourceType":"IMAGE"}' \
   --quantity-per-subnet 1
 ```
 
-## Como obter o issuer OIDC do OKE
+> **Dica:** Consulte a documentação oficial para detalhes sobre permissões, imagens e parâmetros:  
+> https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingclusterusingcli.htm
 
-1. **Acesse o Console OCI**
-2. Vá em **Developer Services > Kubernetes Clusters (OKE)** e selecione seu cluster.
-3. No painel do cluster, procure pela seção **Cluster Details** ou **Access**.
-4. O endpoint OIDC geralmente segue o padrão:
+## Como criar um cluster OKE via Console
 
-    ```
-    https://containerengine.<region>.oci.oraclecloud.com/oke/<cluster-ocid>/oidc
-    ```
+### Passo 1:
 
-    **Exemplo:**
-    ```
-    https://containerengine.sa-saopaulo-1.oci.oraclecloud.com/oke/ocid1.cluster.oc1.sa-saopaulo-1.aaaaaaaaxxxxxxxx/oidc
-    ```
+Selecione o compartimento e a versão mais recente do Kubernetes. Neste exemplo, selecionamos o Endpoint da API como Público e os Nós de Trabalho como Privados.
 
-5. Copie esse URL para utilizar como issuer ao criar a credencial federada no Azure ou outro provedor.
+![1](./img/1.webp)
 
-## Comandos úteis
+Criação do Cluster OKE - Passo 1
 
-- Para obter as credenciais do cluster:
-  ```sh
-  oci ce cluster create-kubeconfig --cluster-id <CLUSTER_OCID> --file $HOME/.kube/config --region <REGION>
-  ```
+### Passo 2:
+
+Escolha o shape de computação com a quantidade de OCPUs/Memória necessária e a imagem de sistema operacional mais recente suportada. Para este demo, defina a contagem de nós como 1.
+
+![2](./img/2.webp)
+
+Criação do Cluster OKE - Passo 2
+
+#### Passo 3:
+
+Revise as configurações e prossiga com a criação do cluster do tipo "enhanced".
+
+![1](./img/3.webp)
+
+Aguarde a conclusão da criação do cluster OKE e anote o OCID do cluster.
+
+## Atualizando um cluster para o tipo `ENHANCED_CLUSTER`
+
+### Via Cli
+
+```bash
+oci ce cluster update --cluster-id <cluster-ocid> --type ENHANCED_CLUSTER
+```
+
+### Via Console
+
+1. Abra o menu de navegação e selecione **Developer Services**. Em **Containers & Artifacts**, clique em **Kubernetes Clusters (OKE)**.
+2. Selecione o compartimento que contém o cluster desejado.
+3. Na página de clusters, clique no nome do cluster do tipo *Basic* que você deseja atualizar para *Enhanced*.
+4. Na página de detalhes do cluster, verifique que o tipo está como **Cluster type: Basic**.
+5. Clique em **Upgrade to Enhanced Cluster**.
+6. Confirme a opção **Upgrade to Enhanced Cluster** para prosseguir com a atualização.  
+  > **Atenção:** Após a atualização, não é possível reverter o cluster para o tipo *Basic*.
+7. Clique em **Upgrade** para iniciar o processo.
+8. Após a conclusão, a página de detalhes do cluster exibirá **Cluster type: Enhanced**.
+
+## Como ativar o Open Id Connect Discovery
+
+1. Crie o arquivo [cluster-enable-oidc.json](cluster-enable-oidc.json) e coloque o seguinte conteúdo:
+
+```json
+{
+  "options": {
+    "openIdConnectDiscovery": {
+      "isOpenIdConnectDiscoveryEnabled": true
+    }
+  }
+}
+```
+
+2. Para atualizar o cluster, execute o seguinte comando :
+```bash
+oci ce cluster update --cluster-id <CLUSTER_OCID> --from-json file://cluster-enable-oidc.json
+```
+>Nota
+>
+> Substitua o <CLUSTER_OCID> pelo OCDI do Cluster
+> Caso apareça `WARNING: Updates to options and freeform-tags and defined-tags and image-policy-config will replace any existing values. Are you sure you want to continue? [y/N]:` digite y
+
+3. Pegue o `open-id-connect-discovery-endpoint` com o comando:
+```bash
+oci ce cluster get --cluster-id <CLUSTER_OCID> | grep -B1 'open-id-connect-discovery'
+
+```
+>Nota
+>
+> Substitua o <CLUSTER_OCID> pelo OCDI do Cluster
 
 ## Exemplo de uso do issuer OIDC do OKE no Azure
 
@@ -132,7 +220,7 @@ az identity federated-credential create \
   --name "oke-federated-credential" \
   --identity-name "<NOME_DA_MANAGED_IDENTITY>" \
   --resource-group "<RESOURCE_GROUP>" \
-  --issuer "<OKE_OIDC_ISSUER_URL>" \
+  --issuer "<open-id-connect-discovery-endpoint>" \
   --subject "system:serviceaccount:<NAMESPACE>:<SERVICE_ACCOUNT_NAME>"
 ```
 

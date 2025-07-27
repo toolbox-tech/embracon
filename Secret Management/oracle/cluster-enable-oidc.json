@@ -1,0 +1,7 @@
+{
+  "options": {
+    "openIdConnectDiscovery": {
+      "isOpenIdConnectDiscoveryEnabled": true
+    }
+  }
+}

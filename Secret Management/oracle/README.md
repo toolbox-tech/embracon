@@ -132,8 +132,8 @@ oci ce node-pool create \
   --quantity-per-subnet 1
 ```
 
-> **Dica:** Consulte a documentação oficial para detalhes sobre permissões, imagens e parâmetros:  
-> https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingclusterusingcli.htm
+> **Dica:** Consulte a documentação oficial para mais detalhes:
+> https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/create-cluster.htm
 
 ## Como criar um cluster OKE via Console
 

@@ -44,29 +44,62 @@ Para autenticar-se e usar o OCI CLI, siga os passos abaixo:
 
 ## Como criar um cluster OKE via Console
 
-### Passo 1:
+### Abra o menu de navegação e selecione **Developer Services**. Em **Containers & Artifacts**, clique em **Kubernetes Clusters (OKE)**.
 
-Selecione o compartimento e a versão mais recente do Kubernetes. Neste exemplo, selecionamos o Endpoint da API como Público e os Nós de Trabalho como Privados.
+![Create Cluster Menu](./img/menu.png)
 
-![Create Cluster 1](./img/1.webp)
+### Clique em `Create Cluster`
 
-Criação do Cluster OKE - Passo 1
+![Create Cluster 0](./img/0.png)
 
-### Passo 2:
+### Escolha em `Quick create`
 
-Escolha o shape de computação com a quantidade de OCPUs/Memória necessária e a imagem de sistema operacional mais recente suportada. Para este demo, defina a contagem de nós como 1.
+![Create Cluster 1](./img/1.png)
 
-![Create Cluster 2](./img/2.webp)
+> Nota
+>
+> O Quick create irá criar automaticamente:
+> - Virtual Cloud Network (VCN)
+> - Internet Gateway (IG)
+> - NAT Gateway (NAT)
+> - Service Gateway (SGW)
+> - Kubernetes cluster
+> - Kubernetes worker node(s) e node pool  
+> Esses recursos são provisionados para facilitar a criação rápida do cluster OKE.
 
-Criação do Cluster OKE - Passo 2
+### Coloque o nome e escolha as definições necessárias
 
-#### Passo 3:
+![Create Cluster 2](./img/2.png)
 
-Revise as configurações e prossiga com a criação do cluster do tipo "enhanced".
+![Create Cluster 3](./img/3.png)
 
-![Create Cluster 1](./img/3.webp)
+![Create Cluster 4](./img/4.png)
 
-Aguarde a conclusão da criação do cluster OKE e anote o OCID do cluster.
+### Clique em `Next`
+
+![Create Cluster 5](./img/5.png)
+
+### Verifique e clique em `Create cluster`
+
+![Create Cluster 6](./img/6.png)
+
+![Create Cluster 7](./img/7.png)
+
+### Aguarde o provisionamento e clique em `Close`
+
+![Create Cluster 8](./img/8.png)
+
+### Aguarde o `Cluster status` virar `Active`
+
+![Create Cluster 9](./img/9.png)
+
+![Create Cluster 10](./img/10.png)
+
+> Nota
+>
+> Observer que o OIDC Discovery está como `Not enabled`
+
+### Anote o OCID do cluster.
 
 ## Atualizando um cluster para o tipo `ENHANCED_CLUSTER`
 
@@ -98,9 +131,17 @@ oci ce cluster update --cluster-id <cluster-ocid> --type ENHANCED_CLUSTER
 
 ![Upgrade 4](./img/upgrade_cluster_4.png)
 
+## Como ativar o Open Id Connect Discovery via Console
 
+### Clique em editar
 
-## Como ativar o Open Id Connect Discovery
+![OIDC 1](./img/1_oidc.png)
+
+![OIDC 2](./img/2_oidc.png)
+
+![OIDC 3](./img/3_oidc.png)
+
+## Como ativar o Open Id Connect Discovery via CLI
 
 1. Crie o arquivo [cluster-enable-oidc.json](cluster-enable-oidc.json) e coloque o seguinte conteúdo:
 

@@ -76,6 +76,8 @@ Aguarde a conclusão da criação do cluster OKE e anote o OCID do cluster.
 oci ce cluster update --cluster-id <cluster-ocid> --type ENHANCED_CLUSTER
 ```
 
+![Upgarde Cluster](./gif/oci_upgrade.gif)
+
 ### Via Console
 
 1. Abra o menu de navegação e selecione **Developer Services**. Em **Containers & Artifacts**, clique em **Kubernetes Clusters (OKE)**.
@@ -116,6 +118,8 @@ oci ce cluster update --cluster-id <cluster-ocid> --type ENHANCED_CLUSTER
 ```bash
 oci ce cluster update --cluster-id <CLUSTER_OCID> --from-json file://cluster-enable-oidc.json
 ```
+![Enable OIDC](./gif/oci_issuer.gif)
+
 >Nota
 >
 > Substitua o <CLUSTER_OCID> pelo OCDI do Cluster
@@ -124,8 +128,9 @@ oci ce cluster update --cluster-id <CLUSTER_OCID> --from-json file://cluster-ena
 3. Pegue o `open-id-connect-discovery-endpoint` com o comando:
 ```bash
 oci ce cluster get --cluster-id <CLUSTER_OCID> | grep -B1 'open-id-connect-discovery'
-
 ```
+
+![Get OIDC](./gif/oci_oidc.gif)
 >Nota
 >
 > Substitua o <CLUSTER_OCID> pelo OCDI do Cluster

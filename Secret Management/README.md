@@ -137,14 +137,20 @@ az identity federated-credential create --name "kubernetes-federated-credential"
   --subject system:serviceaccount:$NAMESPACE:$SERVICE_ACCOUNT_NAME
 ```
 
-### 4.6. Instale o External Secrets Operator
+### 4.6 Conecte-se ao cluster criado
+
+```bash
+az aks get-credentials --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP"
+```
+
+### 4.7. Instale o External Secrets Operator
 
 ```bash
 helm repo add external-secrets https://charts.external-secrets.io
 helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
 ```
 
-### 4.7. Crie a ServiceAccount no Kubernetes
+### 4.8. Crie a ServiceAccount no Kubernetes
 
 Crie um arquivo `service-account.yaml` com as anotações necessárias (client-id, tenant-id).
 (substitua pelos valores das variáveis que você obteve anteriormente):
@@ -167,7 +173,7 @@ metadata:
 kubectl apply -f service-account.yaml
 ```
 
-### 4.8. Crie o Secret Store
+### 4.9. Crie o Secret Store
 
 Crie um arquivo `secret-store.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
 
@@ -196,7 +202,7 @@ Aplique o recurso:
 kubectl apply -f secret-store.yaml
 ```
 
-### 4.9. Conceda Permissões no Key Vault
+### 4.10. Conceda Permissões no Key Vault
 
 No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME` no Key Vault para ter acesso a todos os Segredos do Cofre.
 
@@ -210,7 +216,7 @@ Caso queira dar acesso somente a um segredo específico, vá até o segredo, cli
 
 ![4](anexos/img/4.png)
 
-### 4.10. Crie o External Secret 
+### 4.11. Crie o External Secret 
 
 Crie um arquivo `external-secret.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
 
@@ -244,36 +250,3 @@ Aplique o recurso:
 ```bash
 kubectl apply -f external-secret.yaml
 ```
-
----
-
-## 5. Verificações
-
-- ServiceAccount criada:
-  ```bash
-  kubectl get serviceaccount "$SERVICE_ACCOUNT_NAME" -n "$NAMESPACE"
-  kubectl describe serviceaccount "$SERVICE_ACCOUNT_NAME" -n "$NAMESPACE"
-  ```
-- Federação criada:
-  ```bash
-  az identity federated-credential list --identity-name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP"
-  ```
-
----
-
-## 6. Sincronize Segredos com External Secrets
-
-Siga a [documentação oficial](https://external-secrets.io/v0.6.1/provider/azure-key-vault/) para criar recursos `SecretStore` e `ExternalSecret` apontando para o Key Vault.
-
----
-
-## 7. Referências
-
-- [Secret Zero](./anexos/secret-zero.md)
-- [Azure AKS OIDC](https://learn.microsoft.com/pt-br/azure/aks/use-oidc-issuer)
-- [External Secrets Operator](https://external-secrets.io/)
-- [Azure Workload Identity](https://azure.github.io/azure-workload-identity/docs/quick-start.html)
-
----
-
-Esta abordagem elimina o uso de secrets fixos, centraliza o controle de acesso e automatiza a rotação de credenciais, tornando o acesso ao AKV via AKS mais seguro e gerenciável.

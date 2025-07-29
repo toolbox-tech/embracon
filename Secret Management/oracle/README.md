@@ -275,7 +275,9 @@ oci ce cluster get --cluster-id <CLUSTER_OCID> | grep -B1 'open-id-connect-disco
 >
 > Substitua o <CLUSTER_OCID> pelo OCDI do Cluster
 
-## Exemplo de uso do issuer OIDC do OKE no Azure
+## Acessar o AKV a partir de um OKE
+
+### 1. Crie uma Federated Credential em uma Managed Identity na Azure
 
 ```sh
 az identity federated-credential create \
@@ -286,10 +288,116 @@ az identity federated-credential create \
   --subject "system:serviceaccount:<NAMESPACE>:<SERVICE_ACCOUNT_NAME>"
 ```
 
----
+### 2. Conecte-se ao cluster criado
 
-## Resumo
+```bash
+oci ce cluster create-kubeconfig --cluster-id "$CLUSTER_OCID" --file $HOME/.kube/config --region "$REGION" --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT
+```
 
-- No OKE, o OIDC já está disponível por padrão.
-- Basta obter o issuer URL pelo painel do cluster e usá-lo normalmente para federação de identidade.
-- Não é necessário habilitar o OIDC manualmente.
+### 3. Instale o External Secrets Operator
+
+```bash
+helm repo add external-secrets https://charts.external-secrets.io
+helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
+```
+
+### 4. Crie a ServiceAccount no Kubernetes
+
+Crie um arquivo `service-account.yaml` com as anotações necessárias (client-id, tenant-id).
+(Substitua pelos valores das variáveis que você obteve anteriormente):
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload-identity-sa
+  annotations:
+    azure.workload.identity/client-id: "<CLIENT_ID>"
+    azure.workload.identity/tenant-id: "<TENANT_ID>"
+```
+
+> **Nota:**  
+> - Substitua `<CLIENT_ID>` pelo valor da variável `$CLIENT_ID`.
+> - Substitua `<TENANT_ID>` pelo valor da variável `$TENANT_ID`.
+
+```bash
+kubectl apply -f service-account.yaml
+```
+
+### 5. Crie o Secret Store
+
+Crie um arquivo `secret-store.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: akv-secret-manager-store
+  namespace: <namespace>
+spec:
+  provider:
+    azurekv:
+      authType: WorkloadIdentity
+      vaultUrl: "<KEY_VAULT_URL>"
+      serviceAccountRef:
+        name: workload-identity-sa
+```
+
+> **Nota:**  
+> - Substitua `<namespace>` pelo namespace desejado no cluster Kubernetes (por exemplo, `default` se estiver usando o namespace padrão).
+> - Substitua `<KEY_VAULT_URL>` pelo valor da variável `$KEY_VAULT_URL`.
+
+Aplique o recurso:
+
+```bash
+kubectl apply -f secret-store.yaml
+```
+
+### 6. Conceda Permissões no Key Vault
+
+No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME` no Key Vault para ter acesso a todos os Segredos do Cofre.
+
+Caso queira dar acesso somente a um segredo específico, vá até o segredo, clique no mesmo, acesse Controle de acesso IAM e adicione a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME`.
+
+![1](../anexos/img/1.png)
+
+![2](../anexos/img/2.png)
+
+![3](../anexos/img/3.png)
+
+![4](../anexos/img/4.png)
+
+### 7. Crie o External Secret
+
+Crie um arquivo `external-secret.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: akv-external-secret-manager-store
+  namespace: <namespace>
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: akv-secret-manager-store
+    kind: SecretStore
+  target:
+    name: my-app-secret-k8s-akv
+    creationPolicy: Owner
+  data:
+    - secretKey: my-akv-secret-key
+      remoteRef:
+        key: <nome-do-segredo-no-akv>
+```
+
+> **Nota:**  
+> - Substitua `<namespace>` pelo namespace desejado no cluster Kubernetes (por exemplo, `default` se estiver usando o namespace padrão).
+> - Substitua `nome-do-segredo-no-akv` pelo nome do segredo existente no Key Vault que deseja sincronizar.
+> - O campo `secretKey` define o nome da chave no Secret do Kubernetes.
+
+Aplique o recurso:
+
+```bash
+kubectl apply -f external-secret.yaml
+```

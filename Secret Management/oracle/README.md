@@ -38,7 +38,7 @@ Para autenticar-se e usar o OCI CLI, siga os passos abaixo:
     ```sh
     oci iam compartment list --all
     ```
-    ![oci iam compartment list --all](./gif/oci_list.gif)
+    ![oci iam compartment list --all](/gif/oci_list.gif)
 
 > **Nota:** O login via OIDC é utilizado para workloads no cluster OKE, enquanto o OCI CLI usa autenticação baseada em chave.
 

@@ -1,9 +1,0 @@
-variable "resource_group_name" { default = "Embracon" }
-variable "location"           { default = "brazilsouth" }
-variable "aks_name"           { default = "aks-test" }
-variable "keyvault_name"      { default = "akv-test-embracon" }
-variable "managed_identity_name" { default = "test-aks-akv" }
-variable "ad_group_name"      { default = "akv-access-group" }
-variable "namespace"          { default = "default" }
-variable "service_account_name" { default = "workload-identity-sa" }
-variable "subscription_id" { default = "e2a25891-08c3-4cda-b9ff-8b88c8a7bdfc" }

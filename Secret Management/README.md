@@ -61,94 +61,97 @@ Substitua `<SUA_SUBSCRIPTION_ID>` pelo ID da subscription desejada.
 ### 4.2. Defina Variáveis
 
 ```bash
-SEU_GROUP_NAME="akv-access-group"
-SEU_IDENTITY_MANAGED_NAME="test-aks-akv"
-SEU_RESOURCE_GROUP="Embracon"
-SEU_KEYVAULT_NAME="akv-test-embracon"
-SUA_LOCALIZACAO="brazilsouth"
-SEU_AKS_NAME="aks-test"
-SERVICE_ACCOUNT_NAME="workload-identity-sa"
-NAMESPACE="default"
-TENANT_ID="$(az account show --query tenantId -o tsv)"
+$Env:SEU_GROUP_NAME="akv-access-group"
+$Env:SEU_IDENTITY_MANAGED_NAME="test-aks-akv"
+$Env:SEU_RESOURCE_GROUP="Embracon-Test"
+$Env:SEU_KEYVAULT_NAME="akv-test-embracon"
+$Env:SUA_LOCALIZACAO="brazilsouth"
+$Env:SEU_AKS_NAME="aks-test"
+$Env:SERVICE_ACCOUNT_NAME="workload-identity-sa"
+$Env:NAMESPACE="default"
+$Env:TENANT_ID="$(az account show --query tenantId -o tsv)"
 ```
 
 ### 4.3. Crie os Recursos no Azure
 
 ```bash
+# Resource Group
+az group create --name "$Env:SEU_RESOURCE_GROUP" --location "$Env:SUA_LOCALIZACAO"
+
 # Grupo de acesso
-az ad group create --display-name "$SEU_GROUP_NAME" --mail-nickname "$SEU_GROUP_NAME"
+az ad group create --display-name "$Env:SEU_GROUP_NAME" --mail-nickname "$Env:SEU_GROUP_NAME"
 
 # Managed Identity
-az identity create --name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP" --location "$SUA_LOCALIZACAO"
-IDENTITY_PRINCIPAL_ID="$(az identity show --name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query principalId -o tsv)"
-CLIENT_ID="$(az identity show --name "$SEU_IDENTITY_MANAGED_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query clientId -o tsv)"
+az identity create --name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --location "$Env:SUA_LOCALIZACAO"
+
+# Obtenha o Principal ID e Client ID da Managed Identity
+$Env:IDENTITY_PRINCIPAL_ID = az identity show --name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query principalId -o tsv
+$Env:CLIENT_ID = az identity show --name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query clientId -o tsv
 
 # Adicione a Managed Identity ao grupo
-az ad group member add --group "$SEU_GROUP_NAME" --member-id "$IDENTITY_PRINCIPAL_ID"
+az ad group member add --group "$Env:SEU_GROUP_NAME" --member-id "$Env:IDENTITY_PRINCIPAL_ID"
 
-# Key Vault com RBAC
-az keyvault create \
-  --name "$SEU_KEYVAULT_NAME" \
-  --resource-group "$SEU_RESOURCE_GROUP" \
-  --location "$SUA_LOCALIZACAO" \
-  --enable-rbac-authorization true
-KEY_VAULT_URL="$(az keyvault show --name "$SEU_KEYVAULT_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query properties.vaultUri -o tsv)"
+# Crie um Key Vault com RBAC
+az keyvault create --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --location "$Env:SUA_LOCALIZACAO" --enable-rbac-authorization true
+
+# Após criar o KeyVault, você deve dar permissões aos usuários para poderem usá-lo
+
+# Conceda permissão de "Administrador do Cofre de Chaves" ao usuário no Key Vault
+az role assignment create --assignee "$(az ad signed-in-user show --query id -o tsv)" --role "Key Vault Administrator" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
+
+# Este comando dará a permissão ao usuário logado para administrar o Key Vault recém-criado.
+
+# Obtenha a URL do Vault
+$Env:KEY_VAULT_URL = az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query properties.vaultUri -o tsv
 ```
 
 ### 4.4. Crie ou Atualize o AKS com OIDC
 
 **Novo cluster:**
 ```bash
-az aks create \
-  --name "$SEU_AKS_NAME" \
-  --resource-group "$SEU_RESOURCE_GROUP" \
-  --location "$SUA_LOCALIZACAO" \
-  --enable-oidc-issuer \
-  --enable-managed-identity \
-  --node-count 1 \
-  --enable-cluster-autoscaler \
-  --min-count 1 \
-  --max-count 3 \
-  --tier free
+az aks create --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --location "$Env:SUA_LOCALIZACAO" --enable-oidc-issuer --enable-managed-identity --node-count 1 --enable-cluster-autoscaler --min-count 1 --max-count 3 --tier free --generate-ssh-keys
 ```
 
 **Cluster existente:**
 ```bash
-az aks update --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP" --enable-oidc-issuer
-```
-
-Obtenha as credenciais:
-```bash
-az aks get-credentials --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP"
+az aks update --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --enable-oidc-issuer
 ```
 
 Descubra o issuer URL do OIDC:
 ```bash
-AKS_OIDC_ISSUER=$(az aks show --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP" --query "oidcIssuerProfile.issuerUrl" -o tsv)
+$Env:AKS_OIDC_ISSUER = az aks show --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query "oidcIssuerProfile.issuerUrl" -o tsv
 ```
 
 ### 4.5. Configure a Federação de Identidade
 
 ```bash
-az identity federated-credential create --name "kubernetes-federated-credential" \
-  --identity-name "$SEU_IDENTITY_MANAGED_NAME" \
-  --resource-group "$SEU_RESOURCE_GROUP" \
-  --issuer "$AKS_OIDC_ISSUER" \
-  --subject system:serviceaccount:$NAMESPACE:$SERVICE_ACCOUNT_NAME
+# Crie o subject
+$Env:subject="system:serviceaccount:"+$Env:NAMESPACE+":$Env:SERVICE_ACCOUNT_NAME"
+
+az identity federated-credential create --name "kubernetes-federated-credential" --identity-name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --issuer "$Env:AKS_OIDC_ISSUER" --subject "$Env:subject"
 ```
 
 ### 4.6 Conecte-se ao cluster criado
 
 ```bash
-az aks get-credentials --name "$SEU_AKS_NAME" --resource-group "$SEU_RESOURCE_GROUP"
+az aks get-credentials --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP"
 ```
 
-### 4.7. Instale o External Secrets Operator
+### 4.7.1 Adcione o Repo do External Secrets Operator
 
 ```bash
 helm repo add external-secrets https://charts.external-secrets.io
+```
+
+### 4.7.2 Adcione o Repo do External Secrets Operator
+
+```bash
 helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
 ```
+
+> Nota
+>
+> É necessário ter o [Helm](https://helm.sh/docs/intro/install/) instalado.
 
 ### 4.8. Crie a ServiceAccount no Kubernetes
 
@@ -166,8 +169,8 @@ metadata:
 ```
 
 > **Nota:**  
-> - Substitua `<CLIENT_ID>` pelo valor da variável `$CLIENT_ID`.
-> - Substitua `<TENANT_ID>` pelo valor da variável `$TENANT_ID`.
+> - Substitua `<CLIENT_ID>` pelo valor da variável `$Env:CLIENT_ID`.
+> - Substitua `<TENANT_ID>` pelo valor da variável `$Env:TENANT_ID`.
 
 ```bash
 kubectl apply -f service-account.yaml
@@ -194,7 +197,7 @@ spec:
 
 > **Nota:**  
 > - Substitua `<namespace>` pelo namespace desejado no cluster Kubernetes (por exemplo, `default` se estiver usando o namespace padrão).
-> - Substitua `<KEY_VAULT_URL>` pelo valor da variável `$KEY_VAULT_URL`.
+> - Substitua `<KEY_VAULT_URL>` pelo valor da variável `$Env:KEY_VAULT_URL`.
 
 Aplique o recurso:
 
@@ -204,9 +207,16 @@ kubectl apply -f secret-store.yaml
 
 ### 4.10. Conceda Permissões no Key Vault
 
-No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME` no Key Vault para ter acesso a todos os Segredos do Cofre.
+No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$Env:SEU_GROUP_NAME` no Key Vault para ter acesso a todos os Segredos do Cofre.
 
-Caso queira dar acesso somente a um segredo específico, vá até o segredo, clique no mesmo, acesse Controle de acesso IAM e adicione a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$SEU_GROUP_NAME`.
+Caso queira dar acesso somente a um segredo específico, vá até o segredo, clique no mesmo, acesse Controle de acesso IAM e adicione a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$Env:SEU_GROUP_NAME`.
+
+Conceda permissão de "Usuário de Segredos do Cofre de Chaves" ao grupo no Key Vault via CLI, assim ele poderá ver todos os secrets
+```bash
+az role assignment create --assignee-object-id $(az ad group show --group "$Env:SEU_GROUP_NAME" --query id -o tsv) --assignee-principal-type Group --role "Key Vault Secrets User" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
+```
+
+Se desejar conceder acesso apenas a um segredo específico, utilize o comando abaixo para atribuir a função **Usuário de Segredos do Cofre de Chaves** ao grupo apenas no escopo do segredo desejado:
 
 ![1](anexos/img/1.png)
 
@@ -250,3 +260,20 @@ Aplique o recurso:
 ```bash
 kubectl apply -f external-secret.yaml
 ```
+### 4.12 Visualizando o Secrets
+
+Para visualizar o Secret criado no Kubernetes, utilize o comando abaixo, substituindo `<namespace>` pelo namespace utilizado (por exemplo, `default`):
+
+```bash
+kubectl get secret my-app-secret-k8s-akv -n default
+```
+
+Para exibir o conteúdo do Secret (decodificando o valor):
+
+```bash
+kubectl get secret my-app-secret-k8s-akv -n default -o jsonpath="{.data.my-akv-secret-key}" | %{ [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
+```
+
+> **Nota:**  
+> - O nome `my-app-secret-k8s-akv` corresponde ao campo `.spec.target.name` definido no recurso `ExternalSecret`.
+> - O campo `my-akv-secret-key` corresponde ao campo `.spec.data.secretKey` do `ExternalSecret`.

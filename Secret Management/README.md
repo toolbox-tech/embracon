@@ -15,13 +15,10 @@ Esta pasta contém os seguintes arquivos e diretórios:
 - **[`AKS/`](AKS/)** - Contém versões específicas dos guias:
   - [`README-Windows.md`](AKS/README-Windows.md) - Guia para uso no Windows/Powershell
   - [`README-Linux.md`](AKS/README-Linux.md) - Guia para uso no Linux/Bash
-- **[`anexos/`](anexos/)** - Imagens e recursos de apoio para a documentação
 - **[`infra-secrets/`](infra-secrets/)** - Terraform para criação do AKV
 - **[`OKE/`](OKE/)** - Contém documentação específica para Oracle Kubernetes Engine (OKE):
   - [`README.md`](OKE/README.md) - Guia para configuração do OIDC no OKE (Oracle Cloud)
   - [`cluster-enable-oidc.json`](OKE/cluster-enable-oidc.json) - Configuração JSON para habilitar OIDC no cluster OKE
-  - [`gif/`](OKE/gif/) - Animações demonstrativas do processo
-  - [`img/`](OKE/img/) - Imagens de apoio para a documentação do OKE
 
 ### 🎯 Propósito dos Arquivos YAML
 

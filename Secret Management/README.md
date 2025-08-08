@@ -51,7 +51,7 @@ Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (A
 
 Antes de iniciar, faça login no Azure CLI e defina a subscription correta:
 
-```bash
+```powershell
 az login
 az account set --subscription "<SUA_SUBSCRIPTION_ID>"
 ```
@@ -60,7 +60,7 @@ Substitua `<SUA_SUBSCRIPTION_ID>` pelo ID da subscription desejada.
 
 ### 4.2. 🏷️ Defina Variáveis
 
-```bash
+```powershell
 $Env:SEU_GROUP_NAME="akv-access-group"
 $Env:SEU_IDENTITY_MANAGED_NAME="test-aks-akv"
 $Env:SEU_RESOURCE_GROUP="Embracon-Test"
@@ -75,7 +75,7 @@ $Env:SECRET_NAME="secretx"
 
 ### 4.3. 🏗️ Crie os Recursos no Azure
 
-```bash
+```powershell
 # Resource Group
 az group create --name "$Env:SEU_RESOURCE_GROUP" --location "$Env:SUA_LOCALIZACAO"
 
@@ -107,23 +107,23 @@ $Env:KEY_VAULT_URL = az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource
 ### 4.4. ☁️ Crie ou Atualize o AKS com OIDC
 
 **Novo cluster:**
-```bash
+```powershell
 az aks create --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --location "$Env:SUA_LOCALIZACAO" --enable-oidc-issuer --enable-managed-identity --node-count 1 --enable-cluster-autoscaler --min-count 1 --max-count 3 --tier free --generate-ssh-keys
 ```
 
 **Cluster existente:**
-```bash
+```powershell
 az aks update --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --enable-oidc-issuer
 ```
 
 Descubra o issuer URL do OIDC:
-```bash
+```powershell
 $Env:AKS_OIDC_ISSUER = az aks show --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query "oidcIssuerProfile.issuerUrl" -o tsv
 ```
 
 ### 4.5. 🔄 Configure a Federação de Identidade
 
-```bash
+```powershell
 # Crie o subject
 $Env:subject="system:serviceaccount:"+$Env:NAMESPACE+":$Env:SERVICE_ACCOUNT_NAME"
 
@@ -132,19 +132,19 @@ az identity federated-credential create --name "kubernetes-federated-credential"
 
 ### 4.6 🔗 Conecte-se ao cluster criado
 
-```bash
+```powershell
 az aks get-credentials --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP"
 ```
 
 ### 4.7.1 📦 Adcione o Repo do External Secrets Operator
 
-```bash
+```powershell
 helm repo add external-secrets https://charts.external-secrets.io
 ```
 
 ### 4.7.2 📦 Instale o External Secrets Operator
 
-```bash
+```powershell
 helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
 ```
 
@@ -170,7 +170,7 @@ metadata:
 > - Substitua `<CLIENT_ID>` pelo valor da variável `$Env:CLIENT_ID`.
 > - Substitua `<TENANT_ID>` pelo valor da variável `$Env:TENANT_ID`.
 
-```bash
+```powershell
 kubectl apply -f service-account.yaml
 ```
 
@@ -199,7 +199,7 @@ spec:
 
 Aplique o recurso:
 
-```bash
+```powershell
 kubectl apply -f secret-store.yaml
 ```
 
@@ -210,7 +210,7 @@ No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofr
 Caso queira dar acesso somente a um segredo específico, vá até o segredo, clique no mesmo, acesse Controle de acesso IAM e adicione a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$Env:SEU_GROUP_NAME`.
 
 Conceda permissão de "Usuário de Segredos do Cofre de Chaves" ao grupo no Key Vault via CLI, assim ele poderá ver todos os secrets
-```bash
+```powershell
 az role assignment create --assignee-object-id $(az ad group show --group "$Env:SEU_GROUP_NAME" --query id -o tsv) --assignee-principal-type Group --role "Key Vault Secrets User" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
 ```
 
@@ -218,7 +218,7 @@ Se desejar conceder acesso apenas a um segredo específico, siga os passos abaix
 
 #### 🗝️ Crie o secret
 
-```bash
+```powershell
 az keyvault secret set --vault-name "$Env:SEU_KEYVAULT_NAME" --name "$Env:SECRET_NAME" --value "TESTE"
 ```
 
@@ -266,20 +266,20 @@ spec:
 
 Aplique o recurso:
 
-```bash
+```powershell
 kubectl apply -f external-secret.yaml
 ```
 ### 4.12 👁️ Visualizando o Secrets
 
 Para visualizar o Secret criado no Kubernetes, utilize o comando abaixo, substituindo `<namespace>` pelo namespace utilizado (por exemplo, `default`):
 
-```bash
+```powershell
 kubectl get secret my-app-secret-k8s-akv -n default
 ```
 
 Para exibir o conteúdo do Secret (decodificando o valor):
 
-```bash
+```powershell
 kubectl get secret my-app-secret-k8s-akv -n default -o jsonpath="{.data.my-akv-secret-key}" | %{ [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_)) }
 ```
 
@@ -295,7 +295,7 @@ Para remover todos os recursos criados durante este tutorial, execute os comando
 
 ### 5.1. 🧽 Remover recursos do Kubernetes
 
-```bash
+```powershell
 # Remover o ExternalSecret
 kubectl delete externalsecret akv-external-secret-manager-store -n default
 
@@ -317,14 +317,14 @@ kubectl delete namespace external-secrets
 
 ### 5.2. 🗑️ Remover Federated Identity Credential
 
-```bash
+```powershell
 # Remover o federated credential
 az identity federated-credential delete --name "kubernetes-federated-credential" --identity-name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --yes
 ```
 
 ### 5.3. 🗑️ Remover recursos do Azure
 
-```bash
+```powershell
 # Remover role assignments (se foram criados)
 az role assignment delete --assignee $(az ad group show --group "$Env:SEU_GROUP_NAME" --query id -o tsv) --role "Key Vault Secrets User" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
 
@@ -358,7 +358,7 @@ az group delete --name "$Env:SEU_RESOURCE_GROUP" --yes --no-wait
 
 ### 5.4. 🧹 Limpar configuração local do kubectl
 
-```bash
+```powershell
 # Remover o contexto do kubectl (opcional)
 kubectl config delete-context "$Env:SEU_AKS_NAME"
 

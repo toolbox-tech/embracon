@@ -1,53 +1,53 @@
-# Guia para acessar um segredo no Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS)
+# 🗝️ Guia para acessar um segredo no Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS)
 
 Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS) de forma segura, utilizando a Federação de Identidade de Carga de Trabalho (Workload Identity Federation) via OIDC, External Secrets Operator e RBAC do Azure.
 
-## Visão Geral
+## 👀 Visão Geral
 
-- **Elimina o "Secret Zero"**: Não é necessário armazenar secrets fixos no cluster.
-- **Segurança aprimorada**: O acesso é feito por tokens temporários emitidos via OIDC.
-- **Automação**: Permissões dinâmicas para workloads, sem rotacionar secrets manualmente.
-- **Gerenciamento centralizado**: RBAC do Azure AD controla o acesso aos segredos.
-
----
-
-## 1. Conceitos-Chave
-
-- **Secret Zero**: Segredo inicial que, se exposto, compromete todo o acesso. Eliminado com OIDC.
-- **OIDC (OpenID Connect)**: Protocolo de autenticação que permite ao AKS emitir tokens para workloads.
-- **Workload Identity Federation**: Permite que pods do AKS assumam identidades do Azure AD sem secrets.
-- **External Secrets Operator**: Sincroniza segredos do AKV para o Kubernetes.
-- **RBAC do Azure**: Gerencia quem pode acessar quais segredos no AKV.
+- 🔒 **Elimina o "Secret Zero"**: Não é necessário armazenar secrets fixos no cluster.
+- 🛡️ **Segurança aprimorada**: O acesso é feito por tokens temporários emitidos via OIDC.
+- 🤖 **Automação**: Permissões dinâmicas para workloads, sem rotacionar secrets manualmente.
+- 🗂️ **Gerenciamento centralizado**: RBAC do Azure AD controla o acesso aos segredos.
 
 ---
 
-## 2. Pré-requisitos
+## 1. 🧩 Conceitos-Chave
 
-- Azure CLI configurado (`az login`)
-- Permissões para criar recursos no Azure (AKS, Key Vault, Managed Identity, Grupos)
-- Helm instalado para deploy do External Secrets Operator
-
----
-
-## 3. Fluxo Resumido
-
-1. Crie um grupo no Azure AD para controle de acesso.
-2. Crie uma Managed Identity para workloads do AKS.
-3. Adicione a Managed Identity ao grupo criado.
-4. Crie o Key Vault com RBAC habilitado.
-5. Crie ou atualize o cluster AKS com OIDC habilitado.
-6. Configure a federação de identidade entre o AKS e a Managed Identity.
-7. Instale o External Secrets Operator no cluster.
-8. Crie a ServiceAccount no Kubernetes com as anotações necessárias.
-9. Crie o SecretStore apontando para o Key Vault.
-10. Conceda permissões de acesso ao grupo no Key Vault.
-11. Crie o recurso ExternalSecret para sincronizar segredos do AKV para o Kubernetes.
+- 🕵️‍♂️ **Secret Zero**: Segredo inicial que, se exposto, compromete todo o acesso. Eliminado com OIDC.
+- 🔗 **OIDC (OpenID Connect)**: Protocolo de autenticação que permite ao AKS emitir tokens para workloads.
+- 👷 **Workload Identity Federation**: Permite que pods do AKS assumam identidades do Azure AD sem secrets.
+- 🔄 **External Secrets Operator**: Sincroniza segredos do AKV para o Kubernetes.
+- 🛡️ **RBAC do Azure**: Gerencia quem pode acessar quais segredos no AKV.
 
 ---
 
-## 4. Passo a Passo
+## 2. 📝 Pré-requisitos
 
-### 4.1. Faça login e defina a subscription
+- 💻 Azure CLI configurado (`az login`)
+- 🛠️ Permissões para criar recursos no Azure (AKS, Key Vault, Managed Identity, Grupos)
+- 🧢 Helm instalado para deploy do External Secrets Operator
+
+---
+
+## 3. 🏃 Fluxo Resumido
+
+1. 👥 Crie um grupo no Azure AD para controle de acesso.
+2. 🆔 Crie uma Managed Identity para workloads do AKS.
+3. ➕ Adicione a Managed Identity ao grupo criado.
+4. 🔐 Crie o Key Vault com RBAC habilitado.
+5. ☁️ Crie ou atualize o cluster AKS com OIDC habilitado.
+6. 🔄 Configure a federação de identidade entre o AKS e a Managed Identity.
+7. 📦 Instale o External Secrets Operator no cluster.
+8. 🧑‍💻 Crie a ServiceAccount no Kubernetes com as anotações necessárias.
+9. 🏪 Crie o SecretStore apontando para o Key Vault.
+10. 🛂 Conceda permissões de acesso ao grupo no Key Vault.
+11. 🔁 Crie o recurso ExternalSecret para sincronizar segredos do AKV para o Kubernetes.
+
+---
+
+## 4. 🛠️ Passo a Passo
+
+### 4.1. 🔑 Faça login e defina a subscription
 
 Antes de iniciar, faça login no Azure CLI e defina a subscription correta:
 
@@ -58,7 +58,7 @@ az account set --subscription "<SUA_SUBSCRIPTION_ID>"
 
 Substitua `<SUA_SUBSCRIPTION_ID>` pelo ID da subscription desejada.
 
-### 4.2. Defina Variáveis
+### 4.2. 🏷️ Defina Variáveis
 
 ```bash
 $Env:SEU_GROUP_NAME="akv-access-group"
@@ -73,7 +73,7 @@ $Env:TENANT_ID="$(az account show --query tenantId -o tsv)"
 $Env:SECRET_NAME="secretx"
 ```
 
-### 4.3. Crie os Recursos no Azure
+### 4.3. 🏗️ Crie os Recursos no Azure
 
 ```bash
 # Resource Group
@@ -104,7 +104,7 @@ az role assignment create --assignee "$(az ad signed-in-user show --query id -o 
 $Env:KEY_VAULT_URL = az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query properties.vaultUri -o tsv
 ```
 
-### 4.4. Crie ou Atualize o AKS com OIDC
+### 4.4. ☁️ Crie ou Atualize o AKS com OIDC
 
 **Novo cluster:**
 ```bash
@@ -121,7 +121,7 @@ Descubra o issuer URL do OIDC:
 $Env:AKS_OIDC_ISSUER = az aks show --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query "oidcIssuerProfile.issuerUrl" -o tsv
 ```
 
-### 4.5. Configure a Federação de Identidade
+### 4.5. 🔄 Configure a Federação de Identidade
 
 ```bash
 # Crie o subject
@@ -130,29 +130,28 @@ $Env:subject="system:serviceaccount:"+$Env:NAMESPACE+":$Env:SERVICE_ACCOUNT_NAME
 az identity federated-credential create --name "kubernetes-federated-credential" --identity-name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --issuer "$Env:AKS_OIDC_ISSUER" --subject "$Env:subject"
 ```
 
-### 4.6 Conecte-se ao cluster criado
+### 4.6 🔗 Conecte-se ao cluster criado
 
 ```bash
 az aks get-credentials --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP"
 ```
 
-### 4.7.1 Adcione o Repo do External Secrets Operator
+### 4.7.1 📦 Adcione o Repo do External Secrets Operator
 
 ```bash
 helm repo add external-secrets https://charts.external-secrets.io
 ```
 
-### 4.7.2 Adcione o Repo do External Secrets Operator
+### 4.7.2 📦 Instale o External Secrets Operator
 
 ```bash
 helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
 ```
 
-> Nota
->
+> ℹ️ **Nota:**  
 > É necessário ter o [Helm](https://helm.sh/docs/intro/install/) instalado.
 
-### 4.8. Crie a ServiceAccount no Kubernetes
+### 4.8. 🧑‍💻 Crie a ServiceAccount no Kubernetes
 
 Crie um arquivo `service-account.yaml` com as anotações necessárias (client-id, tenant-id).
 (substitua pelos valores das variáveis que você obteve anteriormente):
@@ -175,7 +174,7 @@ metadata:
 kubectl apply -f service-account.yaml
 ```
 
-### 4.9. Crie o Secret Store
+### 4.9. 🏪 Crie o Secret Store
 
 Crie um arquivo `secret-store.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
 
@@ -204,7 +203,7 @@ Aplique o recurso:
 kubectl apply -f secret-store.yaml
 ```
 
-### 4.10. Conceda Permissões no Key Vault
+### 4.10. 🛂 Conceda Permissões no Key Vault
 
 No portal do Azure ou via CLI, atribua a função **Usuário de Segredos do Cofre de Chaves** ao grupo `$Env:SEU_GROUP_NAME` no Key Vault para ter acesso a todos os Segredos do Cofre.
 
@@ -217,14 +216,13 @@ az role assignment create --assignee-object-id $(az ad group show --group "$Env:
 
 Se desejar conceder acesso apenas a um segredo específico, siga os passos abaixo para atribuir a função **Usuário de Segredos do Cofre de Chaves** ao grupo apenas no escopo do segredo desejado:
 
-#### Crie o secret
+#### 🗝️ Crie o secret
 
 ```bash
 az keyvault secret set --vault-name "$Env:SEU_KEYVAULT_NAME" --name "$Env:SECRET_NAME" --value "TESTE"
 ```
 
-> Nota
->
+> ℹ️ **Nota:**  
 > A criação do segredo se faz necessária somente para fins de exemplificação.
 
 ![0](anexos/img/0.png)
@@ -237,7 +235,7 @@ az keyvault secret set --vault-name "$Env:SEU_KEYVAULT_NAME" --name "$Env:SECRET
 
 ![4](anexos/img/4.png)
 
-### 4.11. Crie o External Secret 
+### 4.11. 🔁 Crie o External Secret 
 
 Crie um arquivo `external-secret.yaml` com o seguinte conteúdo, substituindo os valores conforme necessário:
 
@@ -271,7 +269,7 @@ Aplique o recurso:
 ```bash
 kubectl apply -f external-secret.yaml
 ```
-### 4.12 Visualizando o Secrets
+### 4.12 👁️ Visualizando o Secrets
 
 Para visualizar o Secret criado no Kubernetes, utilize o comando abaixo, substituindo `<namespace>` pelo namespace utilizado (por exemplo, `default`):
 
@@ -288,3 +286,92 @@ kubectl get secret my-app-secret-k8s-akv -n default -o jsonpath="{.data.my-akv-s
 > **Nota:**  
 > - O nome `my-app-secret-k8s-akv` corresponde ao campo `.spec.target.name` definido no recurso `ExternalSecret`.
 > - O campo `my-akv-secret-key` corresponde ao campo `.spec.data.secretKey` do `ExternalSecret`.
+
+---
+
+## 5. 🧹 Limpeza dos Recursos (Cleanup)
+
+Para remover todos os recursos criados durante este tutorial, execute os comandos abaixo na ordem apresentada:
+
+### 5.1. 🧽 Remover recursos do Kubernetes
+
+```bash
+# Remover o ExternalSecret
+kubectl delete externalsecret akv-external-secret-manager-store -n default
+
+# Remover o SecretStore
+kubectl delete secretstore akv-secret-manager-store -n default
+
+# Remover o Secret criado (se existir)
+kubectl delete secret my-app-secret-k8s-akv -n default
+
+# Remover o ServiceAccount
+kubectl delete serviceaccount workload-identity-sa -n default
+
+# Desinstalar o External Secrets Operator
+helm uninstall external-secrets -n external-secrets
+
+# Remover o namespace do External Secrets Operator
+kubectl delete namespace external-secrets
+```
+
+### 5.2. 🗑️ Remover Federated Identity Credential
+
+```bash
+# Remover o federated credential
+az identity federated-credential delete --name "kubernetes-federated-credential" --identity-name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --yes
+```
+
+### 5.3. 🗑️ Remover recursos do Azure
+
+```bash
+# Remover role assignments (se foram criados)
+az role assignment delete --assignee $(az ad group show --group "$Env:SEU_GROUP_NAME" --query id -o tsv) --role "Key Vault Secrets User" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
+
+# Remover o segredo do Key Vault (se foi criado)
+az keyvault secret delete --vault-name "$Env:SEU_KEYVAULT_NAME" --name "$Env:SECRET_NAME"
+
+# Purgar o segredo (remoção permanente)
+az keyvault secret purge --vault-name "$Env:SEU_KEYVAULT_NAME" --name "$Env:SECRET_NAME"
+
+# Remover a Managed Identity do grupo
+az ad group member remove --group "$Env:SEU_GROUP_NAME" --member-id "$Env:IDENTITY_PRINCIPAL_ID"
+
+# Deletar o cluster AKS (CUIDADO - isso remove todo o cluster!)
+az aks delete --name "$Env:SEU_AKS_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --yes --no-wait
+
+# Deletar o Key Vault (CUIDADO - isso remove o cofre e todos os segredos!)
+az keyvault delete --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP"
+
+# Purgar o Key Vault (remoção permanente)
+az keyvault purge --name "$Env:SEU_KEYVAULT_NAME" --location "$Env:SUA_LOCALIZACAO"
+
+# Deletar a Managed Identity
+az identity delete --name "$Env:SEU_IDENTITY_MANAGED_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP"
+
+# Deletar o grupo Azure AD
+az ad group delete --group "$Env:SEU_GROUP_NAME"
+
+# Deletar o Resource Group (CUIDADO - isso remove TODOS os recursos do grupo!)
+az group delete --name "$Env:SEU_RESOURCE_GROUP" --yes --no-wait
+```
+
+### 5.4. 🧹 Limpar configuração local do kubectl
+
+```bash
+# Remover o contexto do kubectl (opcional)
+kubectl config delete-context "$Env:SEU_AKS_NAME"
+
+# Remover o cluster da configuração do kubectl (opcional)
+kubectl config delete-cluster "$Env:SEU_AKS_NAME"
+
+# Remover o usuário da configuração do kubectl (opcional)
+kubectl config delete-user "clusterUser_$($Env:SEU_RESOURCE_GROUP)_$($Env:SEU_AKS_NAME)"
+```
+
+> **⚠️ AVISO IMPORTANTE:**
+> - Os comandos de cleanup removem PERMANENTEMENTE todos os recursos criados.
+> - Tenha certeza de que não precisa mais desses recursos antes de executar os comandos.
+> - O comando `az group delete` remove TODOS os recursos do Resource Group.
+> - Faça backup de qualquer dado importante antes de executar a limpeza.
+

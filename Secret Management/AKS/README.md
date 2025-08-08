@@ -70,6 +70,7 @@ $Env:SEU_AKS_NAME="aks-test"
 $Env:SERVICE_ACCOUNT_NAME="workload-identity-sa"
 $Env:NAMESPACE="default"
 $Env:TENANT_ID="$(az account show --query tenantId -o tsv)"
+$Env:SECRET_NAME="secretx"
 ```
 
 ### 4.3. Crie os Recursos no Azure
@@ -96,10 +97,8 @@ az keyvault create --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RE
 
 # Após criar o KeyVault, você deve dar permissões aos usuários para poderem usá-lo
 
-# Conceda permissão de "Administrador do Cofre de Chaves" ao usuário no Key Vault
+# Conceda permissão de "Administrador do Cofre de Chaves" ao usuário no Key Vault, este comando dará a permissão ao usuário logado para administrar o Key Vault recém-criado.
 az role assignment create --assignee "$(az ad signed-in-user show --query id -o tsv)" --role "Key Vault Administrator" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
-
-# Este comando dará a permissão ao usuário logado para administrar o Key Vault recém-criado.
 
 # Obtenha a URL do Vault
 $Env:KEY_VAULT_URL = az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query properties.vaultUri -o tsv
@@ -216,7 +215,19 @@ Conceda permissão de "Usuário de Segredos do Cofre de Chaves" ao grupo no Key 
 az role assignment create --assignee-object-id $(az ad group show --group "$Env:SEU_GROUP_NAME" --query id -o tsv) --assignee-principal-type Group --role "Key Vault Secrets User" --scope $(az keyvault show --name "$Env:SEU_KEYVAULT_NAME" --resource-group "$Env:SEU_RESOURCE_GROUP" --query id -o tsv)
 ```
 
-Se desejar conceder acesso apenas a um segredo específico, utilize o comando abaixo para atribuir a função **Usuário de Segredos do Cofre de Chaves** ao grupo apenas no escopo do segredo desejado:
+Se desejar conceder acesso apenas a um segredo específico, siga os passos abaixo para atribuir a função **Usuário de Segredos do Cofre de Chaves** ao grupo apenas no escopo do segredo desejado:
+
+#### Crie o secret
+
+```bash
+az keyvault secret set --vault-name "$Env:SEU_KEYVAULT_NAME" --name "$Env:SECRET_NAME" --value "TESTE"
+```
+
+> Nota
+>
+> A criação do segredo se faz necessária somente para fins de exemplificação.
+
+![0](anexos/img/0.png)
 
 ![1](anexos/img/1.png)
 

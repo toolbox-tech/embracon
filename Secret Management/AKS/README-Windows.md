@@ -267,6 +267,11 @@ spec:
 > - Substitua `<namespace>` pelo namespace desejado no cluster Kubernetes (por exemplo, `default` se estiver usando o namespace padrão).
 > - Substitua `nome-do-segredo-no-akv` pelo nome do segredo existente no Key Vault que deseja sincronizar.
 > - O campo `secretKey` define o nome da chave no Secret do Kubernetes.
+> - O campo `refreshInterval` define o intervalo de tempo para que o segredo seja atualizado a partir do SecretStore.
+> - **# RefreshInterval is the amount of time before the values are read again from the SecretStore provider**
+> - **# Unidades válidas: "ns", "us" (ou "µs"), "ms", "s", "m", "h" (conforme time.ParseDuration)**
+> - **# Pode ser definido como zero para buscar e criar o segredo apenas uma vez**
+> Para mais detalhes acesse [Extenal Secret](https://external-secrets.io/v0.4.4/api-externalsecret)
 
 Aplique o recurso:
 

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # OIDC no Oracle Cloud (OKE)
 
 No Oracle Kubernetes Engine (OKE), o processo de configuração do OIDC é diferente do AKS, pois o OKE não expõe um endpoint OIDC por padrão para autenticação de workloads. 

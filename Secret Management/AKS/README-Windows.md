@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="anexos/img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # 🗝️ Guia para acessar um segredo no Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS)
 
 Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (AKV) a partir do Azure Kubernetes Service (AKS) de forma segura, utilizando a Federação de Identidade de Carga de Trabalho (Workload Identity Federation) via OIDC, External Secrets Operator e RBAC do Azure.

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # 🗝️ Guia para acessar um segredo no Azure Key Vault (AKV) usando OIDC
 
 Este guia apresenta um passo a passo para acessar segredos do Azure Key Vault (AKV) de forma segura usando OIDC (OpenID Connect), External Secrets Operator e RBAC do Azure. A solução elimina a necessidade de armazenar credenciais estáticas, utilizando Workload Identity Federation para autenticação baseada em tokens temporários.

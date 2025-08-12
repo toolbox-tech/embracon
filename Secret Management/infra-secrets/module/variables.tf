@@ -64,3 +64,9 @@ variable "certificate_permissions" {
   description = "List of certificate permissions."
   default     = ["Backup", "Create", "Delete", "DeleteIssuers", "Get", "GetIssuers", "Import", "List", "ListIssuers", "ManageContacts", "ManageIssuers", "Purge", "Recover", "Restore", "SetIssuers", "Update"]
 }
+
+variable "users_allowed" {
+  description = "Lista de Object IDs dos usuários permitidos a acessar o Key Vault"
+  type        = list(string)
+  default     = []
+}

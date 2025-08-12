@@ -12,17 +12,11 @@ resource "azurerm_key_vault" "this" {
 
   enable_rbac_authorization = true
   sku_name                  = var.sku_name
+}
 
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
-
-    key_permissions = var.key_permissions
-
-    secret_permissions = var.secret_permissions
-
-    storage_permissions = var.storage_permissions
-
-    certificate_permissions = var.certificate_permissions
-  }
+resource "azurerm_role_assignment" "example" {
+  count = length(var.users_allowed)
+  scope                = azurerm_key_vault.this.id
+  role_definition_name = "Key Vault Administrator"
+  principal_id         = element(var.users_allowed, count.index)
 }

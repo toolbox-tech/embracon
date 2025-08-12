@@ -30,16 +30,19 @@ Esta pasta contém os seguintes arquivos e diretórios:
 - **O que faz**: Define uma ServiceAccount no Kubernetes com anotações específicas para Azure Workload Identity
 - **Função**: Permite que pods assumam a identidade do Azure AD sem usar secrets estáticos
 - **Uso**: Aplicado uma vez no cluster Kubernetes
+- **Observação**: Para usar mais de um identidade, crie múltiplos recursos `ServiceAccount` com as anotações apropriadas para cada identidade desejada.
 
 #### `secret-store.yaml`
-- **O que faz**: Configura uma conexão entre o External Secrets Operator e o Azure Key Vault
+- **O que faz**: Configura uma conexão entre o External Secrets Operator e o Azure Key Vault. A ideia por trás do recurso `SecretStore` é separar as responsabilidades de autenticação/acesso da configuração e dos próprios segredos utilizados pelas aplicações. O `ExternalSecret` define **o que** buscar, enquanto o `SecretStore` define **como** acessar. Este recurso é do tipo namespaced, ou seja, pertence a um namespace específico no Kubernetes.
 - **Função**: Define como o operador deve se autenticar e acessar o Key Vault
 - **Uso**: Define a fonte dos secrets (Azure Key Vault)
+- **Observação**: Para usar mais de uma fonte de secrets, crie múltiplos recursos `SecretStore`.
 
 #### `external-secret.yaml`
 - **O que faz**: Especifica quais secrets do Key Vault devem ser sincronizados para o Kubernetes
 - **Função**: Cria um mapeamento entre secrets do Azure e secrets do Kubernetes
 - **Uso**: Aplicado para cada secret que você quer sincronizar
+- **Observação**: Para usar mais de um secret, crie múltiplos recursos `ExternalSecret` apontando para diferentes secrets do Key Vault conforme necessário.
 
 ### 🚀 Fluxo de Uso
 

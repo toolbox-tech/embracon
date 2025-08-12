@@ -69,6 +69,12 @@ module "key_vault" {
 | `storage_permissions` | Lista de permissões para storage | `list(string)` | Ver padrões | ❌ |
 | `certificate_permissions` | Lista de permissões para certificados | `list(string)` | Ver padrões | ❌ |
 
+### Variáveis do Provider
+
+| Nome | Descrição | Tipo | Obrigatório |
+|------|-----------|------|-------------|
+| `subscription_id` | ID da subscription do Azure | `string` | ✅ |
+
 ### Valores Padrão das Permissões
 
 **Key Permissions (Padrão):**
@@ -101,13 +107,18 @@ Este módulo implementa as seguintes práticas de segurança:
 ## 📋 Pré-requisitos
 
 1. **Terraform**: Versão >= 1.0
-2. **Azure CLI**: Configurado e autenticado
-3. **Permissões Azure**: O usuário/service principal deve ter:
+2. **Azure Provider**: Versão 4.38.1 (conforme especificado)
+3. **Azure CLI**: Configurado e autenticado
+4. **Subscription ID**: ID da subscription do Azure onde os recursos serão criados
+5. **Permissões Azure**: O usuário/service principal deve ter:
    - Permissão para criar Key Vaults
    - Permissão para criar Role Assignments
    - Acesso ao Resource Group especificado
+   - Acesso à subscription especificada
 
-## 🚀 Como Obter Object IDs dos Usuários
+## 🚀 Como Obter Informações Necessárias
+
+### Object IDs dos Usuários
 
 Para obter o Object ID de um usuário do Azure AD:
 
@@ -122,6 +133,21 @@ az ad signed-in-user show --query objectId -o tsv
 az ad user list --query "[].{DisplayName:displayName, ObjectId:objectId}" -o table
 ```
 
+### Subscription ID
+
+Para obter o ID da subscription do Azure:
+
+```bash
+# Listar todas as subscriptions
+az account list --query "[].{Name:name, SubscriptionId:id}" -o table
+
+# Obter subscription por nome específico
+az account list --query "[?name=='Nome da Assinatura'].id" --output tsv
+
+# Obter subscription atual
+az account show --query id -o tsv
+```
+
 ## 📝 Exemplo Completo de Implementação
 
 ```hcl
@@ -130,17 +156,21 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0"
+      version = "4.38.1"
     }
   }
 }
 
 provider "azurerm" {
-  features {
-    key_vault {
-      purge_soft_delete_on_destroy = true
-    }
-  }
+  subscription_id = var.subscription_id
+  # Para ver a subscrição rode o comando az account list --query "[?name=='Nome da Assinatura'].id" --output tsv
+  features {}
+}
+
+# variables.tf
+variable "subscription_id" {
+  description = "ID da subscription do Azure"
+  type        = string
 }
 
 # main.tf
@@ -166,6 +196,12 @@ output "key_vault_uri" {
   description = "URI do Key Vault criado"
   sensitive   = true
 }
+```
+
+### terraform.tfvars (exemplo)
+
+```hcl
+subscription_id = "12345678-1234-1234-1234-123456789012"
 ```
 
 ## ⚠️ Considerações Importantes

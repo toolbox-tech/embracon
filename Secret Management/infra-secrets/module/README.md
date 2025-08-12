@@ -148,6 +148,20 @@ az account list --query "[?name=='Nome da Assinatura'].id" --output tsv
 az account show --query id -o tsv
 ```
 
+### Definir subscription_id como Variável de Ambiente
+
+#### No Linux/macOS
+```bash
+export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+```
+
+#### No Windows (PowerShell)
+```powershell
+$env:TF_VAR_subscription_id = (az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+```
+
+> **Nota**: Substitua `'TBX-Sandbox'` pelo nome da sua subscription do Azure.
+
 ## 📝 Exemplo Completo de Implementação
 
 ```hcl
@@ -198,7 +212,25 @@ output "key_vault_uri" {
 }
 ```
 
-### terraform.tfvars (exemplo)
+### Usando Variável de Ambiente (Recomendado)
+
+Defina a variável de ambiente antes de executar o Terraform:
+
+#### Linux/macOS:
+```bash
+export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+terraform plan
+terraform apply
+```
+
+#### Windows (PowerShell):
+```powershell
+$env:TF_VAR_subscription_id = (az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+terraform plan
+terraform apply
+```
+
+### terraform.tfvars (alternativa)
 
 ```hcl
 subscription_id = "12345678-1234-1234-1234-123456789012"

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Módulo Terraform: Azure Key Vault (AKV)
 
 Este módulo facilita a criação e o gerenciamento de um **Azure Key Vault** (AKV) utilizando Terraform, permitindo integração segura de segredos, chaves e certificados em sua infraestrutura como código.

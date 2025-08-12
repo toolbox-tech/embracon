@@ -51,15 +51,12 @@ output "key_vault_uri" {
 - `vault_uri`: URI do Key Vault criado.
 - `vault_id`: ID do recurso Key Vault.
 
-## Set subscription_id on Linux
+## Definir subscription_id no Linux
 ```bash
- export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
- ```
+export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+```
 
-## Licença
-
-MIT
-
-## Contribuição
-
-Contribuições são bem-vindas! Abra uma issue ou pull
+## Definir subscription_id no Windows
+```powershell
+$env:TF_VAR_subscription_id = (az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+```

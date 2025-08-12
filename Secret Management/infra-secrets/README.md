@@ -60,3 +60,7 @@ export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].
 ```powershell
 $env:TF_VAR_subscription_id = (az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
 ```
+
+## Observação
+
+A permissão de acesso ao AKV será dada ao usuário utilizado para criar.

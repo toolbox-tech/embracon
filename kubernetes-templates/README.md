@@ -247,6 +247,23 @@ resources:
 | `resources.requests.cpu` | Request de CPU | `500m` | string |
 | `resources.requests.memory` | Request de Memory | `256Mi` | string |
 
+## 📖 Documentação Completa
+
+### 🎓 **Para Iniciantes**
+- [📚 **GUIA COMPLETO PASSO A PASSO**](./GUIA-INICIANTES.md) - **Comece aqui se é novo no Kubernetes!**
+- [🚀 **Exemplo Prático Completo**](./EXEMPLO-PRATICO.md) - Deploy de API REST com DB e Cache
+- [⚡ **Comandos Essenciais**](./COMANDOS-ESSENCIAIS.md) - Cheat sheet para troubleshooting
+
+### 🔧 **Para Desenvolvedores**
+- [🏥 Implementações de Health Checks](./examples/health-implementations.md) - Python, Java, Node.js, .NET
+- [⚙️ Cenários de Configuração](./examples/configuration-scenarios.md) - 7 tipos de aplicação
+- [📜 Scripts Personalizados](./scripts/health-check.sh) - Health checks bash
+
+### 📋 **Guias Rápidos**
+- [🎯 Quick Start](#-quick-start) - Deploy em 5 minutos
+- [🛠️ Troubleshooting](#-troubleshooting) - Soluções para problemas comuns
+- [📊 Monitoramento](#-monitoramento) - Métricas e alertas
+
 ## 🎯 Casos de Uso
 
 ### **📱 Aplicação Web (Frontend)**

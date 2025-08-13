@@ -2,11 +2,11 @@
   <img src="Secret Management/img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
-# 🏢 Embracon - Toolbox de DevOps e Infraestrutura
+# 🏢 Embracon - DevOps e Infraestrutura
 
 ## 🎯 Sobre o Projeto
 
-O **Embracon Toolbox** é uma coleção abrangente de ferramentas, práticas e templates de DevOps desenvolvidos especificamente para a **Embracon**, fornecendo soluções padronizadas para desenvolvimento seguro, CI/CD, gerenciamento de segredos e melhores práticas de SDLC (Software Development Life Cycle).
+É uma coleção abrangente de ferramentas, práticas e templates de DevOps desenvolvidos especificamente para a **Embracon**, fornecendo soluções padronizadas para desenvolvimento seguro, CI/CD, gerenciamento de segredos e melhores práticas de SDLC (Software Development Life Cycle).
 
 Este repositório serve como **centro de conhecimento** e **toolkit operacional** para equipes de desenvolvimento, oferecendo:
 - 🔐 **Soluções de segurança** para gerenciamento de segredos

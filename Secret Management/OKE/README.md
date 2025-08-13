@@ -4,6 +4,137 @@
 
 # OIDC no Oracle Cloud (OKE)
 
+## 🏗️ Diagrama da Solução - OKE com Azure Key Vault
+
+```mermaid
+graph TB
+    %% Oracle Cloud Infrastructure
+    subgraph "Oracle Cloud Infrastructure (OCI)"
+        subgraph "OKE Cluster"
+            direction TB
+            APP[Aplicação]
+            ESO[External Secrets Operator]
+            SS[SecretStore<br/>Azure Key Vault Config]
+            ES[ExternalSecret<br/>Secret Mapping]
+            SA[ServiceAccount<br/>OIDC Identity]
+            PODS[Pods com Secrets]
+        end
+        
+        subgraph "OKE OIDC Provider"
+            OIDC_OKE["OIDC Issuer URL<br/>containerengine.oracle.com/clusters/cluster-id/oidc"]
+        end
+    end
+
+    %% Azure Cloud
+    subgraph "Azure Cloud"
+        subgraph "Resource Group: Embracon"
+            AKV[Azure Key Vault<br/>meukeyvault123]
+            MI_OKE[Managed Identity<br/>oke-workload-identity]
+        end
+        
+        subgraph "Azure AD"
+            AAD[Azure Active Directory<br/>Tenant]
+            FIC_OKE[Federated Identity<br/>OKE OIDC Trust]
+        end
+    end
+
+    %% Cross-Cloud Connections
+    SA -->|OIDC Token Request| OIDC_OKE
+    OIDC_OKE -->|Issue OIDC Token| SA
+    SA -->|OIDC Authentication| AAD
+    AAD -->|Validate Federated Creds| FIC_OKE
+    FIC_OKE -->|Map to Identity| MI_OKE
+    MI_OKE -->|RBAC Permissions| AKV
+    
+    %% Kubernetes Workflow
+    APP -->|Request Secret| PODS
+    ESO -->|Read Config| SS
+    SS -->|Reference| SA
+    ES -->|Use SecretStore| SS
+    ESO -->|Process ExternalSecret| ES
+    ESO -->|Authenticate & Fetch| AKV
+    AKV -->|Return Secret Value| ESO
+    ESO -->|Create/Update K8s Secret| PODS
+    PODS -->|Provide Secret| APP
+
+    %% Styling
+    classDef oracle fill:#ff4500,stroke:#cc3400,stroke-width:2px,color:#fff
+    classDef azure fill:#0078d4,stroke:#005a9e,stroke-width:2px,color:#fff
+    classDef k8s fill:#326ce5,stroke:#1a5490,stroke-width:2px,color:#fff
+    classDef secret fill:#ff6b35,stroke:#cc5429,stroke-width:2px,color:#fff
+
+    class OIDC_OKE oracle
+    class AKV,MI_OKE,AAD,FIC_OKE azure
+    class APP,ESO,SS,ES,SA,PODS k8s
+```
+
+## 🔄 Fluxo de Autenticação Cross-Cloud
+
+```mermaid
+sequenceDiagram
+    participant Pod as Pod OKE
+    participant SA as ServiceAccount
+    participant OKE as OKE OIDC Provider
+    participant AAD as Azure AD
+    participant MI as Managed Identity (OKE)
+    participant AKV as Azure Key Vault
+    participant ESO as External Secrets Operator
+
+    Pod->>SA: Solicitar acesso a secret
+    SA->>OKE: Solicitar OIDC token
+    OKE-->>SA: Retornar OIDC token
+    SA->>AAD: Autenticar com OIDC token
+    AAD->>MI: Validar Federated Identity
+    MI-->>AAD: Confirmar identidade
+    AAD-->>SA: Retornar access token Azure
+    ESO->>AKV: Buscar secret (com token Azure)
+    AKV-->>ESO: Retornar valor do secret
+    ESO->>Pod: Criar K8s secret
+    Pod-->>Pod: Consumir secret
+```
+
+## 📋 Componentes da Solução OKE
+
+### **Componentes Oracle Cloud**
+| Componente | Propósito | Configuração |
+|-----------|---------|---------------|
+| **OKE Cluster** | Cluster Kubernetes gerenciado | Enhanced cluster com OIDC habilitado |
+| **OIDC Provider** | Provedor de identidade OKE | `https://containerengine.oracle.com/clusters/{cluster-id}/oidc` |
+| **ServiceAccount** | Identidade de workload | Configurado com anotações Azure |
+| **External Secrets Operator** | Sincronização de secrets | Instalado via Helm ou manifests |
+
+### **Componentes Azure (Cross-Cloud)**
+| Componente | Propósito | Configuração |
+|-----------|---------|---------------|
+| **Azure Key Vault** | Armazenamento de secrets | `meukeyvault123.vault.azure.net` |
+| **Managed Identity (OKE)** | Identidade para workloads OKE | `oke-workload-identity` |
+| **Federated Credentials** | Confiança OIDC com OKE | Trust relationship com OKE OIDC issuer |
+| **RBAC Roles** | Controle de acesso | Key Vault Secrets User ou granular |
+
+### **Integração Kubernetes**
+| Componente | Propósito | Configuração |
+|-----------|---------|---------------|
+| **SecretStore** | Configuração de conexão | Referência ao ServiceAccount e vault |
+| **ExternalSecret** | Mapeamento de secrets | Define quais secrets buscar |
+| **K8s Secrets** | Secrets nativos do cluster | Criados automaticamente pelo ESO |
+
+## 🔐 Configuração de Segurança Cross-Cloud
+
+### **Vantagens da Integração OKE + Azure Key Vault:**
+✅ **Centralização**: Secrets centralizados no Azure Key Vault
+✅ **Cross-Cloud**: Acesso seguro entre Oracle e Azure
+✅ **Zero Secrets**: Nenhum secret armazenado no cluster OKE
+✅ **OIDC Nativo**: Usa OIDC provider do próprio OKE
+✅ **RBAC Granular**: Controle fino de acesso por workload
+✅ **Auditoria**: Logs centralizados no Azure Monitor
+
+### **Fluxo de Segurança:**
+1. **OKE** gera tokens OIDC para workloads
+2. **Azure AD** valida tokens via Federated Credentials
+3. **Managed Identity** mapeia identidade OKE para Azure
+4. **RBAC** controla acesso granular ao Key Vault
+5. **External Secrets Operator** sincroniza secrets automaticamente
+
 No Oracle Kubernetes Engine (OKE), o processo de configuração do OIDC é diferente do AKS, pois o OKE não expõe um endpoint OIDC por padrão para autenticação de workloads. 
 
 Para a utilização do OIDC é necessário que o cluster seja do tipo `ENHANCED_CLUSTER` e deve-se ativar o `Open Id Connect Discovery`.

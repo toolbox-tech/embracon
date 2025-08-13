@@ -1,0 +1,23 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: embracon-app-vpa
+  labels:
+    app: embracon-app
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: embracon-app
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: app
+      maxAllowed:
+        cpu: "2000m"
+        memory: "2Gi"
+      minAllowed:
+        cpu: "100m"
+        memory: "128Mi"
+      controlledResources: ["cpu", "memory"]

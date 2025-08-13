@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: embracon-app-monitor
+  labels:
+    app: embracon-app
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: embracon-app
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

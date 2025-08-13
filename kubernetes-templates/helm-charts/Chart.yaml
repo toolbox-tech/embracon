@@ -1,0 +1,24 @@
+apiVersion: v2
+name: embracon-app
+description: Template Helm Chart para aplicações Embracon com Health Checks, HPA e VPA
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - embracon
+  - kubernetes
+  - health-checks
+  - autoscaling
+  - hpa
+  - vpa
+home: https://github.com/toolbox-tech/embracon
+sources:
+  - https://github.com/toolbox-tech/embracon/tree/main/kubernetes-templates
+maintainers:
+  - name: Embracon DevOps Team
+    email: devops@embracon.com.br
+annotations:
+  category: Application
+  "helm.sh/images": |
+    - name: app
+      image: nginx:latest

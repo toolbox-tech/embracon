@@ -1,0 +1,277 @@
+# Configurações da Imagem
+image:
+  repository: nginx
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Configurações de Deploy
+replicaCount: 1
+nameOverride: ""
+fullnameOverride: ""
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Configurações de Segurança
+podSecurityContext: {}
+securityContext: {}
+
+# Configurações do Service
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+# Configurações de Ingress
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Configurações de Recursos
+resources:
+  limits:
+    cpu: "1000m"
+    memory: "512Mi"
+  requests:
+    cpu: "500m"
+    memory: "256Mi"
+
+# Health Checks Configuration
+healthChecks:
+  enabled: true
+  
+  # Liveness Probe - Detecta containers "mortos"
+  liveness:
+    enabled: true
+    type: "httpGet" # httpGet, tcpSocket, exec
+    httpGet:
+      path: "/health"
+      port: 8080
+      scheme: HTTP
+    tcpSocket:
+      port: 8080
+    exec:
+      command:
+        - /health-check.sh
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Readiness Probe - Controla roteamento de tráfego
+  readiness:
+    enabled: true
+    type: "httpGet" # httpGet, tcpSocket, exec
+    httpGet:
+      path: "/ready"
+      port: 8080
+      scheme: HTTP
+    tcpSocket:
+      port: 8080
+    exec:
+      command:
+        - /ready-check.sh
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    successThreshold: 1
+    failureThreshold: 3
+  
+  # Startup Probe - Protege aplicações com inicialização lenta
+  startup:
+    enabled: false
+    type: "httpGet" # httpGet, tcpSocket, exec
+    httpGet:
+      path: "/startup"
+      port: 8080
+      scheme: HTTP
+    tcpSocket:
+      port: 8080
+    exec:
+      command:
+        - /startup-check.sh
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 30
+
+# Autoscaling Configuration
+autoscaling:
+  # Horizontal Pod Autoscaler (HPA)
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    
+    # Métricas baseadas em recursos
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+    
+    # Métricas customizadas (opcional)
+    customMetrics: []
+    # Exemplo de métricas customizadas:
+    # customMetrics:
+    #   - type: Pods
+    #     pods:
+    #       metric:
+    #         name: http_requests_per_second
+    #       target:
+    #         type: AverageValue
+    #         averageValue: "1k"
+    
+    # Comportamento de escala
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+        selectPolicy: Max
+
+  # Vertical Pod Autoscaler (VPA)
+  vpa:
+    enabled: false
+    updateMode: "Auto" # Auto, Initial, Off
+    resourcePolicy:
+      containerPolicies:
+      - containerName: app
+        maxAllowed:
+          cpu: "2000m"
+          memory: "2Gi"
+        minAllowed:
+          cpu: "100m"
+          memory: "128Mi"
+        controlledResources: ["cpu", "memory"]
+
+# Node Selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Configurações de Monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    labels: {}
+    annotations: {}
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics
+    port: metrics
+
+# Environment Variables
+env: []
+# env:
+#   - name: ENV_VAR_NAME
+#     value: "env_var_value"
+#   - name: SECRET_ENV_VAR
+#     valueFrom:
+#       secretKeyRef:
+#         name: my-secret
+#         key: secret-key
+
+# ConfigMaps
+configMaps: []
+# configMaps:
+#   - name: app-config
+#     data:
+#       config.yaml: |
+#         app:
+#           name: "My App"
+
+# Secrets
+secrets: []
+# secrets:
+#   - name: app-secrets
+#     data:
+#       api-key: "bXktc2VjcmV0LWFwaS1rZXk="
+
+# Volumes
+volumes: []
+# volumes:
+#   - name: config-volume
+#     configMap:
+#       name: app-config
+
+# Volume Mounts
+volumeMounts: []
+# volumeMounts:
+#   - name: config-volume
+#     mountPath: /app/config
+
+# Init Containers
+initContainers: []
+# initContainers:
+#   - name: init-db
+#     image: busybox:1.35
+#     command: ['sh', '-c', 'echo Initializing database && sleep 10']
+
+# Sidecar Containers
+sidecars: []
+# sidecars:
+#   - name: sidecar-container
+#     image: busybox:1.35
+#     command: ['sh', '-c', 'echo Sidecar running && tail -f /dev/null']
+
+# Pod Labels
+podLabels: {}
+
+# Pod Annotations
+podAnnotations: {}
+
+# Deployment Strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 25%
+    maxSurge: 25%
+
+# Lifecycle Hooks
+lifecycle: {}
+# lifecycle:
+#   preStop:
+#     exec:
+#       command: ["/bin/sh", "-c", "echo 'Graceful shutdown'"]
+
+# DNS Policy
+dnsPolicy: ClusterFirst
+
+# Restart Policy
+restartPolicy: Always
+
+# Termination Grace Period
+terminationGracePeriodSeconds: 30

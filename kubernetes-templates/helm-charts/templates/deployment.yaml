@@ -1,0 +1,188 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "embracon-app.fullname" . }}
+  labels:
+    {{- include "embracon-app.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.hpa.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "embracon-app.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: {{ .Values.strategy.type }}
+    {{- if eq .Values.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
+    {{- end }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "embracon-app.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "embracon-app.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers }}
+      initContainers:
+        {{- toYaml .Values.initContainers | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+            {{- if .Values.monitoring.enabled }}
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+            {{- end }}
+          
+          {{- if .Values.healthChecks.enabled }}
+          # Liveness Probe - Detecta se o container está "vivo"
+          {{- if .Values.healthChecks.liveness.enabled }}
+          livenessProbe:
+            {{- if eq .Values.healthChecks.liveness.type "httpGet" }}
+            httpGet:
+              path: {{ .Values.healthChecks.liveness.httpGet.path }}
+              port: {{ .Values.healthChecks.liveness.httpGet.port }}
+              scheme: {{ .Values.healthChecks.liveness.httpGet.scheme }}
+            {{- else if eq .Values.healthChecks.liveness.type "tcpSocket" }}
+            tcpSocket:
+              port: {{ .Values.healthChecks.liveness.tcpSocket.port }}
+            {{- else if eq .Values.healthChecks.liveness.type "exec" }}
+            exec:
+              command:
+                {{- toYaml .Values.healthChecks.liveness.exec.command | nindent 16 }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.healthChecks.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthChecks.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthChecks.liveness.timeoutSeconds }}
+            successThreshold: {{ .Values.healthChecks.liveness.successThreshold }}
+            failureThreshold: {{ .Values.healthChecks.liveness.failureThreshold }}
+          {{- end }}
+          
+          # Readiness Probe - Controla o roteamento de tráfego
+          {{- if .Values.healthChecks.readiness.enabled }}
+          readinessProbe:
+            {{- if eq .Values.healthChecks.readiness.type "httpGet" }}
+            httpGet:
+              path: {{ .Values.healthChecks.readiness.httpGet.path }}
+              port: {{ .Values.healthChecks.readiness.httpGet.port }}
+              scheme: {{ .Values.healthChecks.readiness.httpGet.scheme }}
+            {{- else if eq .Values.healthChecks.readiness.type "tcpSocket" }}
+            tcpSocket:
+              port: {{ .Values.healthChecks.readiness.tcpSocket.port }}
+            {{- else if eq .Values.healthChecks.readiness.type "exec" }}
+            exec:
+              command:
+                {{- toYaml .Values.healthChecks.readiness.exec.command | nindent 16 }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.healthChecks.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthChecks.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthChecks.readiness.timeoutSeconds }}
+            successThreshold: {{ .Values.healthChecks.readiness.successThreshold }}
+            failureThreshold: {{ .Values.healthChecks.readiness.failureThreshold }}
+          {{- end }}
+          
+          # Startup Probe - Para aplicações com inicialização lenta
+          {{- if .Values.healthChecks.startup.enabled }}
+          startupProbe:
+            {{- if eq .Values.healthChecks.startup.type "httpGet" }}
+            httpGet:
+              path: {{ .Values.healthChecks.startup.httpGet.path }}
+              port: {{ .Values.healthChecks.startup.httpGet.port }}
+              scheme: {{ .Values.healthChecks.startup.httpGet.scheme }}
+            {{- else if eq .Values.healthChecks.startup.type "tcpSocket" }}
+            tcpSocket:
+              port: {{ .Values.healthChecks.startup.tcpSocket.port }}
+            {{- else if eq .Values.healthChecks.startup.type "exec" }}
+            exec:
+              command:
+                {{- toYaml .Values.healthChecks.startup.exec.command | nindent 16 }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.healthChecks.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.healthChecks.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.healthChecks.startup.timeoutSeconds }}
+            successThreshold: {{ .Values.healthChecks.startup.successThreshold }}
+            failureThreshold: {{ .Values.healthChecks.startup.failureThreshold }}
+          {{- end }}
+          {{- end }}
+          
+          # Variáveis de Ambiente
+          {{- if .Values.env }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- end }}
+          
+          # Recursos
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          
+          # Volume Mounts
+          {{- if .Values.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.volumeMounts | nindent 12 }}
+          {{- end }}
+          
+          # Lifecycle Hooks
+          {{- if .Values.lifecycle }}
+          lifecycle:
+            {{- toYaml .Values.lifecycle | nindent 12 }}
+          {{- end }}
+        
+        {{- if .Values.sidecars }}
+        # Sidecar Containers
+        {{- toYaml .Values.sidecars | nindent 8 }}
+        {{- end }}
+      
+      # Volumes
+      {{- if .Values.volumes }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 8 }}
+      {{- end }}
+      
+      # Node Selector
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # Affinity
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # Tolerations
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      
+      # DNS Policy
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      
+      # Restart Policy
+      restartPolicy: {{ .Values.restartPolicy }}
+      
+      # Termination Grace Period
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}

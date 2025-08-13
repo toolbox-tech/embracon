@@ -1,0 +1,39 @@
+{{- if .Values.autoscaling.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "embracon-app.fullname" . }}
+  labels:
+    {{- include "embracon-app.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "embracon-app.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.hpa.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.hpa.maxReplicas }}
+  metrics:
+    {{- if .Values.autoscaling.hpa.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.hpa.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.hpa.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.hpa.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.autoscaling.hpa.customMetrics }}
+    {{- toYaml .Values.autoscaling.hpa.customMetrics | nindent 4 }}
+    {{- end }}
+  {{- if .Values.autoscaling.hpa.behavior }}
+  behavior:
+    {{- toYaml .Values.autoscaling.hpa.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -2,24 +2,186 @@
   <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
-# Módulo Terraform: Azure Key Vault (AKV)
+# 🏗️ Infraestrutura Terraform: Azure Key Vault (AKV)
 
-Este módulo facilita a criação e o gerenciamento de um **Azure Key Vault** (AKV) utilizando Terraform, permitindo integração segura de segredos, chaves e certificados em sua infraestrutura como código.
+Este diretório contém a infraestrutura como código (IaC) para criação e gerenciamento do **Azure Key Vault** usando Terraform, com integração para OIDC e GitHub Actions, permitindo acesso seguro de aplicações Kubernetes (AKS/OKE) aos segredos armazenados.
 
-## Funcionalidades
+## 🏛️ Diagrama da Solução - Infraestrutura Azure Key Vault
 
-- Criação automatizada de um Azure Key Vault.
-- Suporte a gerenciamento de segredos, chaves e certificados.
-- Controle de acesso via IAM e políticas de acesso granular.
-- Pronto para integração com aplicações e pipelines CI/CD.
+```mermaid
+graph TB
+    %% GitHub Actions Infrastructure
+    subgraph "GitHub Actions - CI/CD"
+        GHA[GitHub Actions Workflow<br/>akv.yml]
+        OIDC_GH[OIDC Authentication<br/>Token Request]
+    end
+    
+    %% Azure Cloud Infrastructure
+    subgraph "Azure Cloud - Infraestrutura"
+        subgraph "Resource Group: Embracon"
+            AKV[Azure Key Vault<br/>akv-test-embracon]
+            MI_TERRAFORM[Managed Identity<br/>github-actions-terraform]
+        end
+        
+        subgraph "Azure AD"
+            AAD[Azure Active Directory<br/>Tenant]
+            FIC_TERRAFORM[Federated Identity<br/>GitHub OIDC Trust]
+        end
+        
+        subgraph "Terraform State"
+            TF_STATE[Terraform State<br/>Local/Remote Backend]
+        end
+    end
+    
+    %% Kubernetes Clusters (Consumers)
+    subgraph "Kubernetes Clusters - Consumidores"
+        subgraph "Azure AKS"
+            AKS[AKS Cluster<br/>aks-test]
+            MI_AKS[Managed Identity<br/>test-aks-akv]
+        end
+        
+        subgraph "Oracle OKE"
+            OKE[OKE Cluster<br/>oke-test]
+            OCI_OIDC[OCI OIDC Provider<br/>Cross-Cloud Auth]
+        end
+    end
 
-## Pré-requisitos
+    %% GitHub Actions Flow
+    GHA -->|Trigger Manual/Push| OIDC_GH
+    OIDC_GH -->|Request OIDC Token| AAD
+    AAD -->|Validate Federated Creds| FIC_TERRAFORM
+    FIC_TERRAFORM -->|Map to Identity| MI_TERRAFORM
+    MI_TERRAFORM -->|Terraform Permissions| AKV
+    
+    %% Terraform Infrastructure Creation
+    MI_TERRAFORM -->|Create/Manage| AKV
+    MI_TERRAFORM -->|Store State| TF_STATE
+    
+    %% AKS Integration (Native Azure)
+    AKS -->|OIDC Token| AAD
+    AAD -->|Azure AD Group| MI_AKS
+    MI_AKS -->|RBAC Access| AKV
+    
+    %% OKE Integration (Cross-Cloud)
+    OKE -->|OIDC Token| OCI_OIDC
+    OCI_OIDC -->|Cross-Cloud Trust| AAD
+    AAD -->|Federated Identity| AKV
 
-- Conta Azure com permissões para criar recursos.
-- [Azure CLI](https://docs.microsoft.com/pt-br/cli/azure/install-azure-cli) instalado e autenticado.
-- [Terraform](https://www.terraform.io/downloads.html) instalado.
+    %% Styling
+    classDef github fill:#24292e,stroke:#1a1e22,stroke-width:2px,color:#fff
+    classDef azure fill:#0078d4,stroke:#005a9e,stroke-width:2px,color:#fff
+    classDef k8s fill:#326ce5,stroke:#1a5490,stroke-width:2px,color:#fff
+    classDef terraform fill:#623ce4,stroke:#4b2ca0,stroke-width:2px,color:#fff
+    classDef oracle fill:#f80000,stroke:#cc0000,stroke-width:2px,color:#fff
 
-## Uso
+    class GHA,OIDC_GH github
+    class AKV,MI_TERRAFORM,AAD,FIC_TERRAFORM,MI_AKS azure
+    class AKS k8s
+    class TF_STATE terraform
+    class OKE,OCI_OIDC oracle
+```
+
+## 🔄 Fluxo de Deployment com GitHub Actions
+
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub Actions
+    participant AAD as Azure AD
+    participant MI as Managed Identity
+    participant TF as Terraform
+    participant AKV as Azure Key Vault
+
+    Dev->>GH: Push/Manual Trigger
+    GH->>AAD: Request OIDC Token
+    AAD->>MI: Validate Federated Identity
+    MI-->>AAD: Return Azure Token
+    AAD-->>GH: Provide Access Token
+    GH->>TF: Execute terraform plan/apply
+    TF->>AKV: Create/Update Key Vault
+    AKV-->>TF: Confirm Resources Created
+    TF-->>GH: Return Terraform Outputs
+    GH-->>Dev: Deployment Complete + Outputs
+```
+
+## 🎯 Funcionalidades da Infraestrutura
+
+### **Criação Automatizada de Recursos Azure:**
+✅ **Azure Key Vault** com configurações otimizadas para Kubernetes
+✅ **Managed Identity** para autenticação GitHub Actions
+✅ **Federated Identity Credentials** para OIDC trust
+✅ **RBAC Permissions** granulares para acesso seguro
+✅ **Resource Group** com padronização de nomenclatura
+
+### **Integração CI/CD:**
+✅ **GitHub Actions Workflow** automatizado
+✅ **OIDC Authentication** sem secrets estáticos
+✅ **Terraform State Management** local/remoto
+✅ **Multi-Environment Support** (dev/staging/prod)
+✅ **Validation e Testing** integrados
+
+### **Segurança e Compliance:**
+✅ **Zero Static Secrets** - Apenas tokens temporários
+✅ **Principle of Least Privilege** - Permissões mínimas necessárias
+✅ **Cross-Cloud Authentication** - Suporte AKS e OKE
+✅ **Audit Logging** - Rastreabilidade completa
+✅ **RBAC Granular** - Controle por secret/vault
+
+## 📁 Estrutura do Diretório
+
+```
+infra-secrets/
+├── README.md                          # Este arquivo - Documentação geral
+├── module/                             # Módulo Terraform reutilizável
+│   ├── README.md                       # Documentação específica do módulo
+│   ├── main.tf                         # Recursos principais do Azure Key Vault
+│   ├── variables.tf                    # Variáveis de entrada do módulo
+│   └── outputs.tf                      # Outputs do módulo (URIs, IDs, etc.)
+└── resource/                           # Implementação de exemplo
+    ├── main.tf                         # Uso do módulo para ambiente específico
+    ├── provider.tf                     # Configuração do provider Azure
+    └── variables.tf                    # Variáveis do ambiente
+```
+
+## 🚀 Quick Start
+
+### **1. Pré-requisitos**
+- ✅ [Azure CLI](https://docs.microsoft.com/pt-br/cli/azure/install-azure-cli) instalado e autenticado
+- ✅ [Terraform](https://www.terraform.io/downloads.html) versão ≥ 1.5.0
+- ✅ Conta Azure com permissões para criar recursos
+- ✅ Subscription ID da TBX-Sandbox disponível
+
+### **2. Configuração Rápida**
+
+#### **Linux/macOS:**
+```bash
+# Configurar subscription
+export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+
+# Navegar para o diretório de exemplo
+cd "Secret Management/infra-secrets/resource"
+
+# Inicializar e aplicar
+terraform init
+terraform plan
+terraform apply
+```
+
+#### **Windows PowerShell:**
+```powershell
+# Configurar subscription
+$env:TF_VAR_subscription_id = (az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+
+# Navegar para o diretório de exemplo
+cd "Secret Management/infra-secrets/resource"
+
+# Inicializar e aplicar
+terraform init
+terraform plan
+terraform apply
+```
+
+### **3. Usando o Módulo em Seus Projetos**
 
 ```hcl
 module "key_vault" {
@@ -38,42 +200,45 @@ output "key_vault_uri" {
 }
 ```
 
-## Variáveis
+## 📋 Variáveis e Outputs do Módulo
 
-| Nome                  | Descrição                        | Obrigatório | Padrão |
-|-----------------------|----------------------------------|-------------|--------|
-| `name`                | Nome do Key Vault                | Sim         | -      |
-| `location`            | Região do recurso                | Sim         | -      |
-| `resource_group_name` | Nome do Resource Group           | Sim         | -      |
+### **Variáveis de Entrada**
+| Nome | Descrição | Tipo | Obrigatório | Padrão |
+|------|-----------|------|-------------|--------|
+| `name` | Nome do Key Vault | `string` | ✅ Sim | - |
+| `location` | Região Azure do recurso | `string` | ✅ Sim | - |
+| `resource_group_name` | Nome do Resource Group | `string` | ✅ Sim | - |
 
-## Saídas
+### **Outputs Disponíveis**
+| Nome | Descrição | Uso |
+|------|-----------|-----|
+| `vault_uri` | URI completa do Key Vault | Configuração de aplicações |
+| `vault_id` | Resource ID do Key Vault | Referências e RBAC |
+| `vault_name` | Nome do Key Vault criado | Scripts e automação |
 
-- `vault_uri`: URI do Key Vault criado.
-- `vault_id`: ID do recurso Key Vault.
+## 🔐 Configuração OIDC para GitHub Actions
 
-## Definir subscription_id no Linux
-```bash
-export TF_VAR_subscription_id=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
-```
+### **Visão Geral da Configuração OIDC**
+Esta seção configura autenticação **sem secrets estáticos** entre GitHub Actions e Azure, utilizando:
+- **Managed Identity** para identidade Azure
+- **Federated Identity Credentials** para trust OIDC
+- **RBAC Permissions** para controle granular de acesso
 
-## Definir subscription_id no Windows
-```powershell
-$env:TF_VAR_subscription_id = (az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
-```
+### **🎯 Benefícios vs App Registration**
 
-## Observação
+| Aspecto | App Registration | Managed Identity |
+|---------|------------------|------------------|
+| **Segurança** | ⚠️ Secrets estáticos | ✅ Tokens temporários |
+| **Gerenciamento** | 🔄 Manual | 🤖 Automático |
+| **Integração Azure** | 📋 Boa | 🚀 Nativa |
+| **Complexidade** | 📈 Alta | 📉 Baixa |
+| **Auditoria** | 📊 Complexa | 📋 Simples |
+| **Manutenção** | ⏰ Alta | ✅ Mínima |
 
-A permissão de acesso ao AKV será dada ao usuário utilizado para criar.
 
----
+### **1️⃣ Criar User-Assigned Managed Identity**
 
-# Configuração OIDC com Managed Identity para GitHub Actions
-
-## 📋 Configurações Necessárias
-
-### 1. Criar User-Assigned Managed Identity
-
-#### Criar Resource Group (se não existir):
+#### **Verificar e Criar Resource Group:**
 ```bash
 # Verificar se o Resource Group existe
 az group show --name "Embracon" --output table
@@ -82,7 +247,7 @@ az group show --name "Embracon" --output table
 az group create --name "Embracon" --location "brazilsouth"
 ```
 
-#### Criar Managed Identity:
+#### **Criar Managed Identity:**
 ```bash
 # Criar User-Assigned Managed Identity
 az identity create \
@@ -90,38 +255,38 @@ az identity create \
   --resource-group "Embracon" \
   --location "brazilsouth"
 
-# Obter Client ID da Managed Identity
+# Obter informações importantes
 CLIENT_ID=$(az identity show \
   --name "github-actions-terraform" \
   --resource-group "Embracon" \
   --query clientId -o tsv)
-echo "AZURE_CLIENT_ID: $CLIENT_ID"
 
-# Obter Principal ID da Managed Identity
 PRINCIPAL_ID=$(az identity show \
   --name "github-actions-terraform" \
   --resource-group "Embracon" \
   --query principalId -o tsv)
-echo "Principal ID: $PRINCIPAL_ID"
+
+echo "✅ AZURE_CLIENT_ID: $CLIENT_ID"
+echo "✅ Principal ID: $PRINCIPAL_ID"
 ```
 
-### 2. Configurar Federated Identity Credentials
+### **2️⃣ Configurar Federated Identity Credentials**
 
-#### Para a branch feature/secret-management:
+#### **Para branch feature/akv-terraform:**
 ```bash
 az identity federated-credential create \
-  --name "github-feature-secret-management" \
+  --name "github-feature-akv-terraform" \
   --identity-name "github-actions-terraform" \
   --resource-group "Embracon" \
   --issuer "https://token.actions.githubusercontent.com" \
-  --subject "repo:toolbox-tech/embracon:ref:refs/heads/feature/secret-management" \
+  --subject "repo:toolbox-tech/embracon:ref:refs/heads/feature/akv-terraform" \
   --audiences "api://AzureADTokenExchange"
 ```
 
-#### Para workflow_dispatch de qualquer branch (opcional):
+#### **Para branch main (opcional):**
 ```bash
 az identity federated-credential create \
-  --name "github-workflow-dispatch" \
+  --name "github-main-branch" \
   --identity-name "github-actions-terraform" \
   --resource-group "Embracon" \
   --issuer "https://token.actions.githubusercontent.com" \
@@ -129,149 +294,222 @@ az identity federated-credential create \
   --audiences "api://AzureADTokenExchange"
 ```
 
-### 3. Atribuir Permissões Azure
+### **3️⃣ Atribuir Permissões Azure RBAC**
 
-#### Obter Subscription ID:
+#### **Obter Subscription ID:**
 ```bash
 SUBSCRIPTION_ID=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
-echo "AZURE_SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
+echo "✅ AZURE_SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
 ```
 
-#### Atribuir Roles Necessárias:
+#### **Atribuir Roles Necessárias:**
 ```bash
-# Role Contributor para criar recursos
+# Role Contributor - Para criar/gerenciar recursos
 az role assignment create \
   --assignee $PRINCIPAL_ID \
   --role "Contributor" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
 
-# Role User Access Administrator para gerenciar permissões do Key Vault
+# Role User Access Administrator - Para gerenciar RBAC do Key Vault
 az role assignment create \
   --assignee $PRINCIPAL_ID \
   --role "User Access Administrator" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
 
-# Role Key Vault Administrator (mais específica, opcional)
+# Role Key Vault Administrator - Para gestão completa do Key Vault
 az role assignment create \
   --assignee $PRINCIPAL_ID \
   --role "Key Vault Administrator" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
+
+echo "✅ Permissões RBAC configuradas com sucesso!"
 ```
 
-### 4. GitHub Repository Configuration
+### **4️⃣ Configurar GitHub Repository**
 
-#### Secrets (Repository Settings > Secrets and variables > Actions > Secrets):
-```
-AZURE_CLIENT_ID = <CLIENT_ID da Managed Identity obtido acima>
-AZURE_TENANT_ID = <Tenant ID do Azure AD>
-```
-
-#### Variables (Repository Settings > Secrets and variables > Actions > Variables):
-```
-AZURE_SUBSCRIPTION_ID = <Subscription ID da TBX-Sandbox>
-```
-
-### 5. Comandos para Obter Informações Necessárias
-
+#### **GitHub Secrets** (Repository Settings > Secrets and variables > Actions > Secrets):
 ```bash
-# Client ID da Managed Identity
-CLIENT_ID=$(az identity show \
-  --name "github-actions-terraform" \
-  --resource-group "Embracon" \
-  --query clientId -o tsv)
-echo "AZURE_CLIENT_ID: $CLIENT_ID"
-
-# Tenant ID
-TENANT_ID=$(az account show --query tenantId -o tsv)
-echo "AZURE_TENANT_ID: $TENANT_ID"
-
-# Subscription ID
-SUBSCRIPTION_ID=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
-echo "AZURE_SUBSCRIPTION_ID: $SUBSCRIPTION_ID"
+# Obter valores para configurar no GitHub
+echo "📋 Configure estes SECRETS no GitHub:"
+echo "AZURE_CLIENT_ID = $CLIENT_ID"
+echo "AZURE_TENANT_ID = $(az account show --query tenantId -o tsv)"
 ```
 
-## 🔒 Benefícios do Managed Identity vs App Registration
-
-### **Managed Identity:**
-✅ **Mais Simples**: Gerenciamento automático pelo Azure
-✅ **Mais Seguro**: Não há secrets para gerenciar
-✅ **Integração Nativa**: Melhor integração com recursos Azure
-✅ **Auditoria**: Logs centralizados no Azure AD
-✅ **Lifecycle**: Gerenciamento automático de ciclo de vida
-
-### **App Registration:**
-❌ Requer gerenciamento manual de secrets
-❌ Maior superfície de ataque
-❌ Complexidade adicional de configuração
-
-## ⚙️ Verificação da Configuração
-
-### Verificar Managed Identity:
+#### **GitHub Variables** (Repository Settings > Secrets and variables > Actions > Variables):
 ```bash
-# Listar Managed Identities
+echo "📋 Configure esta VARIABLE no GitHub:"
+echo "AZURE_SUBSCRIPTION_ID = $SUBSCRIPTION_ID"
+```
+
+### **5️⃣ Comandos de Verificação**
+
+#### **Verificar Managed Identity:**
+```bash
+# Listar todas as Managed Identities
 az identity list --resource-group "Embracon" --output table
 
-# Verificar federated credentials
+# Verificar Federated Credentials configurados
 az identity federated-credential list \
   --identity-name "github-actions-terraform" \
   --resource-group "Embracon" \
   --output table
 ```
 
-### Verificar Role Assignments:
+#### **Verificar Permissões RBAC:**
 ```bash
-# Verificar roles atribuídas à Managed Identity
+# Verificar todas as role assignments da Managed Identity
 az role assignment list \
   --assignee $PRINCIPAL_ID \
-  --output table
+  --output table \
+  --include-inherited
 ```
 
-### Testar OIDC Login (no workflow):
+#### **Teste de Conectividade:**
 ```bash
-# No workflow, isso deve funcionar sem erros
-az account show
-az account list
-az group list
+# Validar subscription access
+az account show --subscription $SUBSCRIPTION_ID
+
+# Validar Resource Group access
+az group show --name "Embracon" --subscription $SUBSCRIPTION_ID
+```
+
+## � GitHub Actions Workflow - akv.yml
+
+### **📁 Localização:**
+```
+.github/workflows/akv.yml
+```
+
+### **🎯 Funcionalidades do Workflow:**
+
+#### **Triggers Configurados:**
+- ✅ **Manual Trigger**: `workflow_dispatch` - Execução sob demanda
+- ⚙️ **Working Directory**: `./Secret Management/infra-secrets/resource`
+- 🔒 **Permissions**: `id-token: write` + `contents: read`
+
+#### **Steps de Execução:**
+1. **📥 Checkout Repository** - Download do código fonte
+2. **🔧 Setup Terraform** - Instalação do Terraform 1.5.0
+3. **🔐 Azure Login with OIDC** - Autenticação sem secrets
+4. **⚙️ Set Terraform Variables** - Configuração de variáveis de ambiente
+5. **🚀 Terraform Init** - Inicialização do backend
+6. **✅ Terraform Validate** - Validação da configuração
+7. **📋 Terraform Plan** - Criação do plano de execução
+8. **🚁 Terraform Apply** - Aplicação das mudanças (apenas em feature/akv-terraform)
+
+### **🎮 Como Executar o Workflow:**
+
+#### **Execução Manual:**
+1. Acesse: `https://github.com/toolbox-tech/embracon`
+2. Navegue para: **Actions** > **Azure Key Vault Terraform Deployment**
+3. Clique em: **Run workflow**
+4. Selecione a branch: `feature/akv-terraform`
+5. Confirme: **Run workflow**
+
+### **📊 Monitoramento e Logs:**
+
+#### **Status Indicators:**
+- ✅ **Verde**: Execução bem-sucedida
+- ❌ **Vermelho**: Falha na execução  
+- 🟡 **Amarelo**: Em progresso
+- ⏸️ **Cinza**: Aguardando ou cancelado
+
+#### **Análise de Logs:**
+```bash
+# Logs esperados em execução bem-sucedida:
+✅ Checkout repository
+✅ Setup Terraform (1.5.0)
+✅ Azure Login with OIDC
+✅ Set Terraform Variables  
+✅ Terraform Init
+✅ Terraform Validate
+✅ Terraform Plan (X to add, Y to change, Z to destroy)
+✅ Terraform Apply (Apply complete! Resources: X added, Y changed, Z destroyed)
 ```
 
 ## 🚨 Troubleshooting
 
-### Erro: "AADSTS70021: No matching federated identity record found"
-- Verificar se o subject no federated credential está correto
-- Subject format: `repo:OWNER/REPO:ref:refs/heads/BRANCH`
-- Confirmar que a Managed Identity existe e está no Resource Group correto
+### **🔧 Problemas Comuns e Soluções**
 
-### Erro: "Insufficient privileges to complete the operation"
-- Verificar se as roles foram atribuídas à Managed Identity
-- Confirmar que o Principal ID está correto
-- Verificar se as roles incluem "Contributor" e "User Access Administrator"
-
-### Erro: "Context access might be invalid: AZURE_SUBSCRIPTION_ID"
-- Garantir que a variável foi criada em Repository Settings > Variables
-- Nome deve ser exatamente: `AZURE_SUBSCRIPTION_ID`
-
-### Erro: "The client with object id does not have authorization"
-- Aguardar alguns minutos para propagação das permissões
-- Verificar se as role assignments foram criadas corretamente
-- Confirmar que a subscription ID está correta
-
-### Erro: "Managed Identity not found"
-- Verificar se o Resource Group "Embracon" existe
-- Confirmar que a Managed Identity foi criada com o nome correto
-- Verificar a região (brazilsouth)
-
-## 📝 Resumo das Configurações
-
-| Tipo | Nome | Valor | Local |
-|------|------|-------|-------|
-| Secret | `AZURE_CLIENT_ID` | Managed Identity Client ID | GitHub Secrets |
-| Secret | `AZURE_TENANT_ID` | Azure AD Tenant ID | GitHub Secrets |
-| Variable | `AZURE_SUBSCRIPTION_ID` | TBX-Sandbox Subscription ID | GitHub Variables |
-
-## 🔄 Limpeza (se necessário)
-
-### Remover Managed Identity:
+#### **❌ "AADSTS70021: No matching federated identity record found"**
 ```bash
+# Verificar e corrigir Federated Credentials
+az identity federated-credential list \
+  --identity-name "github-actions-terraform" \
+  --resource-group "Embracon" \
+  --output table
+
+# Recriar se necessário (verificar nome da branch!)
+az identity federated-credential create \
+  --name "github-feature-akv-terraform" \
+  --identity-name "github-actions-terraform" \
+  --resource-group "Embracon" \
+  --issuer "https://token.actions.githubusercontent.com" \
+  --subject "repo:toolbox-tech/embracon:ref:refs/heads/feature/akv-terraform" \
+  --audiences "api://AzureADTokenExchange"
+```
+
+#### **❌ "Insufficient privileges to complete the operation"**
+```bash
+# Verificar e reaplicar permissões RBAC
+PRINCIPAL_ID=$(az identity show \
+  --name "github-actions-terraform" \
+  --resource-group "Embracon" \
+  --query principalId -o tsv)
+
+SUBSCRIPTION_ID=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+
+# Reaplicar roles necessárias
+az role assignment create \
+  --assignee $PRINCIPAL_ID \
+  --role "Contributor" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+
+az role assignment create \
+  --assignee $PRINCIPAL_ID \
+  --role "User Access Administrator" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+```
+
+#### **❌ "Context access might be invalid: AZURE_SUBSCRIPTION_ID"**
+```bash
+# Verificar configuração no GitHub
+echo "Verifique se esta VARIABLE está configurada no GitHub:"
+echo "AZURE_SUBSCRIPTION_ID = $(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)"
+```
+
+#### **❌ "Error: building AzureRM Client: authenticate to Azure CLI"**
+```bash
+# Verificar secrets no GitHub
+echo "Verifique se estes SECRETS estão configurados no GitHub:"
+echo "AZURE_CLIENT_ID = $(az identity show --name "github-actions-terraform" --resource-group "Embracon" --query clientId -o tsv)"
+echo "AZURE_TENANT_ID = $(az account show --query tenantId -o tsv)"
+```
+
+### **⏱️ Aguardar Propagação**
+Algumas mudanças podem levar **até 10 minutos** para propagar:
+- Criação de Managed Identity
+- Atribuição de RBAC roles  
+- Federated Identity Credentials
+
+## 🧹 Limpeza de Recursos (Se Necessário)
+
+### **Remover Infraestrutura Terraform:**
+```bash
+cd "Secret Management/infra-secrets/resource"
+terraform destroy
+```
+
+### **Remover Managed Identity e Permissões:**
+```bash
+# Obter IDs necessários
+PRINCIPAL_ID=$(az identity show \
+  --name "github-actions-terraform" \
+  --resource-group "Embracon" \
+  --query principalId -o tsv)
+
+SUBSCRIPTION_ID=$(az account list --query "[?name=='TBX-Sandbox'].id" --output tsv)
+
 # Remover role assignments
 az role assignment delete \
   --assignee $PRINCIPAL_ID \
@@ -283,195 +521,87 @@ az role assignment delete \
   --role "User Access Administrator" \
   --scope "/subscriptions/$SUBSCRIPTION_ID"
 
+az role assignment delete \
+  --assignee $PRINCIPAL_ID \
+  --role "Key Vault Administrator" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID"
+
 # Remover Managed Identity
 az identity delete \
   --name "github-actions-terraform" \
   --resource-group "Embracon"
 ```
 
-## 🎯 Next Steps
+## 📊 Resumo da Configuração
 
-1. **Criar Managed Identity** executando os comandos da seção 1
-2. **Configurar Federated Credentials** com os comandos da seção 2
-3. **Atribuir Permissões** usando os comandos da seção 3
-4. **Configurar GitHub Secrets/Variables** conforme seção 4
-5. **Testar o workflow** e verificar logs
-6. **Monitorar execução** para garantir autenticação OIDC
+### **📋 Checklist de Configuração:**
 
-## 📊 Comparação: App Registration vs Managed Identity
+#### **Azure Resources:**
+- [ ] ✅ Resource Group "Embracon" existe
+- [ ] ✅ Managed Identity "github-actions-terraform" criada
+- [ ] ✅ Federated Credentials configurados para branch correta
+- [ ] ✅ RBAC roles atribuídas (Contributor + User Access Administrator + Key Vault Administrator)
 
-| Aspecto | App Registration | Managed Identity |
-|---------|------------------|------------------|
-| **Complexidade** | Alta | Baixa |
-| **Gerenciamento** | Manual | Automático |
-| **Segurança** | Boa | Excelente |
-| **Integração Azure** | Boa | Nativa |
-| **Manutenção** | Alta | Mínima |
-| **Auditoria** | Complexa | Simples |
-| **Recomendado para** | Apps externos | Workloads Azure |
+#### **GitHub Configuration:**
+- [ ] ✅ Secret `AZURE_CLIENT_ID` configurado
+- [ ] ✅ Secret `AZURE_TENANT_ID` configurado  
+- [ ] ✅ Variable `AZURE_SUBSCRIPTION_ID` configurada
+
+#### **Terraform Files:**
+- [ ] ✅ Módulo em `module/` está funcional
+- [ ] ✅ Exemplo em `resource/` está configurado
+- [ ] ✅ Provider Azure configurado corretamente
+
+### **🎯 Valores de Configuração:**
+
+| Tipo | Nome | Valor | Local |
+|------|------|-------|-------|
+| **Secret** | `AZURE_CLIENT_ID` | Managed Identity Client ID | GitHub Secrets |
+| **Secret** | `AZURE_TENANT_ID` | Azure AD Tenant ID | GitHub Secrets |
+| **Variable** | `AZURE_SUBSCRIPTION_ID` | TBX-Sandbox Subscription ID | GitHub Variables |
+
+## 🔗 Próximos Passos
+
+### **1️⃣ Após Setup Completo:**
+```bash
+# Executar workflow manualmente via GitHub Actions
+# Verificar logs de execução
+# Confirmar criação do Azure Key Vault
+```
+
+### **2️⃣ Validar Recursos Criados:**
+```bash
+# Listar Key Vaults criados
+az keyvault list --resource-group "Embracon" --output table
+
+# Testar acesso ao Key Vault
+az keyvault secret set --vault-name "meukeyvault123" --name "test-secret" --value "test-value"
+az keyvault secret show --vault-name "meukeyvault123" --name "test-secret"
+```
+
+### **3️⃣ Integração com Kubernetes:**
+- 📖 Consulte [`../AKS/README.md`](../AKS/README.md) para integração com Azure Kubernetes Service
+- 📖 Consulte [`../OKE/README.md`](../OKE/README.md) para integração com Oracle Kubernetes Engine
+
+### **4️⃣ Monitoramento e Manutenção:**
+```bash
+# Monitorar custos no Azure Portal
+# Configurar alertas de billing
+# Revisar logs de acesso do Key Vault
+# Acompanhar execuções do workflow GitHub Actions
+```
+
+## 📚 Recursos Relacionados
+
+- 🏗️ [**Módulo Terraform**](module/README.md) - Documentação detalhada do módulo
+- ⚙️ [**GitHub Actions Workflow**](../../.github/workflows/akv.yml) - Workflow de deployment
+- 🔐 [**Documentação oficial Azure Workload Identity**](https://azure.github.io/azure-workload-identity/)
+- 📖 [**Terraform AzureRM Provider**](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
+- 🛡️ [**Azure Key Vault RBAC Guide**](https://docs.microsoft.com/en-us/azure/key-vault/general/rbac-guide)
 
 ---
 
-# 🚀 Como Usar o Workflow GitHub Actions (akv.yml)
-
-## 📁 Localização do Workflow
-
-O workflow está localizado em: `.github/workflows/akv.yml`
-
-## ⚙️ Configuração do Workflow
-
-### **Triggers:**
-- **Manual**: `workflow_dispatch` - Execução manual através da interface do GitHub
-- **Working Directory**: `./Secret Management/infra-secrets/resource`
-
-### **Permissões:**
-```yaml
-permissions:
-    id-token: write    # Para autenticação OIDC
-    contents: read     # Para leitura do repositório
-```
-
-## 🔧 Pré-requisitos para Executar o Workflow
-
-### 1. **Configuração OIDC Completa**
-Certifique-se de ter executado todas as etapas da seção OIDC acima:
-- ✅ Managed Identity criada
-- ✅ Federated Credentials configurados
-- ✅ Roles atribuídas
-- ✅ Secrets e Variables configurados no GitHub
-
-### 2. **GitHub Secrets Configurados**
-Verificar em `Repository Settings > Secrets and variables > Actions`:
-
-**Secrets:**
-- `AZURE_CLIENT_ID`: Client ID da Managed Identity
-- `AZURE_TENANT_ID`: Tenant ID do Azure AD
-
-**Variables:**
-- `AZURE_SUBSCRIPTION_ID`: Subscription ID da TBX-Sandbox
-
-### 3. **Arquivos Terraform Prontos**
-Verificar se existem no diretório `Secret Management/infra-secrets/resource/`:
-- `main.tf`
-- `provider.tf`
-- `variables.tf`
-
-## 🎯 Como Executar o Workflow
-
-### **Execução Manual:**
-
-1. **Acesse o GitHub Repository**
-   ```
-   https://github.com/toolbox-tech/embracon
-   ```
-
-2. **Navegue para Actions**
-   - Clique na aba "Actions"
-   - Selecione "Azure Key Vault Terraform Deployment"
-
-3. **Execute o Workflow**
-   - Clique em "Run workflow"
-   - Selecione a branch `feature/secret-management`
-   - Clique em "Run workflow"
-
-### **Monitoramento da Execução:**
-
-O workflow executará os seguintes steps:
-1. **Checkout repository** - Baixa o código
-2. **Setup Terraform** - Instala Terraform 1.5.0
-3. **Azure Login with OIDC** - Autentica via OIDC
-4. **Set Terraform Variables** - Define variáveis de ambiente
-5. **Terraform Init** - Inicializa o Terraform
-6. **Terraform Validate** - Valida a configuração
-7. **Terraform Plan** - Cria plano de execução
-8. **Terraform Apply** - Aplica as mudanças (apenas na branch feature/secret-management)
-
-## 📊 Status e Logs
-
-### **Verificar Status:**
-- ✅ **Verde**: Execução bem-sucedida
-- ❌ **Vermelho**: Falha na execução
-- 🟡 **Amarelo**: Em execução
-
-### **Analisar Logs:**
-- Clique no job "terraform-deploy"
-- Expanda cada step para ver logs detalhados
-- Procure por erros ou warnings
-
-## 🚨 Troubleshooting do Workflow
-
-### **Erro: "Error: building AzureRM Client: authenticate to Azure CLI"**
-- Verificar se AZURE_CLIENT_ID está correto
-- Confirmar AZURE_TENANT_ID
-- Verificar Federated Credentials
-
-### **Erro: "Error: Insufficient privileges"**
-- Verificar roles da Managed Identity
-- Confirmar Principal ID correto
-- Aguardar propagação de permissões (até 10 minutos)
-
-### **Erro: "Error: subscription not found"**
-- Verificar AZURE_SUBSCRIPTION_ID
-- Confirmar nome da subscription 'TBX-Sandbox'
-- Verificar se a Managed Identity tem acesso à subscription
-
-### **Erro: "Resource group not found"**
-- Verificar se o Resource Group "Embracon" existe
-- Confirmar região "brazilsouth"
-- Verificar permissões no Resource Group
-
-## 📝 Exemplo de Execução Bem-Sucedida
-
-```bash
-# Logs esperados:
-✅ Checkout repository
-✅ Setup Terraform (1.5.0)
-✅ Azure Login with OIDC
-✅ Set Terraform Variables
-✅ Terraform Init
-✅ Terraform Validate
-✅ Terraform Plan (X to add, Y to change, Z to destroy)
-✅ Terraform Apply (Apply complete! Resources: X added, Y changed, Z destroyed)
-```
-
-## 🔄 Workflow Customization
-
-### **Para Adicionar Triggers Automáticos:**
-```yaml
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - feature/secret-management
-    paths:
-      - 'Secret Management/infra-secrets/**'
-```
-
-### **Para Executar em Múltiplas Branches:**
-Remover ou modificar a condição:
-```yaml
-- name: Terraform Apply
-  # if: github.ref == 'refs/heads/feature/secret-management'  # Remover esta linha
-  run: terraform apply tfplan
-```
-
-## 🎯 Next Steps Após Execução
-
-1. **Verificar Recursos Criados:**
-   ```bash
-   az keyvault list --resource-group "Embracon" --output table
-   ```
-
-2. **Testar Acesso ao Key Vault:**
-   ```bash
-   az keyvault secret set --vault-name "meukeyvault123" --name "test-secret" --value "test-value"
-   az keyvault secret show --vault-name "meukeyvault123" --name "test-secret"
-   ```
-
-3. **Monitorar Custos:**
-   - Verificar billing no Azure Portal
-   - Configurar alertas de custo se necessário
-
-4. **Documentar URIs e IDs:**
-   - Salvar Key Vault URI para uso em aplicações
-   - Documentar Resource IDs para referência futura
+<p align="center">
+  <strong>🚀 Infraestrutura como Código com Segurança Zero-Trust 🔐</strong><br>
+  <em>Azure Key Vault + Terraform + GitHub Actions + OIDC</em>
+</p>

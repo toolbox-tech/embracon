@@ -220,3 +220,676 @@ Uso do [Pre-commit](./pre-commit/README.md) para automatizar validações de có
 
 ## Fluxo Completo SDLC
 ![Fluxo Completo do SDLC](../img/SDLC.png)
+
+
+<p align="center">
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
+# 📋 Boas Práticas de SDLC - Embracon Toolbox
+
+## 🎯 Visão Geral
+
+Este diretório contém um **conjunto abrangente de melhores práticas** para o **Software Development Life Cycle (SDLC)** adotado pela Embracon. Nossa abordagem integra metodologias modernas de desenvolvimento, controle de versão, qualidade de código e automação, garantindo entregas consistentes e de alta qualidade.
+
+## 🏗️ Arquitetura do SDLC Embracon
+
+```mermaid
+graph TB
+    subgraph "📋 Planejamento"
+        PLAN[Product Planning]
+        REQ[Requirements Definition]
+        ARCH[Architecture Design]
+    end
+    
+    subgraph "💻 Desenvolvimento"
+        BRANCH[Branch Strategy]
+        CODE[Coding Standards]
+        COMMIT[Commit Conventions]
+        PR[Pull Requests]
+    end
+    
+    subgraph "🔍 Qualidade"
+        PRECOMMIT[Pre-commit Hooks]
+        LINT[Code Linting]
+        SONAR[SonarQube Analysis]
+        REVIEW[Code Review]
+    end
+    
+    subgraph "🚀 Integração"
+        CI[Continuous Integration]
+        TEST[Automated Testing]
+        BUILD[Build & Package]
+        SECURITY[Security Scan]
+    end
+    
+    subgraph "📦 Entrega"
+        CD[Continuous Deployment]
+        RELEASE[Release Management]
+        MONITOR[Monitoring]
+        FEEDBACK[Feedback Loop]
+    end
+
+    %% Flow connections
+    PLAN --> REQ
+    REQ --> ARCH
+    ARCH --> BRANCH
+    
+    BRANCH --> CODE
+    CODE --> COMMIT
+    COMMIT --> PRECOMMIT
+    PRECOMMIT --> LINT
+    
+    LINT --> PR
+    PR --> REVIEW
+    REVIEW --> SONAR
+    SONAR --> CI
+    
+    CI --> TEST
+    TEST --> BUILD
+    BUILD --> SECURITY
+    SECURITY --> CD
+    
+    CD --> RELEASE
+    RELEASE --> MONITOR
+    MONITOR --> FEEDBACK
+    FEEDBACK --> PLAN
+
+    %% Styling
+    classDef planning fill:#e1f5fe,stroke:#0277bd,stroke-width:2px,color:#000
+    classDef development fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef quality fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#000
+    classDef integration fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef delivery fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000
+
+    class PLAN,REQ,ARCH planning
+    class BRANCH,CODE,COMMIT,PR development
+    class PRECOMMIT,LINT,SONAR,REVIEW quality
+    class CI,TEST,BUILD,SECURITY integration
+    class CD,RELEASE,MONITOR,FEEDBACK delivery
+```
+
+## 📁 Estrutura e Componentes
+
+### 📂 **Componentes do SDLC Embracon**
+
+| Componente | Propósito | Ferramenta/Prática |
+|------------|-----------|-------------------|
+| **[Commitizen](./commitizen/)** | Padronização de commits | Conventional Commits + CLI |
+| **[GitFlow](./gitflow/)** | Estratégia de branching | Git branching model |
+| **[Pre-commit](./pre-commit/)** | Validação automática | Pre-commit hooks + Gitleaks |
+| **[SonarQube](./sonarqube_codesense/)** | Análise de código | SonarQube + CodeScene |
+| **[Swagger/Stoplight](./swagger_stoplight/)** | Design de APIs | OpenAPI + Stoplight Studio |
+| **[Trunk-based](./trunk-based/)** | Desenvolvimento ágil | Trunk-based development |
+
+---
+
+## 🔄 O que é SDLC (Software Development Life Cycle)?
+
+O **Ciclo de Vida do Desenvolvimento de Software (SDLC)** é um framework estruturado que define processos padronizados para construção de aplicações de software. Na Embracon, o SDLC é fundamental para:
+
+- ✅ **Padronização** de processos entre equipes
+- ✅ **Qualidade** consistente de entregáveis  
+- ✅ **Previsibilidade** de cronogramas e custos
+- ✅ **Escalabilidade** de operações de desenvolvimento
+- ✅ **Redução** de riscos e retrabalho
+
+### **🎯 Benefícios do SDLC Estruturado:**
+
+```mermaid
+mindmap
+  root((SDLC Benefits))
+    Qualidade
+      Código consistente
+      Menos bugs
+      Performance otimizada
+    Eficiência
+      Processos padronizados
+      Automação máxima
+      Feedback rápido
+    Colaboração
+      Comunicação clara
+      Responsabilidades definidas
+      Knowledge sharing
+    Manutenibilidade
+      Documentação atualizada
+      Código legível
+      Arquitetura limpa
+```
+
+### **📋 Fases do SDLC Embracon:**
+
+#### **1️⃣ Planejamento e Análise**
+- **Product Planning**: Definição de roadmap e features
+- **Requirements**: Levantamento de requisitos funcionais/não-funcionais
+- **Architecture**: Design de arquitetura e tecnologias
+
+#### **2️⃣ Design e Prototipagem**
+- **System Design**: Arquitetura de sistemas e componentes
+- **API Design**: Especificação OpenAPI/Swagger
+- **UI/UX Design**: Protótipos e mockups
+
+#### **3️⃣ Desenvolvimento**
+- **Coding Standards**: Padrões de codificação
+- **Version Control**: Git com estratégias de branching
+- **Code Review**: Revisão colaborativa de código
+
+#### **4️⃣ Testes e Qualidade**
+- **Unit Testing**: Testes unitários automatizados
+- **Integration Testing**: Testes de integração
+- **Security Testing**: Análise de vulnerabilidades
+
+#### **5️⃣ Deploy e Entrega**
+- **CI/CD Pipelines**: Automação de build/deploy
+- **Release Management**: Gestão de versões
+- **Monitoring**: Observabilidade em produção
+
+#### **6️⃣ Manutenção e Evolução**
+- **Bug Fixes**: Correções e hotfixes
+- **Feature Updates**: Novas funcionalidades
+- **Performance Optimization**: Melhorias contínuas
+
+---
+
+## 🌿 Estratégias de Branching
+
+### **📊 Comparação de Estratégias:**
+
+| Aspecto | [GitFlow](./gitflow/) | [Trunk-based](./trunk-based/) |
+|---------|-------|-------------|
+| **Complexidade** | Alta | Baixa |
+| **Branches** | Múltiplos (main, develop, feature, release, hotfix) | Mínimos (main + short-lived features) |
+| **Deploy Frequency** | Releases planejadas | Deploy contínuo |
+| **Team Size** | Grande (10+ devs) | Pequeno/Médio (2-10 devs) |
+| **Release Cycle** | Semanal/Mensal | Diário/Contínuo |
+| **Risk Level** | Baixo | Médio |
+| **CI/CD Integration** | Complexa | Simples |
+| **Rollback** | Fácil | Feature flags |
+
+### **🎯 Quando Usar Cada Estratégia:**
+
+#### **GitFlow - Indicado para:**
+- ✅ Produtos com releases planejadas
+- ✅ Equipes grandes (10+ desenvolvedores)
+- ✅ Ambientes enterprise com QA dedicado
+- ✅ Produtos que requerem releases estáveis
+
+#### **Trunk-based - Indicado para:**
+- ✅ Desenvolvimento ágil com deploys frequentes
+- ✅ Equipes pequenas/médias (2-10 desenvolvedores)
+- ✅ Produtos web com feedback rápido
+- ✅ Cultura DevOps madura
+
+---
+
+## 📝 Padrões de Commit e Mensagens
+
+### **🔧 Commitizen Integration**
+
+Na Embracon, utilizamos **[Commitizen](./commitizen/)** para padronizar commits seguindo **Conventional Commits**:
+
+```bash
+# Ao invés de:
+git commit -m "fix login bug"
+
+# Use:
+git add . && cz commit
+# Isso abrirá uma interface interativa para criar commits padronizados
+```
+
+### **📋 Tipos de Commit Obrigatórios:**
+
+| Tipo | Descrição | SemVer Impact | Exemplo |
+|------|-----------|---------------|---------|
+| `feat` | Nova funcionalidade | MINOR | `feat(auth): add OAuth2 support` |
+| `fix` | Correção de bug | PATCH | `fix(api): resolve timeout in user service` |
+| `docs` | Documentação | - | `docs(readme): update setup instructions` |
+| `style` | Formatação de código | - | `style(lint): fix eslint warnings` |
+| `refactor` | Refatoração | - | `refactor(utils): simplify date helpers` |
+| `perf` | Melhoria de performance | PATCH | `perf(db): optimize user queries` |
+| `test` | Adição/correção testes | - | `test(auth): add integration tests` |
+| `build` | Sistema de build | - | `build(docker): update node base image` |
+| `ci` | Configuração CI/CD | - | `ci(github): add security scan workflow` |
+
+### **✅ Commits Atômicos e Incrementais:**
+
+#### **Boas Práticas:**
+```bash
+# ✅ BOM: Commit atômico
+feat(auth): add user registration endpoint
+
+# ✅ BOM: Pequenas alterações incrementais  
+fix(validation): handle edge case in email format
+
+# ❌ RUIM: Commit monolítico
+feat: add user management, fix login bug, update docs, refactor utils
+```
+
+#### **Mensagens Descritivas:**
+```bash
+# ✅ BOM: Imperativo, claro, contextual
+feat(payment): integrate Stripe payment gateway
+
+- Add Stripe SDK configuration
+- Implement payment processing service  
+- Add webhook handlers for payment events
+- Update API documentation
+
+# ❌ RUIM: Vago, não descriptivo
+update payment stuff
+```
+
+---
+
+## 🔍 Controle de Qualidade e Code Review
+
+### **🛡️ Pre-commit Hooks com [Pre-commit](./pre-commit/)**
+
+Implementação de validação automática antes de cada commit:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v1.17.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.2
+    hooks:
+      - id: gitleaks
+```
+
+#### **🎯 Benefícios dos Pre-commit Hooks:**
+- ✅ **Detecção precoce** de secrets e credenciais
+- ✅ **Formatação automática** de código
+- ✅ **Padronização** entre desenvolvedores
+- ✅ **Prevenção** de problemas em produção
+
+### **📋 Padrão de Pull Requests (PR)**
+
+#### **📝 Template de PR:**
+
+```markdown
+## 📋 Descrição
+Breve descrição das mudanças implementadas.
+
+## 🎯 Motivação e Contexto
+Por que essas mudanças são necessárias? Qual problema resolve?
+
+## 🧪 Tipos de Mudanças
+- [ ] Bug fix (mudança que corrige um problema)
+- [ ] Nova feature (mudança que adiciona funcionalidade)
+- [ ] Breaking change (mudança que quebra compatibilidade)
+- [ ] Documentação (mudança apenas em documentação)
+
+## ✅ Checklist
+- [ ] Meu código segue o style guide do projeto
+- [ ] Revisei meu próprio código
+- [ ] Comentei o código em partes difíceis de entender
+- [ ] Adicionei testes para minhas mudanças
+- [ ] Todos os testes passam localmente
+- [ ] Atualizei a documentação
+
+## 🔗 Issues Relacionadas
+Resolve #123
+Relacionado a #456
+```
+
+#### **👥 Processo de Revisão:**
+
+| Projeto | Mín. Reviewers | Requisitos |
+|---------|----------------|------------|
+| **Crítico** | 2 | Testes + Docs + Security scan |
+| **Normal** | 1 | Testes + Lint |
+| **Docs** | 1 | Lint |
+
+### **⚙️ Automação de Quality Gates:**
+
+```yaml
+# GitHub Actions - Quality Gate
+name: Quality Gate
+on: [pull_request]
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run linters
+        run: |
+          npm run lint
+          npm run test:coverage
+      - name: SonarQube Scan
+        run: sonar-scanner
+      - name: Security Scan
+        run: npm audit
+```
+
+---
+
+## 📊 Análise de Código e Métricas
+
+### **🔍 SonarQube + CodeScene Integration**
+
+Integração com **[SonarQube](./sonarqube_codesense/)** para análise contínua:
+
+#### **📈 Métricas Obrigatórias:**
+| Métrica | Threshold | Ação se Falhar |
+|---------|-----------|----------------|
+| **Cobertura de Testes** | ≥ 80% | Bloquear merge |
+| **Duplicação de Código** | ≤ 3% | Warning |
+| **Complexidade Ciclomática** | ≤ 10 | Code review obrigatório |
+| **Vulnerabilidades** | 0 Critical | Bloquear merge |
+| **Code Smells** | ≤ 5 Major | Warning |
+
+#### **🎯 Quality Profiles por Linguagem:**
+
+```yaml
+# Java
+sonar.java.checkstyle.reportPaths=target/checkstyle-result.xml
+sonar.java.pmd.reportPaths=target/pmd.xml
+sonar.junit.reportPaths=target/surefire-reports
+
+# JavaScript/TypeScript  
+sonar.typescript.lcov.reportPaths=coverage/lcov.info
+sonar.eslint.reportPaths=eslint-report.json
+
+# Python
+sonar.python.coverage.reportPaths=coverage.xml
+sonar.python.xunit.reportPath=test-results.xml
+```
+
+### **🧠 CodeScene - Análise Comportamental:**
+
+- **Hotspots**: Arquivos com alta mudança + complexidade
+- **Knowledge Distribution**: Distribuição de conhecimento no time
+- **Coupling**: Análise de acoplamento entre módulos
+- **Technical Debt**: Estimativa de débito técnico
+
+---
+
+## 🎨 Design e Documentação de APIs
+
+### **📖 Swagger/OpenAPI com [Stoplight](./swagger_stoplight/)**
+
+#### **🏗️ Design-First Approach:**
+
+```yaml
+# openapi.yaml
+openapi: 3.0.3
+info:
+  title: Embracon API
+  version: 1.0.0
+  description: API para gestão de contratos
+
+servers:
+  - url: https://api.embracon.com.br/v1
+    description: Produção
+  - url: https://api-dev.embracon.com.br/v1
+    description: Desenvolvimento
+
+paths:
+  /contracts:
+    get:
+      summary: Listar contratos
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Lista de contratos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractList'
+```
+
+#### **📋 Padrões de API:**
+
+| Padrão | Implementação | Exemplo |
+|--------|---------------|---------|
+| **Versionamento** | URL Path | `/v1/users`, `/v2/users` |
+| **Paginação** | Query params | `?page=1&limit=20` |
+| **Filtros** | Query params | `?status=active&type=premium` |
+| **Ordenação** | Query params | `?sort=created_at&order=desc` |
+| **Status Codes** | HTTP padrão | `200`, `201`, `400`, `404`, `500` |
+
+### **🔄 Documentação Viva:**
+
+```bash
+# Geração automática de docs
+swagger-codegen generate -i openapi.yaml -l html2 -o docs/
+
+# Validação de contratos
+postman-newman run api-tests.json --environment prod.env
+
+# Mock server para desenvolvimento
+stoplight prism mock openapi.yaml
+```
+
+---
+
+## 🛡️ Segurança e Compliance
+
+### **🔐 Security Scanning Pipeline:**
+
+```yaml
+name: Security Scan
+on: [push, pull_request]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Secret Detection
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          
+      - name: Dependency Check
+        run: |
+          npm audit --audit-level high
+          npm run deps:check
+          
+      - name: SAST Scan
+        uses: github/codeql-action/analyze@v2
+        
+      - name: Container Scan
+        run: |
+          docker build -t app:latest .
+          trivy image app:latest
+```
+
+### **📋 Políticas de Branch Protection:**
+
+#### **Branch `main`:**
+- ✅ Require PR before merge
+- ✅ Require status checks (CI/CD)
+- ✅ Require up-to-date branches
+- ✅ Restrict force pushes
+- ✅ Require 2FA for admin access
+
+#### **Branch `develop`:**
+- ✅ Require PR before merge
+- ✅ Require status checks
+- ⚠️ Allow force pushes (admin only)
+
+### **🔍 Compliance e Auditoria:**
+
+| Aspecto | Ferramenta | Frequência |
+|---------|------------|------------|
+| **Secrets Scanning** | GitLeaks + TruffleHog | Todo commit |
+| **Dependency Audit** | npm audit + Dependabot | Semanal |
+| **License Compliance** | FOSSA | Mensal |
+| **Security Review** | Manual + SAST | Por release |
+
+---
+
+## 🎓 Treinamento e Onboarding
+
+### **📚 Programa de Capacitação SDLC:**
+
+#### **Módulo 1: Fundamentos**
+- Git básico e avançado
+- Conventional Commits
+- Code review best practices
+
+#### **Módulo 2: Ferramentas**
+- Setup de desenvolvimento local
+- Pre-commit hooks
+- IDE configuration
+
+#### **Módulo 3: Qualidade**
+- Testing strategies
+- SonarQube analysis
+- Security awareness
+
+#### **Módulo 4: CI/CD**
+- Pipeline configuration
+- Deployment strategies
+- Monitoring e observability
+
+### **🏆 Certificação Interna:**
+
+```mermaid
+graph LR
+    A[Desenvolidor Iniciante] --> B[Git + Commits]
+    B --> C[Code Review]
+    C --> D[Testing]
+    D --> E[CI/CD]
+    E --> F[Sênior Certified]
+    
+    B1[Workshop 1: Git Flow] --> B
+    C1[Workshop 2: PR Reviews] --> C  
+    D1[Workshop 3: TDD] --> D
+    E1[Workshop 4: DevOps] --> E
+```
+
+---
+
+## 📊 Métricas e KPIs do SDLC
+
+### **📈 Dashboards de Acompanhamento:**
+
+#### **Métricas de Velocidade:**
+- **Lead Time**: Tempo de ideia → produção
+- **Cycle Time**: Tempo de commit → deploy
+- **Deployment Frequency**: Frequência de deploys
+- **MTTR**: Mean Time To Recovery
+
+#### **Métricas de Qualidade:**
+- **Bug Escape Rate**: % bugs que chegam em produção
+- **Test Coverage**: Cobertura de testes
+- **Code Review Coverage**: % código revisado
+- **Technical Debt Ratio**: Ratio de débito técnico
+
+#### **Métricas de Colaboração:**
+- **PR Review Time**: Tempo médio de review
+- **Knowledge Distribution**: Distribuição de conhecimento
+- **Bus Factor**: Fator de dependência de pessoas
+- **Team Velocity**: Velocidade da equipe
+
+### **🎯 Objetivos e Metas 2025:**
+
+| KPI | Meta Q1 | Meta Q2 | Meta Q3 | Meta Q4 |
+|-----|---------|---------|---------|---------|
+| **Deploy Frequency** | 2x/semana | 1x/dia | 2x/dia | 3x/dia |
+| **Lead Time** | 5 dias | 3 dias | 2 dias | 1 dia |
+| **Test Coverage** | 70% | 75% | 80% | 85% |
+| **MTTR** | 4h | 2h | 1h | 30min |
+
+---
+
+## 🚀 Implementação e Roadmap
+
+### **📅 Cronograma de Implementação:**
+
+#### **Fase 1: Fundação (Q1 2025)**
+- ✅ Setup de Commitizen
+- ✅ Configuração Pre-commit hooks
+- ✅ Branch protection policies
+- 🔄 Treinamento em Git practices
+
+#### **Fase 2: Qualidade (Q2 2025)**
+- 🔄 SonarQube integration
+- 📋 PR template padronização
+- 📋 Code review training
+- 📋 Security scanning setup
+
+#### **Fase 3: Automação (Q3 2025)**
+- 📋 CI/CD pipelines optimization
+- 📋 Automated testing integration
+- 📋 Deployment automation
+- 📋 Monitoring dashboards
+
+#### **Fase 4: Excelência (Q4 2025)**
+- 📋 Advanced metrics collection
+- 📋 Predictive analytics
+- 📋 Continuous improvement
+- 📋 Innovation practices
+
+### **🎯 Quick Start para Novos Projetos:**
+
+```bash
+# 1. Setup inicial do projeto
+git clone <repo-url>
+cd <project>
+
+# 2. Install development tools
+npm install -g commitizen @commitlint/cli
+pip install pre-commit
+
+# 3. Configure project
+cz init cz-conventional-changelog --save-dev --save-exact
+pre-commit install
+
+# 4. Primeiro commit padronizado
+git add .
+cz commit
+
+# 5. Setup branch protection
+gh api repos/:owner/:repo/branches/main/protection -X PUT --field required_status_checks='{"strict":true,"contexts":["ci/tests"]}'
+```
+
+---
+
+## 📞 Suporte e Recursos
+
+### **📖 Documentação Adicional:**
+- 📋 [Commitizen Setup Guide](./commitizen/README.md)
+- 🌿 [GitFlow Workflow](./gitflow/README.md)
+- 🛡️ [Pre-commit Configuration](./pre-commit/README.md)
+- 🔍 [SonarQube Integration](./sonarqube_codesense/README.md)
+- 📖 [API Design Guide](./swagger_stoplight/README.md)
+- 🚀 [Trunk-based Development](./trunk-based/README.md)
+
+### **💬 Canais de Suporte:**
+- 🎯 **Canal Slack**: `#sdlc-support`
+- 📧 **Email**: `devops@embracon.com.br`
+- 📅 **Office Hours**: Terças e quintas, 14h-16h
+- 📚 **Wiki**: `https://wiki.embracon.com.br/sdlc`
+
+### **🔄 Processo de Melhoria Contínua:**
+- 📊 **Retrospectivas mensais** de processo
+- 📈 **Review trimestral** de métricas
+- 🎯 **Ajustes semestrais** de práticas
+- 🚀 **Evolução anual** do framework
+
+---
+
+<p align="center">
+  <strong>🚀 Embracon SDLC Framework - Construindo o Futuro com Qualidade 📋</strong><br>
+  <em>Padronização • Automação • Excelência • Inovação</em>
+</p>
+
+<p align="center">
+  <img src="../img/SDLC.png" alt="SDLC Process" width="600"/>
+</p>

@@ -16,10 +16,21 @@ Esta pasta contém os seguintes arquivos e diretórios:
 - **[`service-account.yaml`](service-account.yaml)** - Exemplo de ServiceAccount com anotações para Workload Identity
 
 ### 📂 Diretórios
-- **[`AKS/`](AKS/)** - Contém versões específicas dos guias:
-  - [`README-Windows.md`](AKS/README-Windows.md) - Guia para uso no Windows/Powershell
-  - [`README-Linux.md`](AKS/README-Linux.md) - Guia para uso no Linux/Bash
-- **[`infra-secrets/`](infra-secrets/)** - Terraform para criação do AKV
+- **[`AKS/`](AKS/)** - Contém documentação específica para Azure Kubernetes Service (AKS):
+  - [`README.md`](AKS/README.md) - Visão geral da solução com diagramas arquiteturais
+  - [`README-Linux.md`](AKS/README-Linux.md) - Guia completo para configuração OIDC no AKS (Linux/macOS)
+  - [`README-Windows.md`](AKS/README-Windows.md) - Guia completo para configuração OIDC no AKS (Windows)
+- **[`infra-secrets/`](infra-secrets/)** - Contém código Terraform para criação e gestão do Azure Key Vault:
+  - [`README.md`](infra-secrets/README.md) - Documentação geral do diretório Terraform
+  - **[`module/`](infra-secrets/module/)** - Módulo Terraform reutilizável para Azure Key Vault:
+    - [`README.md`](infra-secrets/module/README.md) - Documentação completa do módulo Terraform
+    - [`main.tf`](infra-secrets/module/main.tf) - Recursos principais do Azure Key Vault
+    - [`variables.tf`](infra-secrets/module/variables.tf) - Variáveis de entrada do módulo
+    - [`outputs.tf`](infra-secrets/module/outputs.tf) - Outputs do módulo (URLs, IDs, etc.)
+  - **[`resource/`](infra-secrets/resource/)** - Exemplo de uso do módulo Terraform:
+    - [`main.tf`](infra-secrets/resource/main.tf) - Implementação de exemplo usando o módulo
+    - [`provider.tf`](infra-secrets/resource/provider.tf) - Configuração do provider Azure
+    - [`variables.tf`](infra-secrets/resource/variables.tf) - Variáveis do ambiente de exemplo
 - **[`OKE/`](OKE/)** - Contém documentação específica para Oracle Kubernetes Engine (OKE):
   - [`README.md`](OKE/README.md) - Guia para configuração do OIDC no OKE (Oracle Cloud)
   - [`cluster-enable-oidc.json`](OKE/cluster-enable-oidc.json) - Configuração JSON para habilitar OIDC no cluster OKE

@@ -418,12 +418,6 @@ flowchart LR
 - 📝 Siga as boas práticas de commit
 - 📤 Abra um Pull Request
 
-### **Estrutura de Branches:**
-- `main` - Código estável em produção
-- `develop` - Desenvolvimento ativo
-- `feature/*` - Novas funcionalidades
-- `hotfix/*` - Correções urgentes
-
 ---
 
 <p align="center">

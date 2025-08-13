@@ -1,6 +1,6 @@
 name: Java CI  # Nome do workflow exibido no GitHub
 
-on: [pull_request, workflow_dispatch]  # Dispara em pull requests ou execução manual
+on: [workflow_dispatch]  # Dispara em pull requests ou execução manual
 
 jobs:
 

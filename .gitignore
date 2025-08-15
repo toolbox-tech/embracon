@@ -26,3 +26,4 @@ terraform.rc
 sa-key-secret-manager.json
 secret.yaml
 todo.md
+*.tfplan

@@ -112,6 +112,7 @@ sequenceDiagram
 ✅ **Federated Identity Credentials** para OIDC trust
 ✅ **RBAC Permissions** granulares para acesso seguro
 ✅ **Resource Group** com padronização de nomenclatura
+✅ **Gerenciamento de Usuários por Email** - Conversão automática para principal_id
 
 ### **Integração CI/CD:**
 ✅ **GitHub Actions Workflow** automatizado
@@ -126,6 +127,7 @@ sequenceDiagram
 ✅ **Cross-Cloud Authentication** - Suporte AKS e OKE
 ✅ **Audit Logging** - Rastreabilidade completa
 ✅ **RBAC Granular** - Controle por secret/vault
+✅ **Validação de Usuários Azure AD** - Verificação automática de existência
 
 ## 📁 Estrutura do Diretório
 
@@ -184,19 +186,60 @@ terraform apply
 ### **3. Usando o Módulo em Seus Projetos**
 
 ```hcl
-module "key_vault" {
+# Exemplo básico - apenas Key Vault
+module "key_vault_basico" {
     source              = "../module"
     resource_group_name = "meu-rg"
     location            = "brazilsouth"
-    key_vault_name      = "meukeyvault123"
+    name                = "meukeyvault123"
 }
 
+# Exemplo avançado - com usuários por principal_id
+module "key_vault_com_usuarios" {
+    source              = "../module"
+    resource_group_name = "meu-rg" 
+    location            = "brazilsouth"
+    name                = "vault-com-usuarios"
+    
+    # Usuários com principal_ids conhecidos
+    users_allowed = [
+        "12345678-1234-1234-1234-123456789012",
+        "87654321-4321-4321-4321-210987654321"
+    ]
+}
+
+# Exemplo completo - combinando principal_ids + emails
+module "key_vault_completo" {
+    source              = "../module"
+    resource_group_name = "meu-rg"
+    location            = "brazilsouth" 
+    name                = "vault-completo"
+    
+    # Usuários com principal_ids diretos
+    users_allowed = [
+        "12345678-1234-1234-1234-123456789012"
+    ]
+    
+    # Usuários identificados por email (convertidos automaticamente)
+    users_allowed_emails = [
+        "admin@embracon.com.br",
+        "devops@empresa.com",
+        "joao.silva@empresa.com"
+    ]
+}
+
+# Outputs para monitoramento
 output "key_vault_id" {
-    value = module.key_vault.key_vault_id
+    value = module.key_vault_completo.key_vault_id
 }
 
 output "key_vault_uri" {
-    value = module.key_vault.key_vault_uri
+    value = module.key_vault_completo.key_vault_uri
+}
+
+output "usuarios_processados" {
+    description = "Informações dos usuários convertidos de email"
+    value       = module.key_vault_completo.users_from_emails
 }
 ```
 
@@ -208,13 +251,106 @@ output "key_vault_uri" {
 | `name` | Nome do Key Vault | `string` | ✅ Sim | - |
 | `location` | Região Azure do recurso | `string` | ✅ Sim | - |
 | `resource_group_name` | Nome do Resource Group | `string` | ✅ Sim | - |
+| `users_allowed` | Lista de principal IDs com acesso | `list(string)` | ❌ Não | `[]` |
+| `users_allowed_emails` | Lista de emails para conversão automática | `list(string)` | ❌ Não | `[]` |
 
 ### **Outputs Disponíveis**
 | Nome | Descrição | Uso |
 |------|-----------|-----|
-| `vault_uri` | URI completa do Key Vault | Configuração de aplicações |
-| `vault_id` | Resource ID do Key Vault | Referências e RBAC |
-| `vault_name` | Nome do Key Vault criado | Scripts e automação |
+| `key_vault_uri` | URI completa do Key Vault | Configuração de aplicações |
+| `key_vault_id` | Resource ID do Key Vault | Referências e RBAC |
+| `key_vault_name` | Nome do Key Vault criado | Scripts e automação |
+| `users_from_emails` | Informações dos usuários convertidos via email | Validação e auditoria |
+| `all_principal_ids` | Lista completa de todos os principal IDs | Configuração RBAC |
+| `direct_principal_ids` | Principal IDs fornecidos diretamente | Auditoria de configuração |
+
+## 👥 Gerenciamento de Usuários por Email
+
+### **🎯 Nova Funcionalidade: Conversão Email → Principal ID**
+
+O módulo agora suporta **gerenciamento de usuários por email**, permitindo que você defina permissões usando endereços de email em vez de principal IDs complexos do Azure AD. Ideal para cenários onde você conhece os emails dos usuários mas não seus object IDs.
+
+### **✨ Funcionalidades:**
+- ✅ **Conversão automática** de email para principal_id
+- ✅ **Validação** de usuários existentes no Azure AD
+- ✅ **Combinação flexível** de principal_ids diretos + emails
+- ✅ **Outputs detalhados** para auditoria e troubleshooting
+- ✅ **Tratamento de erros** robusto para usuários não encontrados
+
+### **📖 Documentação Detalhada:**
+Para guia completo de uso, exemplos práticos e troubleshooting, consulte:
+📋 **[TERRAFORM-EMAIL-TO-PRINCIPAL-ID.md](module/TERRAFORM-EMAIL-TO-PRINCIPAL-ID.md)**
+
+### **🚀 Exemplo de Uso Rápido:**
+
+```hcl
+module "key_vault" {
+  source                = "../module"
+  name                 = "meu-keyvault"
+  location             = "brazilsouth"
+  resource_group_name  = "meu-rg"
+  
+  # Usuários com principal_ids conhecidos
+  users_allowed = [
+    "12345678-1234-1234-1234-123456789012",
+    "87654321-4321-4321-4321-210987654321"
+  ]
+  
+  # Usuários identificados por email (NOVO!)
+  users_allowed_emails = [
+    "joao.silva@empresa.com",
+    "maria.santos@empresa.com",
+    "admin@embracon.com.br"
+  ]
+}
+
+# Verificar usuários processados
+output "usuarios_processados" {
+  value = module.key_vault.users_from_emails
+}
+```
+
+### **📊 Outputs Expandidos:**
+
+```hcl
+# O módulo agora retorna informações detalhadas sobre usuários
+{
+  users_from_emails = {
+    emails = [
+      "joao.silva@empresa.com",
+      "maria.santos@empresa.com"
+    ]
+    principal_ids = [
+      "abcd1234-5678-90ef-ghij-klmnopqrstuv",
+      "efgh5678-90ab-cdef-1234-567890abcdef"
+    ]
+    display_names = [
+      "João Silva",
+      "Maria Santos"
+    ]
+  }
+  
+  # Todos os principal_ids combinados (diretos + convertidos de email)
+  all_principal_ids = [
+    "12345678-1234-1234-1234-123456789012",  # Direto
+    "87654321-4321-4321-4321-210987654321",  # Direto
+    "abcd1234-5678-90ef-ghij-klmnopqrstuv",  # Convertido de joao.silva@empresa.com
+    "efgh5678-90ab-cdef-1234-567890abcdef"   # Convertido de maria.santos@empresa.com
+  ]
+}
+```
+
+### **⚠️ Considerações Importantes:**
+
+#### **Pré-requisitos:**
+- ✅ Usuários devem existir no **mesmo tenant Azure AD**
+- ✅ Email deve ser o **User Principal Name (UPN)** no Azure AD
+- ✅ Terraform deve ter permissões para **ler usuários do Azure AD**
+
+#### **Tratamento de Erros:**
+- 🚨 **Usuário não encontrado**: Terraform exibirá erro detalhado
+- 🔍 **Email inválido**: Validação automática de formato
+- ⚡ **Permissões insuficientes**: Orientação para correção
 
 ## 🔐 Configuração OIDC para GitHub Actions
 

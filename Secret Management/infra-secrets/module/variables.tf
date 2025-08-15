@@ -41,32 +41,50 @@ variable "purge_protection_enabled" {
   default     = true
 }
 
-variable "key_permissions" {
-  type        = list(string)
-  description = "List of key permissions."
-  default     = ["Backup", "Create", "Decrypt", "Delete", "Encrypt", "Get", "Import", "List", "Purge", "Recover", "Restore", "Sign", "UnwrapKey", "Update", "Verify", "WrapKey", "Release", "Rotate", "GetRotationPolicy", "SetRotationPolicy"]
-}
-
-variable "secret_permissions" {
-  type        = list(string)
-  description = "List of secret permissions."
-  default     = ["Backup", "Delete", "Get", "List", "Purge", "Recover", "Restore", "Set"]
-}
-
-variable "storage_permissions" {
-  type        = list(string)
-  description = "List of storage permissions."
-  default     = ["Backup", "Delete", "DeleteSAS", "Get", "GetSAS", "List", "ListSAS", "Purge", "Recover", "RegenerateKey", "Restore", "Set", "SetSAS", "Update"]
-}
-
-variable "certificate_permissions" {
-  type        = list(string)
-  description = "List of certificate permissions."
-  default     = ["Backup", "Create", "Delete", "DeleteIssuers", "Get", "GetIssuers", "Import", "List", "ListIssuers", "ManageContacts", "ManageIssuers", "Purge", "Recover", "Restore", "SetIssuers", "Update"]
-}
-
 variable "users_allowed" {
   description = "Lista de Object IDs dos usuários permitidos a acessar o Key Vault"
   type        = list(string)
   default     = []
+}
+
+variable "users_allowed_emails" {
+  description = "Lista de emails dos usuários permitidos a acessar o Key Vault (user principal names)"
+  type        = list(string)
+  default     = []
+}
+
+variable "tags" {
+  description = "Tags a serem aplicadas ao Key Vault"
+  type        = map(string)
+  default     = {}
+}
+
+variable "key_vault_timeouts" {
+  description = "Configurações de timeout para o Key Vault"
+  type = object({
+    create = optional(string, "30m")
+    read   = optional(string, "30m")
+    update = optional(string, "30m")
+    delete = optional(string, "30m")
+  })
+  default = {
+    create = "30m"
+    read   = "30m"
+    update = "30m"
+    delete = "30m"
+  }
+}
+
+variable "role_assignment_timeouts" {
+  description = "Configurações de timeout para as atribuições de role"
+  type = object({
+    create = optional(string, "10m")
+    read   = optional(string, "5m")
+    delete = optional(string, "10m")
+  })
+  default = {
+    create = "10m"
+    read   = "5m"
+    delete = "10m"
+  }
 }

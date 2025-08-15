@@ -1,3 +1,9 @@
+## 0.2.0 (2025-08-15)
+
+### Feat
+
+- **semver**: create cz.toml file to manage semver
+
 ## 0.1.0 (2025-08-15)
 
 ### Feat

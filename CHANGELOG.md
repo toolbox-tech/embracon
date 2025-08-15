@@ -1,3 +1,9 @@
+## 0.3.0 (2025-08-15)
+
+### Feat
+
+- **semver**: create bump.yml to auto update change.log
+
 ## 0.2.0 (2025-08-15)
 
 ### Feat

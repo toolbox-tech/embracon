@@ -168,3 +168,60 @@ eval "$(register-python-argcomplete cz)"
 ```
 
 Para mais informações sobre ativação, visite o [site do argcomplete](https://kislyuk.github.io/argcomplete/).
+
+## GitHub Actions
+
+### Automatizando bump de versão com GitHub Actions
+
+Você pode automatizar o processo de bump de versão usando GitHub Actions. Crie um arquivo `.github/workflows/bump.yml` no seu repositório:
+
+```yaml
+name: Bump version
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  bump-version:
+    if: "!startsWith(github.event.head_commit.message, 'bump:')"
+    runs-on: ubuntu-latest
+    name: "Bump version and create changelog with commitizen"
+    steps:
+    - name: Check out
+      uses: actions/checkout@v4
+      with:
+        token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+        fetch-depth: 0
+    - name: Create bump and changelog
+      uses: commitizen-tools/commitizen-action@master
+      with:
+        github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+```
+
+### Configuração necessária
+
+1. **Personal Access Token**: Crie um Personal Access Token no GitHub com permissões de `repo` e adicione-o aos secrets do repositório como `PERSONAL_ACCESS_TOKEN`.
+
+2. **Arquivo pyproject.toml**: Configure o commitizen no seu projeto:
+
+```toml
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$major.$minor.$patch"
+version_files = [
+    "pyproject.toml:version"
+]
+```
+
+### Como funciona
+
+- O workflow é executado a cada push na branch `main`
+- Verifica se não é um commit de bump (evita loops infinitos)
+- Usa o commitizen para analisar os commits e determinar o tipo de bump
+- Gera automaticamente o changelog
+- Cria uma tag de versão
+- Faz push das mudanças de volta para o repositório
+
+Dessa forma, toda vez que você fizer merge de uma feature na branch principal, a versão será automaticamente incrementada baseada nos seus commits convencionais.

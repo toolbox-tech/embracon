@@ -1,3 +1,14 @@
+## 0.4.0 (2025-08-17)
+
+### Feat
+
+- **bump**: permissions
+- **bump**: semver
+
+### Refactor
+
+- **bump**: test
+
 ## 0.3.0 (2025-08-15)
 
 ### Feat

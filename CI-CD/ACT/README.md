@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # nektos/act
 
 [nektos/act](https://github.com/nektos/act) é uma ferramenta de linha de comando que permite executar localmente workflows do GitHub Actions. Com o `act`, você pode testar e depurar seus workflows antes de enviá-los para o GitHub, economizando tempo e recursos.
@@ -59,3 +63,10 @@ act workflow_dispatch -P ubuntu-latest=catthehacker/ubuntu:act-latest -s secrets
 ```
 
 O -P especifica a imagem do runner a ser usada, e o -s define um segredo necessário para o teste. O -e permite especificar um arquivo de evento JSON que simula o evento disparador.
+
+---
+
+<p align="center">
+  <strong>🚀 CI/CD e Automação 🛡️</strong><br>
+    <em>🧪 ACT - GitHub Actions Local Testing</em>
+</p>

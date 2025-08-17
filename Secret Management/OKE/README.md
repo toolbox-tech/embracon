@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/tbx.png" alt="Logo Toolbox" width="400"/>
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
 # OIDC no Oracle Cloud (OKE)
@@ -437,3 +437,10 @@ Aplique o recurso:
 ```bash
 kubectl apply -f external-secret.yaml
 ```
+
+---
+
+<p align="center">
+  <strong>🚀 Secret Management 🛡️</strong><br>
+    <em>☁️ Oracle Cloud - OKE</em>
+</p>

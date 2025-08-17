@@ -1,4 +1,6 @@
-# docker-standards/README.md
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
 
 # Padrões Docker
 
@@ -37,3 +39,10 @@ docker-standards/
 ## Conclusão
 
 Seguir estes padrões ajudará a garantir que as imagens Docker sejam seguras, eficientes e fáceis de manter.
+
+---
+
+<p align="center">
+  <strong>🚀 CI/CD e Automação 🛡️</strong><br>
+    <em>🐳 Docker Standards</em>
+</p>

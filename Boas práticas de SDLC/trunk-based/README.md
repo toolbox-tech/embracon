@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Desenvolvimento baseado em tronco
 
 ## Saiba por que essa prática de gerenciamento de controle de versão é comum entre equipes de DevOps.
@@ -99,3 +103,10 @@ Para manter um ritmo rápido de lançamentos, os tempos de execução de constru
 O desenvolvimento baseado em tronco é atualmente o padrão para equipes de engenharia de alto desempenho, pois estabelece e mantém um [cronograma de lançamento de software](https://www.atlassian.com/agile/software-development/release) usando uma estratégia simplificada de branching no Git. Além disso, o desenvolvimento baseado em tronco dá às equipes de engenharia mais flexibilidade e controle sobre como entregam software ao usuário final.
 
 Fonte: [Atlassian - Desenvolvimento baseado em tronco](https://www.atlassian.com/continuous-delivery/continuous-integration/trunk-based-development)
+
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>🌿 Trunk-Based Development</em>
+</p>

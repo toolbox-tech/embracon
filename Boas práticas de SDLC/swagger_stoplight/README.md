@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Design de API com Swagger e Stoplight
 
 ## Visão Geral
@@ -509,3 +513,10 @@ openapi-generator-cli generate \
   -g typescript-axios \
   -o src/client-api
 ```
+
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>📋 API Design e Documentação</em>
+</p>

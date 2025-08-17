@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Otimização de CI/CD no GitHub Enterprise
 
 Este documento descreve as estratégias para otimizar pipelines CI/CD no GitHub Enterprise, incluindo cache de dependências, cache de layers Docker e padronização de imagens.
@@ -74,3 +78,10 @@ docker-standards/
 2. [ ] Coletar métricas iniciais
 3. [ ] Realizar treinamento inicial
 4. [ ] Expandir para toda a organização
+
+---
+
+<p align="center">
+  <strong>🚀 CI/CD e Automação 🛡️</strong><br>
+    <em>⚙️ Pipelines e DevOps</em>
+</p>

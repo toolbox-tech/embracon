@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="anexos/img/tbx.png" alt="Logo Toolbox" width="400"/>
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
 # Azure Kubernetes Service (AKS) com Azure Key Vault
@@ -207,3 +207,10 @@ Ambos os guias levam ao **mesmo resultado final**: uma integração segura e fun
 - 🔧 [External Secrets Operator Documentation](https://external-secrets.io/)
 - 🛡️ [Azure Key Vault RBAC Guide](https://docs.microsoft.com/en-us/azure/key-vault/general/rbac-guide)
 - ☁️ [AKS OIDC Issuer Documentation](https://docs.microsoft.com/en-us/azure/aks/use-oidc-issuer)
+
+---
+
+<p align="center">
+  <strong>🚀 Secret Management 🛡️</strong><br>
+    <em>☁️ Azure Kubernetes Service</em>
+</p>

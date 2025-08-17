@@ -1,5 +1,8 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Hello World Nodejs com Docker
-![Toolbox](../img/toolbox-playground.png)
 
 ## Uso Local
 
@@ -21,3 +24,10 @@ Para usar o projeto Hello World Nodejs com Docker, siga estes passos:
     ```
 
 5. Abra seu navegador e visite `http://localhost:8080` para ver a mensagem "Bem-Vindo ao Hello World Nodejs da ToolBox Playground".
+
+---
+
+<p align="center">
+  <strong>🚀 Aplicações de Exemplo 🛡️</strong><br>
+    <em>⚡ Node.js com Docker</em>
+</p>

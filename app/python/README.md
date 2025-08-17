@@ -1,5 +1,8 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Hello World Python com Docker
-![Toolbox](../img/toolbox-playground.png)
 
 ## Uso Local
 
@@ -21,3 +24,10 @@ Para usar o projeto Hello World Python com Docker, siga estes passos:
     ```
 
 5. Abra seu navegador e visite `http://localhost:5001` para ver a mensagem "Bem-Vindo ao Hello World Flask Python". Evite usar a porta 5000 no seu host ou computador pois outras aplicações podem estar rodando em paralelo utilizando a mesma porta.
+
+---
+
+<p align="center">
+  <strong>🚀 Aplicações de Exemplo 🛡️</strong><br>
+    <em>🐍 Python Flask com Docker</em>
+</p>

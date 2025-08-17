@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # 🚀 Aprenda a autenticar com segurança em serviços Azure a partir de workflows do GitHub Actions usando Azure Login com OpenID Connect (OIDC)
 
 Neste tutorial, você aprenderá a:
@@ -185,3 +189,10 @@ Para mais detalhes e cenários avançados, consulte a documentação oficial da 
 
 > **Dica:**  
 > Sempre revise as permissões atribuídas à Managed Identity e limite o acesso apenas ao necessário para o seu workflow.
+
+---
+
+<p align="center">
+  <strong>🚀 OIDC e Autenticação 🛡️</strong><br>
+    <em>🔑 Azure Login com OpenID Connect</em>
+</p>

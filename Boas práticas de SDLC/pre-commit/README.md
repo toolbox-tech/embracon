@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Documentação sobre o uso de Git Hooks
 
 ## O que são Git Hooks?
@@ -63,3 +67,10 @@ Git Hooks são scripts que o Git executa automaticamente em determinados momento
 
 
 Gitleaks is a tool for **detecting** secrets like passwords, API keys, and tokens in git repos, files, and whatever else you wanna throw at it via `stdin`. If you wanna learn more about how the detection engine works check out this blog: [Regex is (almost) all you need](https://lookingatcomputer.substack.com/p/regex-is-almost-all-you-need).
+
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>🪝 Pre-commit e Git Hooks</em>
+</p>

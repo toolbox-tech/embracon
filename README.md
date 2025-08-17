@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Secret Management/img/tbx.png" alt="Logo Toolbox" width="400"/>
+  <img src="img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
 # 🏢 Embracon - DevOps e Infraestrutura
@@ -421,6 +421,6 @@ flowchart LR
 ---
 
 <p align="center">
-  <strong>🚀 Toolbox Tech - Transformamos empresas com educação e consultoria em DevOps, automação e SRE simplificado.</strong><br>
-  <em>DevOps • Cloud • Security • Best Practices</em>
+  <strong>🚀 Embracon - DevOps e Infraestrutura 🛡️</strong><br>
+    <em>🏢 Toolbox Tech - Soluções Padronizadas</em>
 </p>

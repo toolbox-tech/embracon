@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="img/tbx.png" alt="Logo Toolbox" width="400"/>
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
 # 🗝️ Guia para acessar um segredo no Azure Key Vault (AKV) usando OIDC
@@ -61,3 +61,10 @@ Esta pasta contém os seguintes arquivos e diretórios:
 2. **Configure a infraestrutura**: Siga os passos para criar recursos no Azure
 3. **Aplique os YAMLs**: Use os arquivos de exemplo como base para suas configurações
 4. **Teste a sincronização**: Verifique se os secrets estão sendo sincronizados corretamente
+
+---
+
+<p align="center">
+  <strong>🚀 Secret Management 🛡️</strong><br>
+    <em>🔐 Azure Key Vault e OIDC</em>
+</p>

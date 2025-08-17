@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # 📁 Exemplos de Uso - Azure Key Vault com Email-to-Principal-ID
 
 Este diretório contém exemplos práticos demonstrando como usar o módulo Terraform Azure Key Vault com as novas funcionalidades de conversão de email para principal_id.
@@ -208,6 +212,6 @@ az group show --name "rg-keyvault-email-example"
 ---
 
 <p align="center">
-  <strong>🎯 Exemplos Práticos para Conversão Email → Principal ID</strong><br>
-  <em>Aprenda na prática como usar a nova funcionalidade</em>
+  <strong>🚀 Secret Management 🛡️</strong><br>
+    <em>📚 Terraform Examples</em>
 </p>

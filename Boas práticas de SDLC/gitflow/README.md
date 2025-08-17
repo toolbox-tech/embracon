@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Fluxo de trabalho do Gitflow
 
 Gitflow é um fluxo de trabalho legado do Git que era originalmente uma estratégia inovadora e disruptiva para gerenciar branches do Git. O Gitflow perdeu popularidade em favor de [fluxos de trabalho baseados em trunk](https://www.atlassian.com/continuous-delivery/continuous-integration/trunk-based-development), que agora são considerados práticas recomendadas para o desenvolvimento contínuo de software moderno e práticas [de DevOps](https://www.atlassian.com/devops/what-is-devops). O Gitflow também pode ser desafiador de usar com [CI/CD](https://www.atlassian.com/continuous-delivery). Esta publicação detalha o Gitflow para fins históricos.
@@ -119,3 +123,10 @@ Principais melhorias:
 6. Adicionei margem automática para melhor centralização
 
 Fonte: [Atlassian - Gitflow workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow)
+
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>🌳 GitFlow Workflow</em>
+</p>

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # SonarQube vs CodeScene: Comparação entre Ferramentas de Análise de Código
 
 Ambas são ferramentas poderosas para análise de código, mas com focos e abordagens diferentes.
@@ -75,3 +79,10 @@ Ambas se complementam. Para times sérios sobre qualidade:
 3. Como o CodeScene pode ajudar a detectar áreas de alto risco antes de releases importantes?
 4. É possível integrar o CodeScene ao fluxo de pull requests do seu repositório?
 5. Como o histórico de colaboração entre desenvolvedores, analisado pelo CodeScene, pode melhorar a distribuição de tarefas no time?
+
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>🔍 Análise de Código</em>
+</p>

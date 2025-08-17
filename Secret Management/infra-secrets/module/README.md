@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # Módulo Terraform - Azure Key Vault
 
 Este módulo Terraform cria e configura um Azure Key Vault com as melhores práticas de segurança implementadas.
@@ -266,3 +270,10 @@ Para dúvidas ou problemas:
 ## 📄 Licença
 
 Este projeto está sob a licença [MIT](LICENSE).
+
+---
+
+<p align="center">
+  <strong>🚀 Secret Management 🛡️</strong><br>
+    <em>📦 Terraform Module</em>
+</p>

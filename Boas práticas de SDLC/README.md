@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
 # O que é o Ciclo de Vida do Desenvolvimento de Software (SDLC - Software Development Lifecycle)?
 
 O Ciclo de Vida do Desenvolvimento de Software é um conjunto de práticas que compõem uma estrutura para padronizar a construção de aplicações de software. O SDLC define as tarefas a serem realizadas em cada etapa do desenvolvimento de software. Essa metodologia visa melhorar a qualidade do software e do processo de desenvolvimento, superando as expectativas dos clientes e cumprindo prazos e estimativas de custo.
@@ -887,7 +891,11 @@ gh api repos/:owner/:repo/branches/main/protection -X PUT --field required_statu
 
 <p align="center">
   <strong>🚀 Embracon SDLC Framework - Construindo o Futuro com Qualidade 📋</strong><br>
-  <em>Padronização • Automação • Excelência • Inovação</em>
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>📋 Metodologias e Processos</em>
 </p>
 
 <p align="center">

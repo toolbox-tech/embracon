@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
 </p>
 
 # 🏗️ Infraestrutura Terraform: Azure Key Vault (AKV)
@@ -738,6 +738,6 @@ az keyvault secret show --vault-name "meukeyvault123" --name "test-secret"
 ---
 
 <p align="center">
-  <strong>🚀 Infraestrutura como Código com Segurança Zero-Trust 🔐</strong><br>
-  <em>Azure Key Vault + Terraform + GitHub Actions + OIDC</em>
+  <strong>🚀 Secret Management �️</strong><br>
+    <em>🏗️ Infraestrutura Terraform</em>
 </p>

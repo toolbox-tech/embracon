@@ -1,5 +1,9 @@
 name: 🚀 Bump Version and Generate Changelog (Commitizen)
 
+permissions:
+  contents: write
+  pull-requests: write
+
 on: 
   workflow_dispatch:
     inputs:

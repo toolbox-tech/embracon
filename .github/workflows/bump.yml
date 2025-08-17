@@ -1,19 +1,121 @@
-name: Bump version
+name: 🚀 Bump Version and Generate Changelog (Commitizen)
 
-on: [workflow_dispatch]
+on: 
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: 'Increment type (auto/major/minor/patch)'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+        - auto
+        - major
+        - minor
+        - patch
+      dry_run:
+        description: 'Dry run (no changes will be made)'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   bump-version:
-    if: "!startsWith(github.event.head_commit.message, 'bump:')"
     runs-on: ubuntu-latest
-    name: "Bump version and create changelog with commitizen"
+    name: "🚀 Bump version and create changelog with commitizen"
     steps:
-      - name: Check out
-        uses: actions/checkout@v3
+      - name: 📥 Check out
+        uses: actions/checkout@v4
         with:
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          token: "${{ secrets.GITHUB_TOKEN }}"
           fetch-depth: 0
-      - name: Create bump and changelog
-        uses: commitizen-tools/commitizen-action@master
+      
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
         with:
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          python-version: '3.11'
+      
+      - name: 📋 Check if config exists
+        run: |
+          echo "Checking for Commitizen configuration..."
+          if [ -f "pyproject.toml" ] && grep -q "tool.commitizen" pyproject.toml; then
+            echo "✅ Found pyproject.toml with Commitizen config"
+          elif [ -f ".cz.toml" ]; then
+            echo "✅ Found .cz.toml config"
+          else
+            echo "⚠️ No Commitizen config found, creating minimal setup..."
+            cat > .cz.toml << EOF
+          [tool.commitizen]
+          name = "cz_conventional_commits"
+          version = "1.0.0"
+          tag_format = "v\$version"
+          changelog_file = "Secret Management/infra-secrets/CHANGELOG.md"
+          changelog_start_rev = "v1.0.0"
+          bump_message = "bump: version \$current_version → \$new_version"
+          update_changelog_on_bump = true
+          annotated_tag = true
+          EOF
+            echo "📝 Created .cz.toml config"
+          fi
+      
+      - name: 🏷️ Check existing tags
+        run: |
+          echo "Checking existing tags..."
+          git tag -l | head -10
+          
+          # Se não há tags, criar uma tag inicial
+          if [ -z "$(git tag -l)" ]; then
+            echo "No tags found, creating initial tag..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag v1.0.0
+            echo "✅ Created initial tag v1.0.0"
+          else
+            echo "✅ Found existing tags"
+            git describe --tags --abbrev=0
+          fi
+      
+      - name: 📦 Install Commitizen
+        run: |
+          pip install --upgrade pip
+          pip install commitizen
+      
+      - name: 🔍 Dry Run (if requested)
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "🔍 Performing dry run..."
+          if [ "${{ inputs.increment }}" = "auto" ]; then
+            cz bump --dry-run --changelog
+          else
+            cz bump --increment ${{ inputs.increment }} --dry-run --changelog
+          fi
+      
+      - name: 🚀 Create bump and changelog
+        if: ${{ !inputs.dry_run }}
+        run: |
+          # Configurar git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          echo "🚀 Creating version bump..."
+          if [ "${{ inputs.increment }}" = "auto" ]; then
+            cz bump --yes --changelog
+          else
+            cz bump --increment ${{ inputs.increment }} --yes --changelog
+          fi
+      
+      - name: 📤 Push changes
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "📤 Pushing changes and tags..."
+          git push
+          git push --tags
+      
+      - name: 📋 Show results
+        run: |
+          echo "📋 Bump completed!"
+          echo "Latest tag:"
+          git describe --tags --abbrev=0
+          echo ""
+          echo "Recent commits:"
+          git log --oneline -5

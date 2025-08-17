@@ -1,4 +1,11 @@
-# Introdução
+<p align="center">
+  <img src="../../img/tbx.png" alt="Logo Toolbox" width="400"/>
+</p>
+
+
+# 🚀 Commitizen - Guia Completo
+
+*Transforme seus commits em uma obra de arte!*
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/commitizen-tools/commitizen/pythonpackage.yml?label=python%20package&logo=github&logoColor=white&style=flat-square)](https://github.com/commitizen-tools/commitizen/actions)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=flat-square)](https://conventionalcommits.org)
@@ -12,106 +19,118 @@
 
 ![Usando commitizen cli](https://commitizen-tools.github.io/commitizen/images/demo.gif)
 
----
-
-**Documentação:** [https://commitizen-tools.github.io/commitizen/](https://commitizen-tools.github.io/commitizen/)
+</div>
 
 ---
 
-## Sobre
+## 📚 **Documentação Oficial**
+🔗 **[https://commitizen-tools.github.io/commitizen/](https://commitizen-tools.github.io/commitizen/)**
 
-Commitizen é uma ferramenta de gerenciamento de versão projetada para equipes.
+---
 
-Commitizen assume que sua equipe usa uma forma padrão de regras de commit e, a partir dessa base, pode incrementar a versão do seu projeto, criar o changelog e atualizar arquivos.
+## 🎯 **O que é o Commitizen?**
 
-Por padrão, commitizen usa [conventional commits](https://www.conventionalcommits.org), mas você pode criar seu próprio conjunto de regras e publicá-las.
+> 💡 **Commitizen é a ferramenta definitiva para equipes que levam versionamento a sério!**
 
-Usar um conjunto padronizado de regras para escrever commits torna os commits mais fáceis de ler e impõe a escrita de commits descritivos.
+O Commitizen revoluciona a forma como sua equipe gerencia versões e commits. Ele assume que você segue padrões de commit bem definidos e, a partir disso, automatiza todo o processo de:
 
-### Funcionalidades
+- ✅ **Versionamento semântico**
+- ✅ **Geração de changelogs**  
+- ✅ **Atualização de arquivos de versão**
 
-- Utilitário de linha de comando para criar commits com suas regras. Padrão: [Conventional commits](https://www.conventionalcommits.org)
-- Incrementar versão automaticamente usando [versionamento semântico](https://semver.org/) baseado nos commits. [Leia mais](https://commitizen-tools.github.io/commitizen/commands/bump/)
-- Gerar um changelog usando [Keep a changelog](https://keepachangelog.com/)
-- Atualizar automaticamente os arquivos de versão do seu projeto
-- Exibir informações sobre suas regras de commit (comandos: schema, example, info)
-- Criar seu próprio conjunto de regras e publicá-las no pip. Leia mais sobre [Customização](https://commitizen-tools.github.io/commitizen/customization/)
+Por padrão, utiliza [**Conventional Commits**](https://www.conventionalcommits.org), mas você pode criar suas próprias regras personalizadas!
 
-## Requisitos
+### 🌟 **Por que usar?**
 
-[Python](https://www.python.org/downloads/) `3.9+`
+**Padronização** torna commits mais legíveis e força a criação de mensagens descritivas que realmente importam!
 
-[Git](https://git-scm.com/downloads) `1.8.5.2+`
+---
 
-## Instalação
+## ⚡ **Funcionalidades Poderosas**
 
-Instale commitizen em seu sistema usando `pipx` (Recomendado, [https://pypa.github.io/pipx/installation/](https://pypa.github.io/pipx/installation/)):
+| Funcionalidade | Descrição |
+|---|---|
+| 🔧 **CLI Intuitivo** | Crie commits seguindo suas regras com facilidade |
+| 🚀 **Auto-increment** | Versionamento semântico automático baseado em commits |
+| 📋 **Changelog** | Geração automática usando [Keep a changelog](https://keepachangelog.com/) |
+| 🔄 **Sync de Versões** | Atualiza automaticamente arquivos de versão do projeto |
+| 📖 **Documentação** | Comandos para exibir regras (schema, example, info) |
+| 🎨 **Customização** | Crie e publique seus próprios conjuntos de regras |
 
+---
+
+## 📋 **Requisitos do Sistema**
+
+| Ferramenta | Versão Mínima |
+|---|---|
+| 🐍 **Python** | `3.9+` |
+| 🌳 **Git** | `1.8.5.2+` |
+
+---
+
+## 📦 **Instalação Rápida**
+
+### 🏆 **Método Recomendado - pipx**
 ```bash
 pipx ensurepath
 pipx install commitizen
 pipx upgrade commitizen
 ```
 
-Instale commitizen usando `pip` com a flag `--user`:
-
+### 🔧 **Instalação Global - pip**
 ```bash
 pip install --user -U commitizen
 ```
 
-### Projeto Python
+### 🐍 **Para Projetos Python**
 
-Você pode adicioná-lo ao seu projeto local usando um dos seguintes métodos.
-
-Com `pip`:
-
+**Com pip:**
 ```bash
 pip install -U commitizen
 ```
 
-Com `conda`:
-
+**Com conda:**
 ```bash
 conda install -c conda-forge commitizen
 ```
 
-Com Poetry >= 1.2.0:
-
+**Com Poetry (>= 1.2.0):**
 ```bash
 poetry add commitizen --group dev
 ```
 
-Com Poetry < 1.2.0:
-
+**Com Poetry (< 1.2.0):**
 ```bash
 poetry add commitizen --dev
 ```
 
-### macOS
-
-Via [homebrew](https://formulae.brew.sh/formula/commitizen):
-
+### 🍎 **macOS - Homebrew**
 ```bash
 brew install commitizen
 ```
 
-## Uso
+---
 
-Na maioria das vezes, este é o único comando que você executará:
+## 🎮 **Como Usar**
 
+### 🎯 **Comando Principal**
 ```bash
-cz bump
+cz bump  # ✨ Mágica acontece aqui!
 ```
 
-Além disso, você pode usar commitizen para ajudá-lo na criação de commits:
-
+### 💬 **Criar Commits Padronizados**
 ```bash
-cz commit
+cz commit  # 📝 Guia interativo para commits perfeitos
 ```
 
-Leia mais na seção [Começando](https://commitizen-tools.github.io/commitizen/getting_started/).
+> 📖 **Quer saber mais?** Visite nossa seção [**Começando**](https://commitizen-tools.github.io/commitizen/getting_started/)
 
-### Ajuda
+---
+
+## 🆘 **Central de Ajuda**
+
+<details>
+<summary>🔍 <strong>Ver todos os comandos disponíveis</strong></summary>
 
 ```bash
 $ cz --help
@@ -143,37 +162,38 @@ comandos:
     version             obtém a versão do commitizen instalado ou do projeto atual (padrão: commitizen instalado)
 ```
 
-## Configurando autocompletar no bash
+</details>
 
-Ao usar bash como seu shell (há suporte limitado para zsh, fish e tcsh), Commitizen pode usar [argcomplete](https://kislyuk.github.io/argcomplete/) para autocompletar. Para isso, o argcomplete precisa estar ativado.
+---
 
-argcomplete é instalado quando você instala Commitizen, pois é uma dependência.
+## ⚙️ **Configurando Autocompletar no Bash**
 
-Se o Commitizen estiver instalado globalmente, a ativação global pode ser executada:
+> 💡 **Dica Pro:** Acelere seu workflow com autocompletar inteligente!
 
+**Ativação Global:**
 ```bash
 sudo activate-global-python-argcomplete
 ```
 
-Para ativação permanente (mas não global) do Commitizen, use:
-
+**Ativação Permanente (local):**
 ```bash
 register-python-argcomplete cz >> ~/.bashrc
 ```
 
-Para ativação única do argcomplete apenas para Commitizen, use:
-
+**Ativação Única:**
 ```bash
 eval "$(register-python-argcomplete cz)"
 ```
 
-Para mais informações sobre ativação, visite o [site do argcomplete](https://kislyuk.github.io/argcomplete/).
+📚 **Mais informações:** [Site do argcomplete](https://kislyuk.github.io/argcomplete/)
 
-## GitHub Actions
+---
 
-### Automatizando bump de versão com GitHub Actions
+## 🤖 **Automação com GitHub Actions**
 
-Você pode automatizar o processo de bump de versão usando GitHub Actions. Crie um arquivo `.github/workflows/bump.yml` no seu repositório:
+### 🔄 **Workflow Automático de Bump**
+
+Crie o arquivo `.github/workflows/bump.yml`:
 
 ```yaml
 name: Bump version
@@ -199,12 +219,13 @@ jobs:
         github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 ```
 
-### Configuração necessária
+### ⚙️ **Configuração Essencial**
 
-1. **Personal Access Token**: Crie um Personal Access Token no GitHub com permissões de `repo` e adicione-o aos secrets do repositório como `PERSONAL_ACCESS_TOKEN`.
+**1. 🔑 Personal Access Token**
+- Crie um token com permissões `repo`
+- Adicione como `PERSONAL_ACCESS_TOKEN` nos secrets
 
-2. **Arquivo pyproject.toml**: Configure o commitizen no seu projeto:
-
+**2. 📄 Arquivo pyproject.toml**
 ```toml
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -215,13 +236,20 @@ version_files = [
 ]
 ```
 
-### Como funciona
+### 🎯 **Como Funciona a Magia**
 
-- O workflow é executado a cada push na branch `main`
-- Verifica se não é um commit de bump (evita loops infinitos)
-- Usa o commitizen para analisar os commits e determinar o tipo de bump
-- Gera automaticamente o changelog
-- Cria uma tag de versão
-- Faz push das mudanças de volta para o repositório
+1. 🚀 **Trigger:** Push na branch `main`
+2. 🔍 **Análise:** Verifica commits desde a última versão
+3. 📊 **Decisão:** Determina tipo de bump (patch/minor/major)
+4. 📝 **Geração:** Cria changelog automaticamente
+5. 🏷️ **Tag:** Cria tag de versão
+6. ⬆️ **Push:** Envia mudanças de volta ao repositório
 
-Dessa forma, toda vez que você fizer merge de uma feature na branch principal, a versão será automaticamente incrementada baseada nos seus commits convencionais.
+> 🎉 **Resultado:** Versionamento 100% automatizado baseado em commits convencionais!
+
+---
+
+<p align="center">
+  <strong>🚀 Boas Práticas de SDLC 🛡️</strong><br>
+    <em>📝 Commitizen</em>
+</p>

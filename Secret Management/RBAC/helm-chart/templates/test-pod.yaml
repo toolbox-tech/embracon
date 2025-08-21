@@ -1,0 +1,41 @@
+{{- if .Values.testPod.create }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.testPod.name }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: test-pod
+    chart: {{ include "external-secrets-rbac.chart" . }}
+spec:
+  serviceAccountName: {{ .Values.testPod.serviceAccountName }}
+  containers:
+  - name: test-container
+    image: {{ .Values.testPod.image }}
+    
+    # Environment Variables
+    env:
+    - name: MY_SECRET_VALUE
+      valueFrom:
+        secretKeyRef:
+          name: {{ .Values.azureKeyVault.externalSecret.targetSecret.name }}
+          key: my-akv-secret-key
+    
+    # Volume Mounts
+    volumeMounts:
+    - name: secret-volume
+      mountPath: "/etc/secrets"
+      readOnly: true
+    
+    # Test command
+    command: ["/bin/sh"]
+    args: ["-c", "echo 'Secret via ENV:' && echo $MY_SECRET_VALUE && echo 'Secret via file:' && cat /etc/secrets/my-akv-secret-key && echo 'Files in /etc/secrets/:' && ls -la /etc/secrets/ && sleep 3600"]
+  
+  volumes:
+  - name: secret-volume
+    secret:
+      secretName: {{ .Values.azureKeyVault.externalSecret.targetSecret.name }}
+  
+  restartPolicy: Never
+{{- end }}

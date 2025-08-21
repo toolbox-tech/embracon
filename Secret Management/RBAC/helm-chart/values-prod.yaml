@@ -1,0 +1,40 @@
+# Production values
+global:
+  namespace: production
+
+namespace:
+  name: production
+  labels:
+    environment: production
+    project: embracon-toolbox
+
+serviceAccounts:
+  app:
+    name: app-prod-sa
+  azureKv:
+    name: akv-prod-sa
+    annotations:
+      azure.workload.identity/client-id: "YOUR-PROD-CLIENT-ID"
+      azure.workload.identity/tenant-id: "YOUR-PROD-TENANT-ID"
+
+rbac:
+  role:
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        resourceNames: 
+          - "prod-secret-k8s-akv"
+        verbs: ["get", "watch", "list"]
+
+azureKeyVault:
+  secretStore:
+    name: akv-secret-store-prod
+    vaultUrl: "https://your-prod-keyvault.vault.azure.net/"
+    serviceAccountName: akv-prod-sa
+  externalSecret:
+    name: akv-external-secret-prod
+    targetSecret:
+      name: prod-secret-k8s-akv
+
+testPod:
+  create: false

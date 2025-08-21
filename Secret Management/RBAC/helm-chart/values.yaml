@@ -1,0 +1,85 @@
+# Global settings
+global:
+  namespace: dev
+  
+# Namespace configuration
+namespace:
+  create: true
+  name: dev
+  labels:
+    environment: development
+    project: embracon-toolbox
+  annotations:
+    description: "Namespace para desenvolvimento e testes de RBAC com External Secrets"
+
+# Service Accounts
+serviceAccounts:
+  app:
+    create: true
+    name: app-alpha-sa
+    labels:
+      app: app-alpha
+      environment: dev
+    annotations: {}
+  
+  azureKv:
+    create: true
+    name: akv-rbac-test-sa
+    labels: {}
+    annotations:
+      azure.workload.identity/client-id: "3504d333-babd-4b86-8161-18ddacd85e84"
+      azure.workload.identity/tenant-id: "38270d4e-aea5-4430-b2c7-1deb696ac290"
+
+# RBAC Configuration
+rbac:
+  create: true
+  role:
+    name: secret-reader
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        resourceNames: 
+          - "rbac-test-secret-k8s-akv"
+        verbs: ["get", "watch", "list"]
+  
+  roleBinding:
+    name: app-alpha-can-read-secretstore
+    roleRef:
+      kind: Role
+      name: secret-reader
+    subjects:
+      - kind: ServiceAccount
+        name: app-alpha-sa
+
+# Azure Key Vault Configuration
+azureKeyVault:
+  secretStore:
+    create: true
+    name: akv-secret-store-test
+    vaultUrl: "https://rbac-test-embracon.vault.azure.net/"
+    serviceAccountName: akv-rbac-test-sa
+    
+  externalSecret:
+    create: true
+    name: akv-external-secret-test
+    refreshInterval: 5s
+    secretStoreName: akv-secret-store-test
+    targetSecret:
+      name: rbac-test-secret-k8s-akv
+      creationPolicy: Owner
+    data:
+      - secretKey: my-akv-secret-key
+        remoteRef:
+          key: secretx
+
+# External Secrets Operator
+externalSecrets:
+  operator:
+    enabled: false  # Set to true if you want to install the operator via this chart
+
+# Test Pod
+testPod:
+  create: true
+  name: test-pod
+  image: nginx:alpine
+  serviceAccountName: app-alpha-sa

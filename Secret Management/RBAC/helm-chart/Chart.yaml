@@ -1,0 +1,15 @@
+apiVersion: v2
+name: external-secrets-rbac
+description: A Helm chart for External Secrets Operator with RBAC and Azure Key Vault integration
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - external-secrets
+  - rbac
+  - azure-key-vault
+  - kubernetes
+home: https://github.com/toolbox-tech/embracon
+maintainers:
+  - name: Toolbox Team
+    email: dev@toolbox.com

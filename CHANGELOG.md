@@ -1,3 +1,9 @@
+## 0.5.0 (2025-08-21)
+
+### Feat
+
+- **akv**: implement complete RBAC solution for External Secrets with Azure Key Vault
+
 ## 0.4.3 (2025-08-17)
 
 ### Fix

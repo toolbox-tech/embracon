@@ -77,7 +77,7 @@ graph TB
 
 | Componente | Responsabilidade | Status |
 |------------|------------------|--------|
-| **Azure Key Vault** | Armazenar secrets seguros | ✅ kvtest-marcelo-sbx |
+| **Azure Key Vault** | Armazenar secrets seguros | ✅ rbac-test-embracon |
 | **Workload Identity** | Autenticação sem senha | ✅ Client/Tenant ID |
 | **akv-rbac-test-sa** | Acesso ao Azure KV | ✅ Annotations Azure |
 | **app-alpha-sa** | Identidade da aplicação | ✅ Labels aplicação |

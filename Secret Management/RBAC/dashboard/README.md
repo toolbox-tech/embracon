@@ -17,6 +17,135 @@ Esta documentação abrange como instalar, configurar, usar e principalmente **p
 - [�🛡️ Melhores Práticas de Segurança](#️-melhores-práticas-de-segurança)
 - [🔧 Troubleshooting](#-troubleshooting)
 
+## 🏗️ Arquitetura da Solução
+
+```mermaid
+graph TB
+    subgraph "🌐 Cliente/Usuário"
+        USER[👤 Usuário]
+        BROWSER[🌍 Navegador Web]
+        USER --> BROWSER
+    end
+
+    subgraph "🔐 Autenticação"
+        ENTRA[🆔 Microsoft Entra ID]
+        TOKEN[🎫 Bearer Token]
+        SA[⚙️ Service Account]
+        ENTRA --> TOKEN
+        SA --> TOKEN
+    end
+
+    subgraph "🚪 Acesso Externo"
+        PORTFW[🔀 Port Forward]
+        INGRESS[🌐 Ingress Controller]
+        LOADBAL[⚖️ Load Balancer]
+    end
+
+    subgraph "☁️ Kubernetes Cluster"
+        subgraph "📊 Dashboard Namespace"
+            DASHBOARD[📱 Kubernetes Dashboard]
+            KONG[🦍 Kong Proxy]
+            METRICS[📈 Metrics Scraper]
+            DASHBOARD --> KONG
+            DASHBOARD --> METRICS
+        end
+
+        subgraph "🛡️ RBAC & Security"
+            RBAC[🔒 RBAC Policies]
+            CR[👑 ClusterRoles]
+            CRB[🔗 ClusterRoleBindings]
+            NS[📁 Namespaces]
+            RBAC --> CR
+            RBAC --> CRB
+            RBAC --> NS
+        end
+
+        subgraph "🔍 Kubernetes API"
+            APISERVER[🎯 API Server]
+            ETCD[💾 etcd]
+            APISERVER --> ETCD
+        end
+
+        subgraph "⚡ Worker Nodes"
+            PODS[🐳 Pods]
+            SERVICES[🔧 Services]
+            VOLUMES[💿 Volumes]
+            PODS --> SERVICES
+            PODS --> VOLUMES
+        end
+    end
+
+    subgraph "📊 Monitoramento"
+        PROMETHEUS[📊 Prometheus]
+        GRAFANA[📈 Grafana]
+        ALERTS[🚨 AlertManager]
+        PROMETHEUS --> GRAFANA
+        PROMETHEUS --> ALERTS
+    end
+
+    %% Fluxos de Autenticação
+    BROWSER -->|"🔐 HTTPS (8443)"| PORTFW
+    BROWSER -->|"🌐 HTTPS"| INGRESS
+    PORTFW --> KONG
+    INGRESS --> KONG
+    LOADBAL --> KONG
+
+    %% Fluxos de Autorização
+    KONG -->|"🎫 Token Validation"| APISERVER
+    TOKEN --> KONG
+    RBAC --> APISERVER
+
+    %% Fluxos de Dados
+    DASHBOARD -->|"📊 Resource Queries"| APISERVER
+    APISERVER -->|"📋 Cluster Resources"| PODS
+    APISERVER -->|"🔧 Service Discovery"| SERVICES
+    APISERVER -->|"💿 Volume Info"| VOLUMES
+
+    %% Monitoramento
+    METRICS -->|"📊 Metrics"| PROMETHEUS
+    DASHBOARD -->|"📈 Dashboard Metrics"| PROMETHEUS
+
+    %% Segurança
+    ENTRA -.->|"🔑 OIDC Integration"| APISERVER
+    CR -->|"🛡️ Permissions"| APISERVER
+    CRB -->|"👤 User Binding"| SA
+
+    %% Estilos
+    classDef userStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef authStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef k8sStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef secStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef monStyle fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+
+    class USER,BROWSER userStyle
+    class ENTRA,TOKEN,SA authStyle
+    class DASHBOARD,KONG,METRICS,APISERVER,ETCD,PODS,SERVICES,VOLUMES k8sStyle
+    class RBAC,CR,CRB,NS secStyle
+    class PROMETHEUS,GRAFANA,ALERTS monStyle
+```
+
+### 🔍 Componentes da Arquitetura
+
+#### **🌐 Camada de Acesso**
+- **Port Forward**: Acesso local seguro via `kubectl port-forward`
+- **Ingress Controller**: Acesso externo com balanceamento de carga
+- **Kong Proxy**: Proxy reverso com autenticação integrada
+
+#### **🔐 Camada de Autenticação**
+- **Microsoft Entra ID**: Integração OIDC empresarial
+- **Service Accounts**: Contas de serviço com tokens JWT
+- **Bearer Tokens**: Autenticação baseada em tokens
+
+#### **🛡️ Camada de Autorização**
+- **RBAC Policies**: Controle granular de permissões
+- **ClusterRoles**: Definição de permissões globais
+- **RoleBindings**: Associação usuário-permissões
+
+#### **📊 Camada de Monitoramento**
+- **Prometheus**: Coleta de métricas
+- **Grafana**: Visualização de dados
+- **AlertManager**: Alertas proativos
+
 ## 🚀 Instalação do Dashboard
 
 ### Método Recomendado: Helm
@@ -218,6 +347,78 @@ Para clusters AKS, você pode integrar o Dashboard diretamente com Microsoft Ent
 ### ⚠️ Importante
 
 > **Microsoft Entra ID** (anteriormente Azure Active Directory) oferece integração nativa com AKS, eliminando a necessidade de gerenciar tokens manualmente.
+
+### 🔄 Fluxo de Autenticação e Autorização
+
+```mermaid
+sequenceDiagram
+    participant U as 👤 Usuário
+    participant B as 🌍 Browser
+    participant D as 📱 Dashboard
+    participant K as 🦍 Kong Proxy
+    participant A as 🎯 API Server
+    participant E as 🆔 Entra ID
+    participant R as 🛡️ RBAC
+
+    Note over U,R: 🔐 Fluxo de Autenticação Tradicional (Token)
+    
+    U->>+B: 1. Acessa Dashboard URL
+    B->>+D: 2. HTTPS Request
+    D->>B: 3. Login Page (Token Required)
+    
+    Note over U,A: 📋 Gerar Token
+    U->>A: 4. kubectl create token admin-user
+    A->>U: 5. JWT Token
+    
+    U->>B: 6. Insere Token no Dashboard
+    B->>+K: 7. Request com Bearer Token
+    K->>+A: 8. Valida Token
+    A->>+R: 9. Verifica Permissões RBAC
+    R->>A: 10. Permissões Aprovadas
+    A->>K: 11. Token Válido
+    K->>D: 12. Acesso Liberado
+    D->>K: 13. Dados do Cluster
+    K->>B: 14. Dashboard UI
+    B->>U: 15. Interface Autenticada
+
+    Note over U,R: 🔐 Fluxo de Autenticação Entra ID (OIDC)
+    
+    U->>+B: 1. Acessa Dashboard URL
+    B->>+D: 2. HTTPS Request
+    D->>B: 3. Redirect to Entra ID
+    B->>+E: 4. Login Microsoft
+    E->>B: 5. OIDC ID Token
+    B->>+K: 6. Request com OIDC Token
+    K->>+E: 7. Valida Token OIDC
+    E->>K: 8. Token Válido + Claims
+    K->>+A: 9. Request com Claims
+    A->>+R: 10. Mapeia Groups -> Roles
+    R->>A: 11. Permissões por Grupo
+    A->>K: 12. Acesso Autorizado
+    K->>D: 13. Dados do Cluster
+    D->>K: 14. Dashboard UI
+    K->>B: 15. Interface Autenticada
+    B->>U: 16. SSO Completo
+
+    Note over A,R: 🛡️ Controle de Acesso
+    rect rgb(255, 240, 240)
+        A->>R: Toda requisição passa por RBAC
+        R->>A: Allow/Deny baseado em ClusterRoles
+    end
+```
+
+### 🔍 Comparação: Token vs Entra ID
+
+| Aspecto | 🎫 Token Tradicional | 🆔 Microsoft Entra ID |
+|---------|---------------------|----------------------|
+| **Setup** | Simples | Configuração inicial complexa |
+| **Segurança** | Token de longa duração | Tokens com expiração automática |
+| **SSO** | ❌ Não | ✅ Sim |
+| **Auditoria** | Limitada | ✅ Logs completos no Azure |
+| **Gestão** | Manual | ✅ Centralized Identity Management |
+| **MFA** | ❌ Não suportado | ✅ Suportado nativamente |
+| **Revogação** | Manual (deletar SA) | ✅ Automática via grupos |
+| **Downtime** | ❌ Sem downtime | ⚠️ Requer restart do cluster |
 
 ### Pré-requisitos
 
@@ -559,6 +760,135 @@ kubectl apply -f namespace-specific-rbac.yaml
 
 ## 🛡️ Melhores Práticas de Segurança
 
+### 🏗️ Estrutura RBAC do Dashboard
+
+```mermaid
+graph TB
+    subgraph "👥 Usuários e Identidades"
+        ADMIN[👑 Cluster Admin]
+        DEV[👨‍💻 Developer]
+        VIEWER[👀 Viewer]
+        SVC[🔧 Service Account]
+        ENTRA_GROUP[🏢 Entra ID Groups]
+    end
+
+    subgraph "🛡️ RBAC Components"
+        subgraph "🌐 Cluster-Level"
+            CR_ADMIN[🔴 cluster-admin]
+            CR_VIEW[🔵 view]
+            CR_EDIT[🟡 edit]
+            CR_CUSTOM[🟣 custom-roles]
+            
+            CRB_ADMIN[🔗 admin-binding]
+            CRB_VIEW[🔗 view-binding]
+            CRB_DEV[🔗 dev-binding]
+        end
+
+        subgraph "📁 Namespace-Level"
+            R_PROD[🔴 prod-admin]
+            R_DEV[🟡 dev-user]
+            R_MONITOR[🔵 monitoring]
+            
+            RB_PROD[🔗 prod-binding]
+            RB_DEV[🔗 dev-binding]
+            RB_MONITOR[🔗 monitor-binding]
+        end
+    end
+
+    subgraph "📊 Dashboard Resources"
+        DASH_ADMIN[📱 Full Dashboard Access]
+        DASH_NS[📱 Namespace Dashboard]
+        DASH_VIEW[📱 Read-Only Dashboard]
+    end
+
+    subgraph "🎯 Kubernetes Resources"
+        subgraph "📦 Core Resources"
+            PODS[🐳 Pods]
+            SVC_RES[🔧 Services]
+            CM[📄 ConfigMaps]
+            SECRETS[🔐 Secrets]
+        end
+
+        subgraph "📋 Workload Resources"
+            DEPLOY[🚀 Deployments]
+            RS[📊 ReplicaSets]
+            DS[🔄 DaemonSets]
+            STS[📚 StatefulSets]
+        end
+
+        subgraph "🌐 Network Resources"
+            INGRESS[🚪 Ingress]
+            NP[🛡️ NetworkPolicies]
+            EP[🔗 Endpoints]
+        end
+    end
+
+    %% Fluxos de Autorização - Cluster Admin
+    ADMIN --> CRB_ADMIN
+    CRB_ADMIN --> CR_ADMIN
+    CR_ADMIN --> DASH_ADMIN
+    DASH_ADMIN --> PODS
+    DASH_ADMIN --> SVC_RES
+    DASH_ADMIN --> CM
+    DASH_ADMIN --> SECRETS
+    DASH_ADMIN --> DEPLOY
+    DASH_ADMIN --> INGRESS
+
+    %% Fluxos de Autorização - Developer
+    DEV --> CRB_DEV
+    CRB_DEV --> CR_EDIT
+    CR_EDIT --> DASH_NS
+    DEV --> RB_DEV
+    RB_DEV --> R_DEV
+    R_DEV --> DASH_NS
+    DASH_NS --> PODS
+    DASH_NS --> DEPLOY
+    DASH_NS --> SVC_RES
+
+    %% Fluxos de Autorização - Viewer
+    VIEWER --> CRB_VIEW
+    CRB_VIEW --> CR_VIEW
+    CR_VIEW --> DASH_VIEW
+    DASH_VIEW --> PODS
+    DASH_VIEW --> SVC_RES
+
+    %% Service Accounts
+    SVC --> CRB_ADMIN
+    SVC --> RB_MONITOR
+    RB_MONITOR --> R_MONITOR
+    R_MONITOR --> DASH_VIEW
+
+    %% Entra ID Integration
+    ENTRA_GROUP --> CRB_ADMIN
+    ENTRA_GROUP --> CRB_DEV
+    ENTRA_GROUP --> RB_PROD
+    RB_PROD --> R_PROD
+    R_PROD --> DASH_ADMIN
+
+    %% Estilos
+    classDef userStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef clusterStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef namespaceStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef dashboardStyle fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef resourceStyle fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class ADMIN,DEV,VIEWER,SVC,ENTRA_GROUP userStyle
+    class CR_ADMIN,CR_VIEW,CR_EDIT,CR_CUSTOM,CRB_ADMIN,CRB_VIEW,CRB_DEV clusterStyle
+    class R_PROD,R_DEV,R_MONITOR,RB_PROD,RB_DEV,RB_MONITOR namespaceStyle
+    class DASH_ADMIN,DASH_NS,DASH_VIEW dashboardStyle
+    class PODS,SVC_RES,CM,SECRETS,DEPLOY,RS,DS,STS,INGRESS,NP,EP resourceStyle
+```
+
+### 🎯 Matriz de Permissões
+
+| Papel | Cluster Scope | Namespace Scope | Dashboard Access | Recursos |
+|-------|--------------|----------------|-----------------|----------|
+| 🔴 **Cluster Admin** | cluster-admin | Todos | Full Dashboard | Todos os recursos |
+| 🟡 **Developer** | edit | Específicos | Namespace Dashboard | Workloads + Services |
+| 🔵 **Viewer** | view | Específicos/Todos | Read-Only Dashboard | Visualização apenas |
+| 🟣 **Monitor** | custom | Específicos | Metrics Dashboard | Pods + Services + Metrics |
+| 🏢 **Entra Groups** | Mapeados | Baseado no grupo | Baseado no grupo | Baseado no grupo |
+
 ### 1. Princípio do Menor Privilégio
 
 ```yaml
@@ -738,6 +1068,155 @@ kubectl create secret tls kubernetes-dashboard-certs \
 - **ConfigMaps**: Configurações de aplicação
 - **Secrets**: Dados sensíveis
 - **Resource Quotas**: Limites de recursos
+
+## 🌐 Topologia de Rede e Segurança
+
+```mermaid
+graph TB
+    subgraph "🌍 Internet/Corporate Network"
+        CLIENT[💻 Cliente]
+        VPN[🔒 VPN/Bastion]
+        FIREWALL[🔥 Firewall]
+    end
+
+    subgraph "🚪 Ingress Layer"
+        LB[⚖️ Load Balancer]
+        INGRESS_CTRL[🌐 Ingress Controller]
+        WAF[🛡️ WAF]
+    end
+
+    subgraph "☁️ Kubernetes Cluster"
+        subgraph "🔐 Control Plane (Managed)"
+            API[🎯 API Server]
+            ETCD[💾 etcd]
+            SCHEDULER[📋 Scheduler]
+            CM[🎮 Controller Manager]
+        end
+
+        subgraph "📊 Dashboard Namespace"
+            subgraph "🦍 Kong Gateway"
+                KONG_POD[🐳 Kong Pod]
+                KONG_SVC[🔧 Kong Service]
+            end
+
+            subgraph "📱 Dashboard Components"
+                DASH_POD[🐳 Dashboard Pod]
+                DASH_SVC[🔧 Dashboard Service]
+                METRICS_POD[📊 Metrics Scraper]
+                METRICS_SVC[📈 Metrics Service]
+            end
+        end
+
+        subgraph "🛡️ Security Components"
+            RBAC_CTRL[🔒 RBAC Controller]
+            PSP[🛡️ Pod Security Policy]
+            NP_CTRL[🚧 Network Policy Controller]
+            ADMISSION[✅ Admission Controllers]
+        end
+
+        subgraph "📁 Application Namespaces"
+            PROD_NS[🔴 Production]
+            DEV_NS[🟡 Development]
+            TEST_NS[🔵 Testing]
+        end
+    end
+
+    subgraph "🔍 Monitoring & Logging"
+        PROMETHEUS[📊 Prometheus]
+        GRAFANA[📈 Grafana]
+        LOGS[📝 Logging Stack]
+    end
+
+    subgraph "🆔 Identity Providers"
+        ENTRA[🏢 Microsoft Entra ID]
+        OIDC[🔑 OIDC Provider]
+        LDAP[📋 LDAP/AD]
+    end
+
+    %% Fluxos de Acesso
+    CLIENT -->|HTTPS:443| FIREWALL
+    FIREWALL --> VPN
+    VPN -->|HTTPS:443| LB
+    LB --> WAF
+    WAF --> INGRESS_CTRL
+
+    %% Dashboard Access
+    INGRESS_CTRL -->|HTTPS:443| KONG_SVC
+    KONG_SVC --> KONG_POD
+    KONG_POD -->|HTTP:8080| DASH_SVC
+    DASH_SVC --> DASH_POD
+
+    %% Port-Forward Alternative
+    CLIENT -.->|kubectl port-forward<br/>HTTPS:8443| KONG_SVC
+
+    %% API Communication
+    DASH_POD -->|REST API<br/>HTTPS:443| API
+    METRICS_POD -->|Metrics API| API
+    KONG_POD -->|Auth Validation| API
+
+    %% Security Flows
+    API --> RBAC_CTRL
+    API --> ADMISSION
+    RBAC_CTRL --> PSP
+    RBAC_CTRL --> NP_CTRL
+
+    %% Identity Integration
+    KONG_POD -->|OIDC Flow| ENTRA
+    API -->|Token Validation| ENTRA
+    API -->|LDAP Query| LDAP
+
+    %% Resource Access
+    API -->|RBAC Check| PROD_NS
+    API -->|RBAC Check| DEV_NS
+    API -->|RBAC Check| TEST_NS
+
+    %% Monitoring
+    DASH_POD -->|Metrics| PROMETHEUS
+    KONG_POD -->|Logs| LOGS
+    API -->|Audit Logs| LOGS
+    PROMETHEUS --> GRAFANA
+
+    %% Network Policies
+    NP_CTRL -.->|Restrict Traffic| DASH_POD
+    NP_CTRL -.->|Restrict Traffic| KONG_POD
+    NP_CTRL -.->|Allow Egress| API
+
+    %% Estilos
+    classDef clientStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef ingressStyle fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef k8sStyle fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef securityStyle fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef monitoringStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef identityStyle fill:#e0f2f1,stroke:#00796b,stroke-width:2px
+
+    class CLIENT,VPN clientStyle
+    class LB,INGRESS_CTRL,WAF,FIREWALL ingressStyle
+    class API,ETCD,SCHEDULER,CM,KONG_POD,KONG_SVC,DASH_POD,DASH_SVC,METRICS_POD,METRICS_SVC,PROD_NS,DEV_NS,TEST_NS k8sStyle
+    class RBAC_CTRL,PSP,NP_CTRL,ADMISSION securityStyle
+    class PROMETHEUS,GRAFANA,LOGS monitoringStyle
+    class ENTRA,OIDC,LDAP identityStyle
+```
+
+### 🔒 Camadas de Segurança
+
+| Camada | Componente | Função de Segurança |
+|--------|------------|-------------------|
+| **🌍 Perimeter** | Firewall + VPN | Controle de acesso de rede |
+| **🚪 Ingress** | WAF + Load Balancer | Proteção contra ataques web |
+| **🦍 Proxy** | Kong Gateway | Autenticação e rate limiting |
+| **🎯 API** | Kubernetes API Server | Autenticação e autorização |
+| **🛡️ RBAC** | Role-based Access Control | Controle granular de permissões |
+| **📁 Namespace** | Network Policies | Isolamento de rede |
+| **🐳 Pod** | Security Context | Privilégios mínimos |
+| **💾 Data** | Secrets + etcd encryption | Proteção de dados sensíveis |
+
+### 🚨 Pontos Críticos de Segurança
+
+1. **🔐 Authentication**: Múltiplos métodos (Token, OIDC, Certificados)
+2. **🛡️ Authorization**: RBAC granular por namespace e recursos
+3. **🌐 Network**: Network Policies para isolamento
+4. **🔍 Monitoring**: Logs de auditoria e métricas de segurança
+5. **🔄 Rotation**: Rotação automática de tokens e certificados
 
 ## 🔄 Limpeza de Recursos
 

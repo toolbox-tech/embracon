@@ -1,15 +1,22 @@
 {
   "name": "node-image",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Criado para o propósito de compartilhar conhecimentos e exemplos práticos",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.js",
+    "audit": "npm audit",
+    "audit-fix": "npm audit fix"
   },
   "author": "Toolbox Company",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.21.0",
+    "helmet": "^7.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }

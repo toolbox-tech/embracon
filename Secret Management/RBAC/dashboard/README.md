@@ -13,7 +13,8 @@ Esta documentação abrange como instalar, configurar, usar e principalmente **p
 - [🔐 Configuração de Segurança](#-configuração-de-segurança)
 - [🌐 Acesso ao Dashboard](#-acesso-ao-dashboard)
 - [👤 Gerenciamento de Usuários](#-gerenciamento-de-usuários)
-- [🛡️ Melhores Práticas de Segurança](#️-melhores-práticas-de-segurança)
+- [� Integração com Microsoft Entra ID (Azure AD)](#-integração-com-microsoft-entra-id-azure-ad)
+- [�🛡️ Melhores Práticas de Segurança](#️-melhores-práticas-de-segurança)
 - [🔧 Troubleshooting](#-troubleshooting)
 
 ## 🚀 Instalação do Dashboard
@@ -209,6 +210,352 @@ subjects:
   name: dev-user
   namespace: dev
 ```
+
+## 🔐 Integração com Microsoft Entra ID (Azure AD)
+
+Para clusters AKS, você pode integrar o Dashboard diretamente com Microsoft Entra ID para autenticação mais robusta e gerenciamento centralizado de identidades.
+
+### ⚠️ Importante
+
+> **Microsoft Entra ID** (anteriormente Azure Active Directory) oferece integração nativa com AKS, eliminando a necessidade de gerenciar tokens manualmente.
+
+### Pré-requisitos
+
+- **Azure CLI** versão 2.29.0 ou superior
+- **kubectl** versão mínima 1.18.1 
+- **kubelogin** para autenticação
+- **Grupo do Microsoft Entra ID** para administradores do cluster
+
+```bash
+# Verificar versões
+az --version
+kubectl version --client
+
+# Instalar kubelogin (se necessário)
+az aks install-cli
+```
+
+### 0. Criar Grupo de Administradores (Obrigatório)
+
+> ⚠️ **Importante**: Você **deve** ter um grupo do Microsoft Entra ID antes de habilitar a integração.
+
+```bash
+# Criar grupo para administradores do cluster
+az ad group create \
+    --display-name "AKS-Cluster-Admins" \
+    --mail-nickname "aks-cluster-admins" \
+    --description "Administradores do cluster AKS"
+
+# Obter o Object ID do grupo (anote este valor!)
+GROUP_ID=$(az ad group show --group "AKS-Cluster-Admins" --query id -o tsv)
+echo "Group Object ID: $GROUP_ID"
+
+# Adicionar usuários ao grupo
+az ad group member add \
+    --group "AKS-Cluster-Admins" \
+    --member-id <user-object-id>
+
+# Verificar membros do grupo
+az ad group member list --group "AKS-Cluster-Admins" --output table
+```
+
+### 1. Criar Cluster AKS com Entra ID
+
+#### Novo Cluster
+
+```bash
+# Criar grupo de recursos
+az group create --name myResourceGroup --location centralus
+
+# Criar cluster com integração Entra ID (sem downtime)
+az aks create \
+    --resource-group myResourceGroup \
+    --name myManagedCluster \
+    --enable-aad \
+    --aad-admin-group-object-ids $GROUP_ID \
+    --aad-tenant-id <tenant-id> \
+    --generate-ssh-keys
+
+# Verificar configuração do AAD Profile
+az aks show \
+    --resource-group myResourceGroup \
+    --name myManagedCluster \
+    --query aadProfile -o table
+```
+
+#### Cluster Existente
+
+> ⚠️ **AVISO CRÍTICO - POSSÍVEL INDISPONIBILIDADE**
+> 
+> - **Clusters de camada gratuita**: Podem ter **tempo de inatividade** do servidor de API durante a atualização
+> - **Clusters pagos**: Geralmente **zero downtime**, mas pode haver breve instabilidade
+> - **Recomendação**: Execute durante **janela de manutenção** ou horário de baixo uso
+> - **kubeconfig**: Será **alterado** após a atualização - você precisará executar `az aks get-credentials` novamente
+
+```bash
+# ⚠️ EXECUTE EM JANELA DE MANUTENÇÃO ⚠️
+# Habilitar integração em cluster existente
+az aks update \
+    --resource-group myResourceGroup \
+    --name myManagedCluster \
+    --enable-aad \
+    --aad-admin-group-object-ids $GROUP_ID \
+    --aad-tenant-id <tenant-id>
+
+# ✅ OBRIGATÓRIO: Atualizar kubeconfig após a mudança
+az aks get-credentials \
+    --resource-group myResourceGroup \
+    --name myManagedCluster \
+    --overwrite-existing
+```
+
+#### Migrar Cluster Legado (Azure AD v1)
+
+> ⚠️ **AVISO DE MIGRAÇÃO**
+> 
+> - **Tempo de inatividade**: Esperado para clusters de camada gratuita
+> - **Alteração de kubeconfig**: Formato será modificado
+> - **Não reversível**: Não há suporte para downgrade
+> - **Teste primeiro**: Execute em ambiente não-produtivo
+
+```bash
+# ⚠️ MIGRAÇÃO COM POSSÍVEL DOWNTIME ⚠️
+az aks update \
+    --resource-group myResourceGroup \
+    --name myManagedCluster \
+    --enable-aad \
+    --aad-admin-group-object-ids $GROUP_ID \
+    --aad-tenant-id <tenant-id>
+
+# Verificar resultado da migração
+az aks show \
+    --resource-group myResourceGroup \
+    --name myManagedCluster \
+    --query aadProfile
+```
+
+### 2. Configurar Acesso ao Cluster
+
+```bash
+# Obter credenciais do cluster
+az aks get-credentials --resource-group myResourceGroup --name myManagedCluster
+
+# Configurar kubelogin
+kubelogin convert-kubeconfig -l azurecli
+
+# Testar acesso
+kubectl get nodes
+```
+
+### 3. Integrar Dashboard com Entra ID
+
+#### Configurar RBAC para Grupos do Entra ID
+
+```yaml
+# entra-id-dashboard-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-admin-entra-id
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: Group
+  name: "<object-id-do-grupo-admin>"  # Object ID do grupo Entra ID
+  apiGroup: rbac.authorization.k8s.io
+```
+
+#### Configurar Usuário Read-Only via Entra ID
+
+```yaml
+# entra-id-readonly-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dashboard-readonly-entra
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps", "extensions"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-readonly-entra-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dashboard-readonly-entra
+subjects:
+- kind: Group
+  name: "<object-id-grupo-readonly>"  # Object ID do grupo read-only
+  apiGroup: rbac.authorization.k8s.io
+```
+
+### 4. Obter Token via Entra ID
+
+```bash
+# Token via CLI do Azure (recomendado)
+az account get-access-token --resource https://management.azure.com/
+
+# Ou usar kubelogin diretamente
+kubectl proxy --port=8001 &
+# Abrir: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+```
+
+### 5. Autenticação Não-Interativa
+
+Para pipelines CI/CD e automação:
+
+```bash
+# Via Service Principal
+kubelogin convert-kubeconfig -l spn
+
+# Configurar variáveis de ambiente
+export AAD_SERVICE_PRINCIPAL_CLIENT_ID=<client-id>
+export AAD_SERVICE_PRINCIPAL_CLIENT_SECRET=<client-secret>
+export AAD_TENANT_ID=<tenant-id>
+
+# Via Managed Identity
+kubelogin convert-kubeconfig -l msi
+```
+
+### 6. Gerenciar Grupos e Permissões
+
+#### Criar Grupo de Administradores
+
+```bash
+# Criar grupo para admins do Dashboard
+az ad group create \
+    --display-name "AKS-Dashboard-Admins" \
+    --mail-nickname "aks-dashboard-admins" \
+    --description "Administradores do Kubernetes Dashboard"
+
+# Adicionar usuários ao grupo
+az ad group member add \
+    --group "AKS-Dashboard-Admins" \
+    --member-id <user-object-id>
+```
+
+#### Configurar Permissões por Namespace
+
+```yaml
+# namespace-specific-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: production
+  name: dashboard-prod-viewer
+rules:
+- apiGroups: ["", "apps", "extensions"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dashboard-prod-viewer-binding
+  namespace: production
+subjects:
+- kind: Group
+  name: "<prod-viewers-group-id>"
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: dashboard-prod-viewer
+  apiGroup: rbac.authorization.k8s.io
+```
+
+### 7. Troubleshooting Entra ID
+
+#### Problema: "Error getting token"
+
+```bash
+# Verificar login no Azure
+az login
+
+# Reconfigurar kubelogin
+kubelogin convert-kubeconfig -l azurecli
+
+# Verificar grupos do usuário
+az ad signed-in-user list-owned-objects
+```
+
+#### Problema: "Forbidden" com Entra ID
+
+```bash
+# Verificar permissões do grupo
+kubectl auth can-i "*" "*" --as-group=<group-object-id>
+
+# Verificar configuração do cluster
+az aks show --resource-group myResourceGroup --name myManagedCluster --query aadProfile
+```
+
+#### Problema: kubelogin não encontrado
+
+```bash
+# Instalar kubelogin
+az aks install-cli
+
+# Ou download manual
+curl -LO https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip
+unzip kubelogin-linux-amd64.zip
+sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+```
+
+### 8. Limitações e Considerações Importantes
+
+- ⚠️ **Não pode ser desabilitada** após habilitação
+- ⚠️ **Não há suporte para downgrade** para clusters legados
+- ⚠️ **Requer RBAC habilitado** no cluster
+- ⚠️ **Kubernetes 1.24+** usa formato exec por padrão
+
+#### ⚠️ **Impactos de Disponibilidade**
+
+| Operação | Cluster Gratuito | Cluster Pago | Recomendação |
+|----------|------------------|--------------|--------------|
+| **Novo Cluster** | ✅ Sem impacto | ✅ Sem impacto | Qualquer horário |
+| **Cluster Existente** | ⚠️ Possível downtime | ⚠️ Breve instabilidade | Janela de manutenção |
+| **Migração Legado** | 🔴 Downtime esperado | ⚠️ Possível impacto | Janela de manutenção obrigatória |
+
+#### 📋 **Checklist Pré-Habilitação**
+
+```bash
+# 1. Verificar se cluster tem RBAC habilitado
+az aks show --resource-group myResourceGroup --name myManagedCluster --query enableRbac
+
+# 2. Verificar tier do cluster (Free vs Paid)
+az aks show --resource-group myResourceGroup --name myManagedCluster --query sku
+
+# 3. Criar grupo de admins ANTES da habilitação
+az ad group create --display-name "AKS-Admins" --mail-nickname "aks-admins"
+
+# 4. Planejar janela de manutenção para clusters existentes
+# 5. Comunicar equipe sobre possível indisponibilidade
+# 6. Ter rollback plan (não aplicável - operação irreversível)
+```
+
+### 9. Vantagens da Integração Entra ID
+
+| Recurso | Benefício |
+|---------|-----------|
+| **SSO** | Login único com credenciais corporativas |
+| **MFA** | Autenticação multi-fator automática |
+| **Conditional Access** | Políticas de acesso baseadas em contexto |
+| **Group Management** | Gerenciamento centralizado via Entra ID |
+| **Audit Logs** | Logs centralizados no Azure AD |
+| **Token Management** | Renovação automática de tokens |
+
+```bash
+# Aplicar configurações
+kubectl apply -f entra-id-dashboard-rbac.yaml
+kubectl apply -f entra-id-readonly-rbac.yaml
+kubectl apply -f namespace-specific-rbac.yaml
 
 ## 🛡️ Melhores Práticas de Segurança
 
@@ -421,6 +768,10 @@ kubectl delete namespace kubernetes-dashboard
 - [Kubernetes RBAC Documentation](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)
 - [Kubernetes Authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/)
 - [Kubernetes Authorization](https://kubernetes.io/docs/reference/access-authn-authz/authorization/)
+- [Microsoft Entra ID Integration with AKS](https://learn.microsoft.com/pt-br/azure/aks/enable-authentication-microsoft-entra-id)
+- [Azure AD RBAC with Kubernetes](https://learn.microsoft.com/pt-br/azure/aks/azure-ad-rbac)
+- [Kubelogin Authentication Methods](https://learn.microsoft.com/pt-br/azure/aks/kubelogin-authentication)
+- [AKS Identity and Access Concepts](https://learn.microsoft.com/pt-br/azure/aks/concepts-identity)
 
 ## 🏷️ Tags
 

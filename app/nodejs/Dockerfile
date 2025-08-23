@@ -5,7 +5,7 @@
 FROM node:20-alpine AS builder
 
 # Metadados da imagem
-LABEL maintainer="Embracon Toolbox <toolbox@embracon.com>"
+LABEL maintainer="Marrcelo Buzzetti <marcelo.buzzetti@tbxtech.com>"
 LABEL version="1.1.0"
 LABEL description="Secure Node.js application with vulnerability fixes"
 

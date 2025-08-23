@@ -1,0 +1,167 @@
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.pdb.minAvailable }}
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  {{- end }}
+  {{- if .Values.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+{{- end }}
+
+---
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress from ingress controllers
+    {{- if .Values.networkPolicy.ingress.enabled }}
+    - from:
+        {{- if .Values.networkPolicy.ingress.namespaceSelector }}
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.ingress.namespaceSelector | nindent 12 }}
+        {{- end }}
+        {{- if .Values.networkPolicy.ingress.podSelector }}
+        - podSelector:
+            {{- toYaml .Values.networkPolicy.ingress.podSelector | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+        {{- if .Values.networking.httpsRequired }}
+        - protocol: TCP
+          port: 8443
+        {{- end }}
+    {{- end }}
+    
+    # Allow prometheus scraping
+    {{- if .Values.monitoring.prometheus.enabled }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: {{ .Values.monitoring.prometheus.namespace | default "monitoring" }}
+      ports:
+        - protocol: TCP
+          port: 9000
+    {{- end }}
+    
+    # Custom ingress rules
+    {{- with .Values.networkPolicy.ingress.customRules }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+    
+    # Allow database access
+    {{- if .Values.networkPolicy.egress.database.enabled }}
+    - to:
+        {{- if .Values.networkPolicy.egress.database.namespaceSelector }}
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.egress.database.namespaceSelector | nindent 12 }}
+        {{- end }}
+        {{- if .Values.networkPolicy.egress.database.podSelector }}
+        - podSelector:
+            {{- toYaml .Values.networkPolicy.egress.database.podSelector | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.database.port }}
+    {{- end }}
+    
+    # Allow Kubernetes API access for OIDC integration
+    {{- if .Values.rbac.oidcIntegration.enabled }}
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 6443
+    {{- end }}
+    
+    # Allow LDAP/AD access
+    {{- if .Values.networkPolicy.egress.ldap.enabled }}
+    - to:
+        {{- with .Values.networkPolicy.egress.ldap.ipBlock }}
+        - ipBlock:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 389
+        - protocol: TCP
+          port: 636
+    {{- end }}
+    
+    # Custom egress rules
+    {{- with .Values.networkPolicy.egress.customRules }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
+
+---
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "keycloak.fullname" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    {{- if .Values.hpa.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if .Values.hpa.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.targetMemoryUtilizationPercentage }}
+    {{- end }}
+    {{- with .Values.hpa.customMetrics }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.hpa.behavior }}
+  behavior:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

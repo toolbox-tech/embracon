@@ -1,3 +1,14 @@
+## 0.6.1 (2025-08-29)
+
+### Fix
+
+- **akv**: change pod to deployment
+
+### Refactor
+
+- **k8s**: create folder kubernetes-tools
+- **k8s**: move folders dashboard and keycloak to kubernetes-templates
+
 ## 0.6.0 (2025-08-29)
 
 ### Feat

@@ -1,0 +1,128 @@
+{{- if .Values.monitoring.prometheus.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.prometheus.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.monitoring.prometheus.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: metrics
+      path: {{ .Values.monitoring.prometheus.serviceMonitor.path }}
+      interval: {{ .Values.monitoring.prometheus.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.prometheus.serviceMonitor.scrapeTimeout }}
+      {{- with .Values.monitoring.prometheus.serviceMonitor.tlsConfig }}
+      tlsConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.monitoring.prometheus.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.monitoring.prometheus.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- with .Values.monitoring.prometheus.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+
+---
+{{- if .Values.monitoring.prometheus.rule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.prometheus.rule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.monitoring.prometheus.rule.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  groups:
+    - name: keycloak.rules
+      rules:
+        # High-level availability and performance metrics
+        - alert: KeycloakDown
+          expr: up{job=~".*keycloak.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            service: keycloak
+          annotations:
+            summary: "Keycloak instance is down"
+            description: "Keycloak instance {{ $labels.instance }} has been down for more than 5 minutes."
+        
+        - alert: KeycloakHighErrorRate
+          expr: rate(keycloak_failed_login_attempts[5m]) > 10
+          for: 2m
+          labels:
+            severity: warning
+            service: keycloak
+          annotations:
+            summary: "High Keycloak login failure rate"
+            description: "Keycloak is experiencing high login failure rate: {{ $value }} failures per second."
+        
+        - alert: KeycloakHighResponseTime
+          expr: histogram_quantile(0.95, rate(keycloak_login_duration_seconds_bucket[5m])) > 2
+          for: 5m
+          labels:
+            severity: warning
+            service: keycloak
+          annotations:
+            summary: "High Keycloak response time"
+            description: "95th percentile login response time is above 2 seconds: {{ $value }}s."
+        
+        - alert: KeycloakDatabaseConnectionError
+          expr: keycloak_database_connections_active == 0
+          for: 1m
+          labels:
+            severity: critical
+            service: keycloak
+          annotations:
+            summary: "Keycloak database connection error"
+            description: "Keycloak has no active database connections."
+        
+        - alert: KeycloakHighMemoryUsage
+          expr: (keycloak_memory_used_bytes / keycloak_memory_max_bytes) * 100 > 85
+          for: 5m
+          labels:
+            severity: warning
+            service: keycloak
+          annotations:
+            summary: "Keycloak high memory usage"
+            description: "Keycloak memory usage is above 85%: {{ $value }}%."
+        
+        - alert: KeycloakSessionsHigh
+          expr: keycloak_user_sessions_total > 1000
+          for: 10m
+          labels:
+            severity: info
+            service: keycloak
+          annotations:
+            summary: "High number of active Keycloak sessions"
+            description: "Keycloak has {{ $value }} active user sessions."
+        
+        # Custom rules from values.yaml
+        {{- with .Values.monitoring.prometheus.rule.customRules }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}

@@ -1,0 +1,29 @@
+apiVersion: v2
+name: keycloak-kubernetes
+description: Keycloak Identity and Access Management for Kubernetes with RBAC integration
+type: application
+version: 1.0.0
+appVersion: "23.0.3"
+keywords:
+  - keycloak
+  - identity
+  - authentication
+  - oidc
+  - sso
+  - rbac
+home: https://www.keycloak.org/
+sources:
+  - https://github.com/keycloak/keycloak
+  - https://github.com/toolbox-tech/embracon
+maintainers:
+  - name: Embracon Toolbox Team
+    email: toolbox@embracon.com.br
+    url: https://toolbox-tech.embracon.com
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+annotations:
+  category: Identity Management
+  licenses: Apache-2.0

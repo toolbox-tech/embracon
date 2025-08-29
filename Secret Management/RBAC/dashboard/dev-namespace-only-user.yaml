@@ -1,0 +1,112 @@
+# 🔐 Service Account para acesso exclusivo ao namespace DEV
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dev-namespace-user
+  namespace: dev
+  labels:
+    app: kubernetes-dashboard
+    component: dev-access
+    environment: development
+---
+# 🛡️ Role com permissões limitadas ao namespace DEV
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dev-namespace-role
+  namespace: dev
+  labels:
+    app: kubernetes-dashboard
+    component: dev-access
+    environment: development
+rules:
+# Permissões para recursos básicos
+- apiGroups: [""]
+  resources:
+    - pods
+    - pods/log
+    - pods/status
+    - services
+    - endpoints
+    - configmaps
+    - secrets
+    - persistentvolumeclaims
+    - events
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Permissões para deployments e replicasets
+- apiGroups: ["apps"]
+  resources:
+    - deployments
+    - replicasets
+    - daemonsets
+    - statefulsets
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Permissões para networking
+- apiGroups: ["networking.k8s.io"]
+  resources:
+    - ingresses
+    - networkpolicies
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Permissões para autoscaling
+- apiGroups: ["autoscaling"]
+  resources:
+    - horizontalpodautoscalers
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Permissões para batch jobs
+- apiGroups: ["batch"]
+  resources:
+    - jobs
+    - cronjobs
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Permissões para métricas (somente leitura)
+- apiGroups: ["metrics.k8s.io"]
+  resources:
+    - pods
+    - nodes
+  verbs: ["get", "list"]
+
+# ❌ EXPLICITAMENTE NEGADO: Acesso a outros namespaces
+# Esta Role só funciona no namespace 'dev' - não pode acessar:
+# - default, kube-system, kube-public
+# - kubernetes-dashboard, ingress-nginx
+# - Qualquer outro namespace
+
+---
+# 🔗 RoleBinding para associar Service Account à Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dev-namespace-binding
+  namespace: dev
+  labels:
+    app: kubernetes-dashboard
+    component: dev-access
+    environment: development
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dev-namespace-role
+subjects:
+- kind: ServiceAccount
+  name: dev-namespace-user
+  namespace: dev
+
+---
+# 📋 Secret para token de longa duração (opcional)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dev-namespace-user-token
+  namespace: dev
+  labels:
+    app: kubernetes-dashboard
+    component: dev-access
+    environment: development
+  annotations:
+    kubernetes.io/service-account.name: "dev-namespace-user"
+type: kubernetes.io/service-account-token

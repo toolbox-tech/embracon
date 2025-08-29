@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-admin-entra-id
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: Group
+  name: "2b3bff4c-0758-47b2-b433-ec4312efe33b"  # Object ID do grupo Entra ID
+  apiGroup: rbac.authorization.k8s.io

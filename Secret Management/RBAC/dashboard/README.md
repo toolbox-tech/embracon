@@ -14,6 +14,7 @@ Esta documentação abrange como instalar, configurar, usar e principalmente **p
 - [🌐 Acesso ao Dashboard](#-acesso-ao-dashboard)
 - [👤 Gerenciamento de Usuários](#-gerenciamento-de-usuários)
 - [� Integração com Microsoft Entra ID (Azure AD)](#-integração-com-microsoft-entra-id-azure-ad)
+- [🧪 Testes de Permissões RBAC](#-testes-de-permissões-rbac)
 - [�🛡️ Melhores Práticas de Segurança](#️-melhores-práticas-de-segurança)
 - [🔧 Troubleshooting](#-troubleshooting)
 
@@ -154,13 +155,10 @@ O Kubernetes Dashboard agora suporta **apenas instalação via Helm** para melho
 
 ```bash
 # Adicionar o repositório oficial
-helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
-helm repo update
+helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/ && helm repo update
 
 # Instalar o Dashboard
-helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard \
-  --create-namespace \
-  --namespace kubernetes-dashboard
+helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard
 ```
 
 ### Verificação da Instalação
@@ -212,8 +210,7 @@ subjects:
 
 ```bash
 # Aplicar as configurações
-kubectl apply -f dashboard-admin-user.yaml
-kubectl apply -f dashboard-admin-rolebinding.yaml
+kubectl apply -f dashboard-admin-user.yaml && kubectl apply -f dashboard-admin-rolebinding.yaml
 ```
 
 ## 🌐 Acesso ao Dashboard
@@ -429,8 +426,7 @@ sequenceDiagram
 
 ```bash
 # Verificar versões
-az --version
-kubectl version --client
+az --version && kubectl version --client
 
 # Instalar kubelogin (se necessário)
 az aks install-cli
@@ -442,19 +438,13 @@ az aks install-cli
 
 ```bash
 # Criar grupo para administradores do cluster
-az ad group create \
-    --display-name "AKS-Cluster-Admins" \
-    --mail-nickname "aks-cluster-admins" \
-    --description "Administradores do cluster AKS"
+az ad group create --display-name "AKS-Cluster-Admins" --mail-nickname "aks-cluster-admins" --description "Administradores do cluster AKS"
 
 # Obter o Object ID do grupo (anote este valor!)
-GROUP_ID=$(az ad group show --group "AKS-Cluster-Admins" --query id -o tsv)
-echo "Group Object ID: $GROUP_ID"
+$Env:GROUP_ID=$(az ad group show --group "AKS-Cluster-Admins" --query id -o tsv); Write-Host "Group Object ID: $Env:GROUP_ID"
 
 # Adicionar usuários ao grupo
-az ad group member add \
-    --group "AKS-Cluster-Admins" \
-    --member-id <user-object-id>
+az ad group member add --group "AKS-Cluster-Admins" --member-id <user-object-id>
 
 # Verificar membros do grupo
 az ad group member list --group "AKS-Cluster-Admins" --output table
@@ -468,20 +458,14 @@ az ad group member list --group "AKS-Cluster-Admins" --output table
 # Criar grupo de recursos
 az group create --name myResourceGroup --location centralus
 
+# Pegar o Tenant Id
+$Env:TENANT_ID="$(az account show --query tenantId -o tsv)"
+
 # Criar cluster com integração Entra ID (sem downtime)
-az aks create \
-    --resource-group myResourceGroup \
-    --name myManagedCluster \
-    --enable-aad \
-    --aad-admin-group-object-ids $GROUP_ID \
-    --aad-tenant-id <tenant-id> \
-    --generate-ssh-keys
+az aks create --resource-group myResourceGroup --name myManagedCluster  --node-vm-size "Standard_B2s" --enable-aad --location "brazilsouth" --enable-oidc-issuer --enable-managed-identity --node-count 1 --enable-cluster-autoscaler --min-count 1 --max-count 3 --aad-admin-group-object-ids $Env:GROUP_ID --aad-tenant-id $Env:TENANT_ID --generate-ssh-keys
 
 # Verificar configuração do AAD Profile
-az aks show \
-    --resource-group myResourceGroup \
-    --name myManagedCluster \
-    --query aadProfile -o table
+az aks show --resource-group myResourceGroup --name myManagedCluster --query aadProfile -o table
 ```
 
 #### Cluster Existente
@@ -496,18 +480,10 @@ az aks show \
 ```bash
 # ⚠️ EXECUTE EM JANELA DE MANUTENÇÃO ⚠️
 # Habilitar integração em cluster existente
-az aks update \
-    --resource-group myResourceGroup \
-    --name myManagedCluster \
-    --enable-aad \
-    --aad-admin-group-object-ids $GROUP_ID \
-    --aad-tenant-id <tenant-id>
+az aks update --resource-group myResourceGroup --name myManagedCluster --enable-aad --aad-admin-group-object-ids $Env:GROUP_ID --aad-tenant-id $Env:TENANT_ID
 
 # ✅ OBRIGATÓRIO: Atualizar kubeconfig após a mudança
-az aks get-credentials \
-    --resource-group myResourceGroup \
-    --name myManagedCluster \
-    --overwrite-existing
+az aks get-credentials --resource-group myResourceGroup --name myManagedCluster --overwrite-existing
 ```
 
 #### Migrar Cluster Legado (Azure AD v1)
@@ -521,18 +497,10 @@ az aks get-credentials \
 
 ```bash
 # ⚠️ MIGRAÇÃO COM POSSÍVEL DOWNTIME ⚠️
-az aks update \
-    --resource-group myResourceGroup \
-    --name myManagedCluster \
-    --enable-aad \
-    --aad-admin-group-object-ids $GROUP_ID \
-    --aad-tenant-id <tenant-id>
+az aks update --resource-group myResourceGroup --name myManagedCluster --enable-aad --aad-admin-group-object-ids $Env:GROUP_ID --aad-tenant-id <tenant-id>
 
 # Verificar resultado da migração
-az aks show \
-    --resource-group myResourceGroup \
-    --name myManagedCluster \
-    --query aadProfile
+az aks show --resource-group myResourceGroup --name myManagedCluster --query aadProfile
 ```
 
 ### 2. Configurar Acesso ao Cluster
@@ -601,10 +569,14 @@ subjects:
 ### 4. Obter Token via Entra ID
 
 ```bash
-# Token via CLI do Azure (recomendado)
-az account get-access-token --resource https://management.azure.com/
+# Token via CLI do Azure para Kubernetes (recomendado)
+az account get-access-token --resource 6dae42f8-4368-4678-94ff-3960e28e3630 --query accessToken -o tsv
 
-# Ou usar kubelogin diretamente
+# Para obter o server-id automaticamente do kubeconfig atual:
+SERVER_ID=$(kubectl config view --minify -o jsonpath='{.users[0].user.exec.args[5]}')
+az account get-access-token --resource $SERVER_ID --query accessToken -o tsv
+
+# Ou usar kubelogin diretamente com kubectl proxy
 kubectl proxy --port=8001 &
 # Abrir: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
 ```
@@ -618,9 +590,7 @@ Para pipelines CI/CD e automação:
 kubelogin convert-kubeconfig -l spn
 
 # Configurar variáveis de ambiente
-export AAD_SERVICE_PRINCIPAL_CLIENT_ID=<client-id>
-export AAD_SERVICE_PRINCIPAL_CLIENT_SECRET=<client-secret>
-export AAD_TENANT_ID=<tenant-id>
+$Env:AAD_SERVICE_PRINCIPAL_CLIENT_ID="<client-id>"; $Env:AAD_SERVICE_PRINCIPAL_CLIENT_SECRET="<client-secret>"; $Env:AAD_TENANT_ID="<tenant-id>"
 
 # Via Managed Identity
 kubelogin convert-kubeconfig -l msi
@@ -632,15 +602,10 @@ kubelogin convert-kubeconfig -l msi
 
 ```bash
 # Criar grupo para admins do Dashboard
-az ad group create \
-    --display-name "AKS-Dashboard-Admins" \
-    --mail-nickname "aks-dashboard-admins" \
-    --description "Administradores do Kubernetes Dashboard"
+az ad group create --display-name "AKS-Dashboard-Admins" --mail-nickname "aks-dashboard-admins" --description "Administradores do Kubernetes Dashboard"
 
 # Adicionar usuários ao grupo
-az ad group member add \
-    --group "AKS-Dashboard-Admins" \
-    --member-id <user-object-id>
+az ad group member add --group "AKS-Dashboard-Admins" --member-id <user-object-id>
 ```
 
 #### Configurar Permissões por Namespace
@@ -690,11 +655,25 @@ az ad signed-in-user list-owned-objects
 #### Problema: "Forbidden" com Entra ID
 
 ```bash
-# Verificar permissões do grupo
-kubectl auth can-i "*" "*" --as-group=<group-object-id>
+# ⚠️ IMPORTANTE: Testes com grupos requerem impersonação de usuário
+# Verificar permissões do grupo (CORRETO - com usuário)
+kubectl auth can-i "*" "*" --as=test-user --as-group="2b3bff4c-0758-47b2-b433-ec4312efe33b"
+
+# ❌ INCORRETO - só grupo (vai dar erro de impersonação)
+kubectl auth can-i "*" "*" --as-group="2b3bff4c-0758-47b2-b433-ec4312efe33b"
+
+# Verificar se você pertence ao grupo
+az ad group member check --group "2b3bff4c-0758-47b2-b433-ec4312efe33b" --member-id $(az ad signed-in-user show --query id -o tsv)
+
+# Listar todos os grupos do usuário atual
+az ad signed-in-user get-member-groups --query "[].displayName" -o table
 
 # Verificar configuração do cluster
-az aks show --resource-group myResourceGroup --name myManagedCluster --query aadProfile
+az aks show --resource-group Embracon --name myManagedCluster --query aadProfile.adminGroupObjectIDs
+
+# Testar token do Entra ID
+TOKEN=$(az account get-access-token --resource 6dae42f8-4368-4678-94ff-3960e28e3630 --query accessToken -o tsv)
+kubectl get pods --token="$TOKEN"
 ```
 
 #### Problema: kubelogin não encontrado
@@ -704,9 +683,7 @@ az aks show --resource-group myResourceGroup --name myManagedCluster --query aad
 az aks install-cli
 
 # Ou download manual
-curl -LO https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip
-unzip kubelogin-linux-amd64.zip
-sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+curl -LO https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip && unzip kubelogin-linux-amd64.zip && sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
 ```
 
 ### 8. Limitações e Considerações Importantes
@@ -754,9 +731,281 @@ az ad group create --display-name "AKS-Admins" --mail-nickname "aks-admins"
 
 ```bash
 # Aplicar configurações
-kubectl apply -f entra-id-dashboard-rbac.yaml
-kubectl apply -f entra-id-readonly-rbac.yaml
-kubectl apply -f namespace-specific-rbac.yaml
+kubectl apply -f entra-id-dashboard-rbac.yaml && kubectl apply -f entra-id-readonly-rbac.yaml && kubectl apply -f namespace-specific-rbac.yaml
+```
+
+## 🧪 Testes de Permissões RBAC
+
+### ⚠️ Importante: Limitações do Usuário Criador
+
+> **ATENÇÃO**: O usuário que criou o cluster AKS **sempre terá permissões completas** (cluster-admin), independente das configurações RBAC. Para testar permissões limitadas, você deve usar contas de usuários diferentes.
+
+### 🔍 Verificar Suas Permissões Atuais
+
+```bash
+# Verificar se você tem permissões de cluster-admin
+kubectl auth can-i "*" "*"
+# Resposta esperada para criador do cluster: yes
+
+# Ver suas atribuições de função no Azure
+az role assignment list --resource-group Embracon --assignee $(az account show --query user.name -o tsv) | grep -i kubernetes
+
+# Verificar grupos do seu usuário
+az ad signed-in-user get-member-groups --query "[].displayName" -o table
+```
+
+### 1. Testes para Service Accounts
+
+#### Teste Admin User (Cluster Admin)
+
+```bash
+# Verificar permissões do admin user
+kubectl auth can-i "*" "*" --as=system:serviceaccount:kubernetes-dashboard:admin-user
+# Resposta esperada: yes
+
+kubectl auth can-i create pods --as=system:serviceaccount:kubernetes-dashboard:admin-user
+# Resposta esperada: yes
+
+kubectl auth can-i delete clusterroles --as=system:serviceaccount:kubernetes-dashboard:admin-user  
+# Resposta esperada: yes
+
+kubectl auth can-i get secrets --as=system:serviceaccount:kubernetes-dashboard:admin-user -A
+# Resposta esperada: yes
+```
+
+#### Teste Read-Only User
+
+Primeiro, crie o usuário read-only:
+
+```bash
+# Criar usuário read-only para testes
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: readonly-test-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dashboard-readonly-test
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "nodes", "namespaces", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-readonly-test-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dashboard-readonly-test
+subjects:
+- kind: ServiceAccount
+  name: readonly-test-user
+  namespace: kubernetes-dashboard
+EOF
+```
+
+Agora teste as permissões:
+
+```bash
+# ✅ Operações READ (devem funcionar)
+kubectl auth can-i get pods --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: yes
+
+kubectl auth can-i list services --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: yes
+
+kubectl auth can-i watch deployments --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: yes
+
+kubectl auth can-i get nodes --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: yes
+
+# ❌ Operações WRITE (devem falhar)
+kubectl auth can-i create pods --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+
+kubectl auth can-i delete services --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+
+kubectl auth can-i update deployments --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+
+kubectl auth can-i patch configmaps --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+
+# ❌ Recursos Sensíveis (devem falhar)
+kubectl auth can-i get secrets --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+
+kubectl auth can-i create serviceaccounts --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+
+kubectl auth can-i delete clusterroles --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user
+# Resposta esperada: no
+```
+
+### 2. Testes para Grupos do Entra ID
+
+> **Nota**: Para testar grupos, você precisa especificar um usuário junto com o grupo.
+
+```bash
+# Teste com impersonação de usuário + grupo admin
+kubectl auth can-i "*" "*" --as=test-user --as-group="2b3bff4c-0758-47b2-b433-ec4312efe33b"
+# Resposta esperada: yes
+
+# Teste com grupo read-only (se configurado)
+kubectl auth can-i get pods --as=test-user --as-group="grupo-readonly-id"
+# Resposta esperada: yes
+
+kubectl auth can-i create pods --as=test-user --as-group="grupo-readonly-id"  
+# Resposta esperada: no
+```
+
+### 3. Script de Teste Automatizado
+
+```bash
+#!/bin/bash
+# test-rbac-permissions.sh
+
+echo "=== 🧪 Teste Completo de Permissões RBAC ==="
+echo ""
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Função para teste
+test_permission() {
+    local description="$1"
+    local command="$2"
+    local expected="$3"
+    
+    echo -n "Testando: $description... "
+    
+    result=$(eval "$command" 2>/dev/null)
+    
+    if [[ "$result" == "$expected" ]]; then
+        echo -e "${GREEN}✅ PASSOU${NC} (resultado: $result)"
+    else
+        echo -e "${RED}❌ FALHOU${NC} (esperado: $expected, obtido: $result)"
+    fi
+}
+
+echo "=== Testes Admin User (deve ter acesso total) ==="
+test_permission "Admin pode listar pods" "kubectl auth can-i get pods --as=system:serviceaccount:kubernetes-dashboard:admin-user" "yes"
+test_permission "Admin pode criar pods" "kubectl auth can-i create pods --as=system:serviceaccount:kubernetes-dashboard:admin-user" "yes"
+test_permission "Admin pode deletar secrets" "kubectl auth can-i delete secrets --as=system:serviceaccount:kubernetes-dashboard:admin-user" "yes"
+
+echo ""
+echo "=== Testes ReadOnly User (deve ter acesso limitado) ==="
+test_permission "ReadOnly pode listar pods" "kubectl auth can-i get pods --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user" "yes"
+test_permission "ReadOnly NÃO pode criar pods" "kubectl auth can-i create pods --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user" "no"
+test_permission "ReadOnly NÃO pode ver secrets" "kubectl auth can-i get secrets --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user" "no"
+test_permission "ReadOnly NÃO pode deletar deployments" "kubectl auth can-i delete deployments --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user" "no"
+
+echo ""
+echo "=== Testes por Namespace ==="
+test_permission "ReadOnly pode ver pods em kube-system" "kubectl auth can-i get pods --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user -n kube-system" "yes"
+test_permission "ReadOnly NÃO pode criar configmaps em default" "kubectl auth can-i create configmaps --as=system:serviceaccount:kubernetes-dashboard:readonly-test-user -n default" "no"
+
+echo ""
+echo "=== Resumo dos Testes ==="
+echo -e "${YELLOW}⚠️  Se você é o criador do cluster, sempre verá 'yes' para suas próprias permissões${NC}"
+echo -e "${GREEN}✅ Para testar realmente RBAC, use contas de usuários diferentes${NC}"
+```
+
+### 4. Teste Prático no Dashboard
+
+#### Preparar Token Read-Only
+
+```bash
+# Gerar token para usuário read-only
+TOKEN_READONLY=$(kubectl create token readonly-test-user -n kubernetes-dashboard --duration=24h)
+echo "Token Read-Only:"
+echo $TOKEN_READONLY
+```
+
+#### Teste no Dashboard Web
+
+1. **Acesse**: https://localhost:8443
+2. **Login**: Cole o token read-only
+3. **Teste as funcionalidades**:
+
+**✅ Deve Funcionar (Read-Only):**
+- Visualizar pods, deployments, services
+- Ver logs de containers  
+- Navegar entre namespaces
+- Ver detalhes de recursos
+- Acessar métricas básicas
+
+**❌ Não Deve Funcionar (Write Operations):**
+- Botões "Delete" devem estar desabilitados/ocultos
+- "Edit" deve dar erro 403 Forbidden
+- "Create" deve falhar
+- "Scale" deve ser bloqueado
+- Exec em pods deve ser negado
+
+### 5. Verificação de Logs
+
+```bash
+# Ver logs de tentativas negadas no Dashboard
+kubectl logs -n kubernetes-dashboard -l k8s-app=kubernetes-dashboard --tail=50 | grep -i "forbidden\|denied\|unauthorized"
+
+# Ver logs de auditoria (se habilitado)
+kubectl get events --all-namespaces | grep -i "forbidden"
+```
+
+### 6. Limpar Recursos de Teste
+
+```bash
+# Remover usuário de teste
+kubectl delete serviceaccount readonly-test-user -n kubernetes-dashboard
+kubectl delete clusterrole dashboard-readonly-test
+kubectl delete clusterrolebinding dashboard-readonly-test-binding
+```
+
+### 7. Testes para Múltiplos Grupos
+
+Se você configurou múltiplos grupos:
+
+```bash
+# Criar grupos diferentes no Entra ID
+az ad group create --display-name "AKS-ReadOnly-Users" --mail-nickname "aks-readonly-users"
+az ad group create --display-name "AKS-Developers" --mail-nickname "aks-developers"
+az ad group create --display-name "AKS-DevOps" --mail-nickname "aks-devops"
+
+# Obter IDs dos grupos
+az ad group list --display-name "AKS-*" --query "[].{Name:displayName, ObjectId:id}" -o table
+
+# Testar permissões por grupo (com impersonação)
+kubectl auth can-i get pods --as=user1 --as-group="readonly-group-id"
+kubectl auth can-i create deployments --as=user2 --as-group="developer-group-id"  
+kubectl auth can-i "*" "*" --as=user3 --as-group="admin-group-id"
+```
+
+### 📊 Matriz de Permissões Esperadas
+
+| Usuário/Grupo | get/list/watch | create/update | delete | secrets | cluster-admin |
+|---------------|----------------|---------------|--------|---------|---------------|
+| **Criador AKS** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **admin-user SA** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **readonly-test-user** | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Admin Group** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **ReadOnly Group** | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 ## 🛡️ Melhores Práticas de Segurança
 
@@ -921,9 +1170,7 @@ SERVICE_ACCOUNT="admin-user"
 kubectl delete secret ${SERVICE_ACCOUNT} -n ${NAMESPACE} --ignore-not-found=true
 
 # Criar novo token
-kubectl create secret generic ${SERVICE_ACCOUNT} \
-  --from-literal=token="$(kubectl create token ${SERVICE_ACCOUNT} -n ${NAMESPACE})" \
-  -n ${NAMESPACE}
+kubectl create secret generic ${SERVICE_ACCOUNT} --from-literal=token="$(kubectl create token ${SERVICE_ACCOUNT} -n ${NAMESPACE})" -n ${NAMESPACE}
 
 echo "Token rotacionado com sucesso!"
 ```
@@ -995,15 +1242,25 @@ kubectl get sa admin-user -n kubernetes-dashboard
 
 **Soluções**:
 ```bash
-# Verificar permissões do usuário
+# Verificar permissões do usuário (Service Account)
 kubectl auth can-i "*" "*" --as=system:serviceaccount:kubernetes-dashboard:admin-user
+
+# Verificar permissões com impersonação de grupo Entra ID
+kubectl auth can-i get pods --as=seu-email@dominio.com --as-group="2b3bff4c-0758-47b2-b433-ec4312efe33b"
 
 # Verificar ClusterRoleBinding
 kubectl describe clusterrolebinding admin-user
+kubectl describe clusterrolebinding dashboard-admin-entra-id
+
+# Listar todas as permissões disponíveis para um usuário
+kubectl auth can-i --list --as=system:serviceaccount:kubernetes-dashboard:admin-user
+
+# Testar permissões específicas por namespace
+kubectl auth can-i create pods --as=system:serviceaccount:kubernetes-dashboard:admin-user -n default
+kubectl auth can-i get secrets --as=system:serviceaccount:kubernetes-dashboard:admin-user -n kube-system
 
 # Recriar binding se necessário
-kubectl delete clusterrolebinding admin-user
-kubectl apply -f dashboard-admin-rolebinding.yaml
+kubectl delete clusterrolebinding admin-user && kubectl apply -f dashboard-admin-rolebinding.yaml
 ```
 
 ### 3. Dashboard Não Carrega
@@ -1032,14 +1289,10 @@ kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy
 # Ou configurar certificado válido:
 
 # Gerar certificado para o Dashboard
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout dashboard.key -out dashboard.crt \
-  -subj "/CN=kubernetes-dashboard"
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout dashboard.key -out dashboard.crt -subj "/CN=kubernetes-dashboard"
 
 # Criar secret com certificado
-kubectl create secret tls kubernetes-dashboard-certs \
-  --key dashboard.key --cert dashboard.crt \
-  -n kubernetes-dashboard
+kubectl create secret tls kubernetes-dashboard-certs --key dashboard.key --cert dashboard.crt -n kubernetes-dashboard
 ```
 
 ## 📊 Recursos do Dashboard
@@ -1224,8 +1477,7 @@ graph TB
 
 ```bash
 # Remover Service Account e ClusterRoleBinding
-kubectl -n kubernetes-dashboard delete serviceaccount admin-user
-kubectl delete clusterrolebinding admin-user
+kubectl -n kubernetes-dashboard delete serviceaccount admin-user && kubectl delete clusterrolebinding admin-user
 
 # Remover secrets (se criados)
 kubectl -n kubernetes-dashboard delete secret admin-user
@@ -1241,7 +1493,256 @@ helm uninstall kubernetes-dashboard -n kubernetes-dashboard
 kubectl delete namespace kubernetes-dashboard
 ```
 
-## 📚 Referências
+## � Arquivos de Configuração Incluídos
+
+Esta pasta contém os seguintes arquivos de configuração RBAC para o Kubernetes Dashboard:
+
+### 🔐 Service Accounts (Tradicionais)
+
+#### `dashboard-admin-user.yaml`
+**Propósito**: Service Account com permissões completas de cluster-admin  
+**Uso**: Para administradores que precisam de acesso total via token
+
+````yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+````
+
+**Comandos de uso**:
+````bash
+# Aplicar configuração
+kubectl apply -f dashboard-admin-user.yaml
+
+# Obter token
+kubectl create token admin-user -n kubernetes-dashboard --duration=24h
+````
+
+---
+
+#### `dashboard-readonly-user.yaml`
+**Propósito**: Service Account com permissões somente leitura  
+**Uso**: Para usuários que precisam apenas visualizar recursos
+
+````yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dashboard-readonly
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dashboard-readonly
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps", "extensions"]
+  resources: ["*"]  
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-readonly
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dashboard-readonly
+subjects:
+- kind: ServiceAccount
+  name: dashboard-readonly
+  namespace: kubernetes-dashboard
+````
+
+**Comandos de uso**:
+````bash
+# Aplicar configuração
+kubectl apply -f dashboard-readonly-user.yaml
+
+# Obter token
+kubectl create token dashboard-readonly -n kubernetes-dashboard --duration=24h
+
+# Testar permissões
+kubectl auth can-i create pods --as=system:serviceaccount:kubernetes-dashboard:dashboard-readonly
+# Resultado esperado: no
+````
+
+---
+
+#### `dev-namespace-only-user.yaml`
+**Propósito**: Service Account com acesso limitado ao namespace "dev"  
+**Uso**: Para desenvolvedores que trabalham apenas no ambiente de desenvolvimento
+
+**Recursos incluídos**:
+- ✅ Acesso completo ao namespace `dev`
+- ✅ Pode criar/editar/deletar recursos no namespace `dev`
+- ❌ Não tem acesso a outros namespaces
+- ❌ Não tem permissões de cluster-admin
+
+**Comandos de uso**:
+````bash
+# Criar namespace dev primeiro
+kubectl create namespace dev
+
+# Aplicar configuração
+kubectl apply -f dev-namespace-only-user.yaml
+
+# Obter token
+kubectl create token dev-namespace-user -n dev --duration=24h
+
+# Testar permissões no namespace dev
+kubectl auth can-i create pods --as=system:serviceaccount:dev:dev-namespace-user -n dev
+# Resultado esperado: yes
+
+# Testar acesso negado a outros namespaces
+kubectl auth can-i get pods --as=system:serviceaccount:dev:dev-namespace-user -n kube-system
+# Resultado esperado: no
+````
+
+### 🏢 Integração com Microsoft Entra ID
+
+#### `entra-id-dashboard-rbac.yaml`
+**Propósito**: Integração com grupo do Entra ID para administradores  
+**Uso**: Para autenticação SSO com credenciais corporativas (permissões completas)
+
+````yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-admin-entra-id
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: Group
+  name: "2b3bff4c-0758-47b2-b433-ec4312efe33b"  # Object ID do grupo Entra ID
+  apiGroup: rbac.authorization.k8s.io
+````
+
+**Pré-requisitos**:
+- Cluster AKS com integração Entra ID habilitada
+- Grupo criado no Entra ID com usuários adicionados
+- kubelogin configurado
+
+**Comandos de uso**:
+````bash
+# Aplicar configuração
+kubectl apply -f entra-id-dashboard-rbac.yaml
+
+# Obter token do Entra ID
+az account get-access-token --resource 6dae42f8-4368-4678-94ff-3960e28e3630 --query accessToken -o tsv
+
+# Verificar se usuário pertence ao grupo
+az ad group member check --group "2b3bff4c-0757-47b2-b433-ec4312efe33b" --member-id $(az ad signed-in-user show --query id -o tsv)
+````
+
+---
+
+#### `entra-id-readonly-rbac.yaml`
+**Propósito**: Integração com grupo do Entra ID para usuários somente leitura  
+**Uso**: Para usuários corporativos que precisam apenas visualizar recursos
+
+````yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dashboard-readonly-entra
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps", "extensions"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dashboard-readonly-entra-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dashboard-readonly-entra
+subjects:
+- kind: Group
+  name: "2b3bff4c-0758-47b2-b433-ec4312efe33b"  # Object ID do grupo read-only
+  apiGroup: rbac.authorization.k8s.io
+````
+
+**Comandos de uso**:
+````bash
+# Aplicar configuração  
+kubectl apply -f entra-id-readonly-rbac.yaml
+
+# Testar com impersonação (usuário + grupo)
+kubectl auth can-i get pods --as=test-user --as-group="2b3bff4c-0758-47b2-b433-ec4312efe33b"
+# Resultado esperado: yes
+
+kubectl auth can-i create pods --as=test-user --as-group="2b3bff4c-0758-47b2-b433-ec4312efe33b"  
+# Resultado esperado: no
+````
+
+## 🚀 Aplicação Rápida
+
+### Cenário 1: Service Accounts Tradicionais
+````bash
+# Aplicar todos os Service Accounts
+kubectl apply -f dashboard-admin-user.yaml
+kubectl apply -f dashboard-readonly-user.yaml  
+kubectl apply -f dev-namespace-only-user.yaml
+
+# Obter tokens
+echo "Admin Token:"
+kubectl create token admin-user -n kubernetes-dashboard --duration=24h
+
+echo "ReadOnly Token:"
+kubectl create token dashboard-readonly -n kubernetes-dashboard --duration=24h
+
+echo "Dev Token:"  
+kubectl create token dev-namespace-user -n dev --duration=24h
+````
+
+### Cenário 2: Integração Entra ID
+````bash
+# Aplicar configurações Entra ID
+kubectl apply -f entra-id-dashboard-rbac.yaml
+kubectl apply -f entra-id-readonly-rbac.yaml
+
+# Obter token Entra ID
+TOKEN=$(az account get-access-token --resource 6dae42f8-4368-4678-94ff-3960e28e3630 --query accessToken -o tsv)
+echo "Entra ID Token: $TOKEN"
+````
+
+## 📊 Resumo dos Níveis de Acesso
+
+| Arquivo | Tipo | Escopo | Permissões | Uso Recomendado |
+|---------|------|--------|------------|----------------|
+| `dashboard-admin-user.yaml` | Service Account | Cluster | Admin Completo | Administradores |
+| `dashboard-readonly-user.yaml` | Service Account | Cluster | Somente Leitura | Usuários Viewer |
+| `dev-namespace-only-user.yaml` | Service Account | Namespace | Admin Limitado | Desenvolvedores |
+| `entra-id-dashboard-rbac.yaml` | Grupo Entra ID | Cluster | Admin Completo | Admins Corporativos |
+| `entra-id-readonly-rbac.yaml` | Grupo Entra ID | Cluster | Somente Leitura | Users Corporativos |
+
+## �📚 Referências
 
 - [Documentação Oficial do Kubernetes Dashboard](https://github.com/kubernetes/dashboard)
 - [Kubernetes RBAC Documentation](https://kubernetes.io/docs/reference/access-authn-authz/rbac/)

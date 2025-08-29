@@ -1,0 +1,61 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.networking.hostname }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.networking.hostname }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: {{ .Values.ingress.pathType }}
+            backend:
+              service:
+                name: {{ include "keycloak.fullname" . }}
+                port:
+                  {{- if .Values.networking.httpsRequired }}
+                  number: {{ .Values.service.httpsPort }}
+                  {{- else }}
+                  number: {{ .Values.service.port }}
+                  {{- end }}
+          {{- with .Values.ingress.extraPaths }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+    {{- with .Values.ingress.extraHosts }}
+    {{- range . }}
+    - host: {{ .host }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "keycloak.fullname" $ }}
+                port:
+                  {{- if $.Values.networking.httpsRequired }}
+                  number: {{ $.Values.service.httpsPort }}
+                  {{- else }}
+                  number: {{ $.Values.service.port }}
+                  {{- end }}
+          {{- end }}
+    {{- end }}
+    {{- end }}
+{{- end }}

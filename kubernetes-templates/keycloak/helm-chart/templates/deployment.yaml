@@ -1,0 +1,243 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keycloak.fullname" . }}
+  namespace: {{ .Values.global.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.keycloak.replicas }}
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+        {{- with .Values.keycloak.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "keycloak.labels" . | nindent 8 }}
+        {{- with .Values.keycloak.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.keycloak.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "keycloak.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.keycloak.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h {{ include "keycloak.databaseHost" . }} -p {{ .Values.database.port }} -U {{ .Values.database.username }}; do
+                echo "Waiting for database to be ready..."
+                sleep 5
+              done
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.fullname" . }}-secrets
+                  key: database-password
+      containers:
+        - name: keycloak
+          securityContext:
+            {{- toYaml .Values.keycloak.securityContext | nindent 12 }}
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
+          args:
+            - start
+            - --optimized
+            {{- if .Values.realmImport.enabled }}
+            - --import-realm
+            {{- end }}
+            {{- with .Values.keycloak.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            # Keycloak Admin Configuration
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.fullname" . }}-secrets
+                  key: admin-username
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.fullname" . }}-secrets
+                  key: admin-password
+            
+            # Database Configuration
+            - name: KC_DB
+              value: "postgres"
+            - name: KC_DB_URL
+              value: {{ include "keycloak.databaseUrl" . }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.database.username }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keycloak.fullname" . }}-secrets
+                  key: database-password
+            
+            # Networking Configuration
+            - name: KC_HOSTNAME
+              value: {{ .Values.networking.hostname }}
+            - name: KC_HOSTNAME_STRICT
+              value: {{ .Values.networking.hostnameStrict | quote }}
+            - name: KC_HOSTNAME_STRICT_HTTPS
+              value: {{ .Values.networking.httpsRequired | quote }}
+            - name: KC_HTTP_ENABLED
+              value: {{ not .Values.networking.httpsRequired | quote }}
+            {{- if .Values.networking.httpsRequired }}
+            - name: KC_HTTPS_PORT
+              value: "8443"
+            {{- else }}
+            - name: KC_HTTP_PORT
+              value: "8080"
+            {{- end }}
+            
+            # Proxy Configuration
+            - name: KC_PROXY
+              value: {{ .Values.networking.proxy }}
+            
+            # Cache Configuration
+            - name: KC_CACHE
+              value: {{ .Values.keycloak.cache.type }}
+            {{- if eq .Values.keycloak.cache.type "ispn" }}
+            - name: KC_CACHE_STACK
+              value: {{ .Values.keycloak.cache.stack }}
+            {{- end }}
+            
+            # Logging Configuration
+            - name: KC_LOG_LEVEL
+              value: {{ .Values.keycloak.logging.level }}
+            {{- if .Values.keycloak.logging.console.enabled }}
+            - name: KC_LOG_CONSOLE_OUTPUT
+              value: {{ .Values.keycloak.logging.console.format }}
+            {{- end }}
+            
+            # Health Check Configuration
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: {{ .Values.monitoring.prometheus.enabled | quote }}
+            
+            {{- with .Values.keycloak.extraEnvVars }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            {{- if .Values.networking.httpsRequired }}
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.monitoring.prometheus.enabled }}
+            - name: metrics
+              containerPort: 9000
+              protocol: TCP
+            {{- end }}
+          
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+              {{- if .Values.networking.httpsRequired }}
+              scheme: HTTPS
+              {{- end }}
+            initialDelaySeconds: {{ .Values.keycloak.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.keycloak.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.keycloak.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.keycloak.probes.liveness.failureThreshold }}
+          
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+              {{- if .Values.networking.httpsRequired }}
+              scheme: HTTPS
+              {{- end }}
+            initialDelaySeconds: {{ .Values.keycloak.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.keycloak.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.keycloak.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.keycloak.probes.readiness.failureThreshold }}
+          
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: http
+              {{- if .Values.networking.httpsRequired }}
+              scheme: HTTPS
+              {{- end }}
+            initialDelaySeconds: {{ .Values.keycloak.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.keycloak.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.keycloak.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.keycloak.probes.startup.failureThreshold }}
+          
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          
+          volumeMounts:
+            {{- if .Values.keycloak.extraConfig }}
+            - name: keycloak-config
+              mountPath: /opt/keycloak/conf/keycloak.conf
+              subPath: keycloak.conf
+            {{- end }}
+            {{- if .Values.realmImport.enabled }}
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+            {{- end }}
+            {{- if .Values.networking.tls.enabled }}
+            - name: tls-certs
+              mountPath: /opt/keycloak/certs
+              readOnly: true
+            {{- end }}
+            {{- with .Values.keycloak.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      
+      volumes:
+        {{- if .Values.keycloak.extraConfig }}
+        - name: keycloak-config
+          configMap:
+            name: {{ include "keycloak.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.realmImport.enabled }}
+        - name: realm-import
+          configMap:
+            name: {{ include "keycloak.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.networking.tls.enabled }}
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.networking.tls.secretName }}
+        {{- end }}
+        {{- with .Values.keycloak.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      
+      {{- with .Values.keycloak.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.keycloak.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.keycloak.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

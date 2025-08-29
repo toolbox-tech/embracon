@@ -1554,8 +1554,11 @@ rules:
 - apiGroups: [""]
   resources: ["*"]
   verbs: ["get", "list", "watch"]
-- apiGroups: ["apps", "extensions"]
-  resources: ["*"]  
+- apiGroups: ["apps"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["*"]
   verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1701,6 +1704,20 @@ kubectl auth can-i create pods --as=test-user --as-group="2b3bff4c-0758-47b2-b43
 # Resultado esperado: no
 ````
 
+---
+
+#### `kubernetes-roles-guide.md`
+**Propósito**: Guia completo para criação de Roles e RBAC no Kubernetes  
+**Uso**: Documentação de referência para entender e criar roles customizadas
+
+**Conteúdo incluído**:
+- 📝 Anatomia detalhada de Roles e ClusterRoles
+- 🔍 Explicação de todos os campos e valores possíveis
+- 📊 Referência completa de API Groups e recursos
+- 🎯 Exemplos práticos por cenário
+- 🛡️ Melhores práticas de segurança
+- 🔧 Comandos úteis para teste e debug
+
 ## 🚀 Aplicação Rápida
 
 ### Cenário 1: Service Accounts Tradicionais
@@ -1741,6 +1758,7 @@ echo "Entra ID Token: $TOKEN"
 | `dev-namespace-only-user.yaml` | Service Account | Namespace | Admin Limitado | Desenvolvedores |
 | `entra-id-dashboard-rbac.yaml` | Grupo Entra ID | Cluster | Admin Completo | Admins Corporativos |
 | `entra-id-readonly-rbac.yaml` | Grupo Entra ID | Cluster | Somente Leitura | Users Corporativos |
+| `kubernetes-roles-guide.md` | Documentação | - | - | Referência RBAC |
 
 ## �📚 Referências
 

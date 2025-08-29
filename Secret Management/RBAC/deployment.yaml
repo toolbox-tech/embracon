@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-deployment
+  namespace: dev
+  labels:
+    app: test-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: test-app
+    spec:
+      serviceAccountName: app-alpha-sa  # Nossa SA (sem permissão get secrets)
+      containers:
+      - name: test-container
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        
+        # MÉTODO 1: Environment Variables
+        env:
+        - name: MY_SECRET_VALUE
+          valueFrom:
+            secretKeyRef:
+              name: rbac-test-secret-k8s-akv  # Secret criado pelo ESO
+              key: my-akv-secret-key
+        
+        # MÉTODO 2: Volume Mount
+        volumeMounts:
+        - name: secret-volume
+          mountPath: "/etc/secrets"
+          readOnly: true
+        
+        # Para testar
+        command: ["/bin/sh"]
+        args: ["-c", "echo 'Secret via ENV:' && echo $MY_SECRET_VALUE && echo 'Secret via file:' && cat /etc/secrets/my-akv-secret-key && echo 'Files in /etc/secrets/:' && ls -la /etc/secrets/ && sleep 3600"]
+        
+        # Adicionar liveness e readiness probes
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      
+      volumes:
+      - name: secret-volume
+        secret:
+          secretName: rbac-test-secret-k8s-akv

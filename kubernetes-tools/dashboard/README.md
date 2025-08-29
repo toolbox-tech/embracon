@@ -337,6 +337,84 @@ subjects:
   namespace: dev
 ```
 
+## 🪙 Geração de Token Permanente para Service Account
+
+> ⚠️ **AVISO DE SEGURANÇA**: Tokens permanentes representam um risco de segurança se vazados. Use apenas quando necessário e gerencie-os como segredos críticos.
+
+### 1. Usando Secret (Kubernetes 1.24+)
+
+```bash
+# 1. Crie um Secret de token para a ServiceAccount
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user-token
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: admin-user
+type: kubernetes.io/service-account-token
+EOF
+
+# 2. Aguarde alguns segundos para o token ser gerado
+sleep 3
+
+# 3. Obtenha o token permanente
+kubectl get secret admin-user-token -n kubernetes-dashboard -o jsonpath='{.data.token}' | base64 -d
+```
+
+### 2. Via PowerShell (com Base64 decode)
+
+```powershell
+# 1. Crie um Secret de token para a ServiceAccount
+$secretYaml = @"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user-token
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: admin-user
+type: kubernetes.io/service-account-token
+"@
+
+$secretYaml | kubectl apply -f -
+
+# 2. Aguarde alguns segundos para o token ser gerado
+Start-Sleep -Seconds 3
+
+# 3. Obtenha o token permanente
+$tokenBase64 = kubectl get secret admin-user-token -n kubernetes-dashboard -o jsonpath='{.data.token}'
+[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($tokenBase64))
+```
+
+### 3. Para ServiceAccount de Leitura
+
+```bash
+# 1. Crie um Secret de token para a ServiceAccount de leitura
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: readonly-user-token
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: dashboard-readonly
+type: kubernetes.io/service-account-token
+EOF
+
+# 2. Obtenha o token permanente
+kubectl get secret readonly-user-token -n kubernetes-dashboard -o jsonpath='{.data.token}' | base64 -d
+```
+
+### ⚠️ Considerações de Segurança para Tokens Permanentes
+
+1. **Rotação**: Mesmo tokens permanentes devem ser rotacionados periodicamente
+2. **Armazenamento**: Armazene em cofre de senhas ou Azure Key Vault
+3. **Auditoria**: Mantenha registros de quem tem acesso ao token
+4. **Revogação**: Para revogar, delete o Secret associado
+5. **Privilégio mínimo**: Use tokens com permissões mínimas necessárias
+
 ## 🔐 Integração com Microsoft Entra ID (Azure AD)
 
 Para clusters AKS, você pode integrar o Dashboard diretamente com Microsoft Entra ID para autenticação mais robusta e gerenciamento centralizado de identidades.

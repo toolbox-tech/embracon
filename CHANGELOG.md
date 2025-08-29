@@ -1,3 +1,14 @@
+## 0.6.0 (2025-08-29)
+
+### Feat
+
+- **dashboard**: use RBAC and Entra ID to log in dashboard
+- **k8s**: keycloak helm
+
+### Fix
+
+- **nodejs**: maintainer email
+
 ## 0.5.0 (2025-08-21)
 
 ### Feat

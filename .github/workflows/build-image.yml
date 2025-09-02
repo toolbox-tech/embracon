@@ -31,6 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: app/nodejs
 
       - name: Build Docker image (cache in GHA)
         uses: docker/build-push-action@v6

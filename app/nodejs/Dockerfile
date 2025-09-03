@@ -24,10 +24,6 @@ WORKDIR /app
 # Copiar apenas package files para otimizar cache do Docker
 COPY package*.json ./
 
-# Instalar dependências (apenas produção)
-RUN npm ci --only=production --no-optional --no-fund \
-    && npm cache clean --force
-
 # Stage 2: Production
 FROM node:20-alpine AS production
 

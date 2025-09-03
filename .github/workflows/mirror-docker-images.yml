@@ -1,0 +1,375 @@
+name: Verificar e Espelhar Imagens Docker para ACR
+
+on:
+  schedule:
+    # Executa toda segunda-feira às 3:00 da manhã
+    - cron: '0 3 * * 1'
+  
+  # Permite execução manual da pipeline
+  workflow_dispatch:
+    inputs:
+      configFile:
+        description: 'Caminho para o arquivo de configuração das imagens'
+        required: true
+        default: './scripts/docker-images.json'
+      forceUpdate:
+        description: 'Forçar atualização de todas as imagens'
+        required: false
+        type: boolean
+        default: false
+
+# Defina permissões para usar OIDC
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ACR_NAME: embraconacr
+  ACR_RESOURCE_GROUP: embracon-infra
+  PREFIX: embracon-
+  CONFIG_FILE: ${{ github.event.inputs.configFile || './scripts/docker-images.json' }}
+  FORCE_UPDATE: ${{ github.event.inputs.forceUpdate || false }}
+
+jobs:
+  verify-and-mirror:
+    name: Verificar e Espelhar Imagens Docker
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+      
+      - name: Instalar jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+      
+      - name: Login no Azure com OIDC
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      - name: Login no ACR
+        run: |
+          # Login direto no ACR usando o token de autenticação da Azure
+          az acr login --name ${{ env.ACR_NAME }}
+      
+      - name: Verificar e Espelhar Imagens
+        id: mirror-images
+        run: |
+          # Timestamp para logging
+          timestamp() {
+            date "+%Y-%m-%d %H:%M:%S"
+          }
+          
+          # Funções para log colorido
+          log_info() {
+            echo "$(timestamp) [INFO] $1"
+          }
+          
+          log_warning() {
+            echo "$(timestamp) [WARNING] $1" >&2
+          }
+          
+          log_error() {
+            echo "$(timestamp) [ERROR] $1" >&2
+          }
+          
+          log_success() {
+            echo "$(timestamp) [SUCCESS] $1"
+          }
+          
+          # Verificar se o arquivo de configuração existe
+          if [ ! -f "$CONFIG_FILE" ]; then
+            log_error "Arquivo de configuração não encontrado: $CONFIG_FILE"
+            exit 1
+          fi
+          
+          # Obter lista de repositórios existentes no ACR
+          log_info "Obtendo lista de repositórios do ACR $ACR_NAME..."
+          acr_repos=$(az acr repository list --name $ACR_NAME --output json)
+          
+          # Estatísticas
+          total_images=$(jq '.images | length' $CONFIG_FILE)
+          existing_count=0
+          mirrored_count=0
+          error_count=0
+          
+          log_info "Processando $total_images imagens..."
+          
+          # Processar cada imagem da configuração
+          for (( i=0; i<$total_images; i++ ))
+          do
+            # Extrair informações da imagem do JSON
+            source_repo=$(jq -r ".images[$i].repository" $CONFIG_FILE)
+            tag=$(jq -r ".images[$i].tag" $CONFIG_FILE)
+            description=$(jq -r ".images[$i].description" $CONFIG_FILE)
+            target_repo=$(jq -r ".images[$i].targetRepository // \"mirrors\"" $CONFIG_FILE)
+            
+            source_image="$source_repo:$tag"
+            prefixed_repo_name="${PREFIX}${source_repo}"
+            target_image="$ACR_NAME.azurecr.io/$target_repo/$prefixed_repo_name:$tag"
+            
+            # Nome do repositório no formato que aparece na lista do ACR
+            acr_repo_name="$target_repo/$prefixed_repo_name"
+            
+            log_info "Verificando: $source_image ($description)"
+            
+            # Verificar se o repositório já existe no ACR
+            repo_exists=$(echo $acr_repos | jq -r --arg repo "$acr_repo_name" 'contains([$repo])')
+            
+            # Se o repositório existir, verificar se a tag específica existe
+            tag_exists="false"
+            if [ "$repo_exists" == "true" ]; then
+              repo_tags=$(az acr repository show-tags --name $ACR_NAME --repository $acr_repo_name --output json)
+              tag_exists=$(echo $repo_tags | jq -r --arg tag "$tag" 'contains([$tag])')
+            fi
+            
+            # Decidir se precisa espelhar a imagem
+            should_mirror="false"
+            if [ "$FORCE_UPDATE" == "true" ] || [ "$tag_exists" == "false" ]; then
+              should_mirror="true"
+            fi
+            
+            if [ "$should_mirror" == "true" ]; then
+              log_info "Espelhando imagem: $source_image -> $target_image ($description)"
+              
+              # Pull da imagem do Docker Hub
+              log_info "Baixando imagem: $source_image"
+              if docker pull $source_image; then
+                
+                # Aplicar tag para o ACR com o prefixo embracon-
+                log_info "Aplicando tag: $target_image"
+                if docker tag $source_image $target_image; then
+                  
+                  # Push para o ACR
+                  log_info "Enviando imagem para o ACR: $target_image"
+                  if docker push $target_image; then
+                    log_success "Imagem espelhada com sucesso: $source_image -> $target_image"
+                    mirrored_count=$((mirrored_count+1))
+                  else
+                    log_error "Falha ao enviar imagem para o ACR: $target_image"
+                    error_count=$((error_count+1))
+                    echo "::error::Falha ao enviar $source_image para o ACR"
+                  fi
+                else
+                  log_error "Falha ao aplicar tag: $target_image"
+                  error_count=$((error_count+1))
+                  echo "::error::Falha ao aplicar tag em $source_image"
+                fi
+              else
+                log_error "Falha ao baixar imagem: $source_image"
+                error_count=$((error_count+1))
+                echo "::error::Falha ao baixar $source_image"
+              fi
+            else
+              log_info "Imagem já existe no ACR: $target_image"
+              existing_count=$((existing_count+1))
+            fi
+          done
+          
+          # Resumo da operação
+          log_info "======= RESUMO DA OPERAÇÃO ======="
+          log_info "Total de imagens: $total_images"
+          log_info "Imagens já existentes: $existing_count"
+          log_success "Imagens espelhadas: $mirrored_count"
+          
+          if [ $error_count -gt 0 ]; then
+            log_error "Erros: $error_count"
+          else
+            log_success "Erros: $error_count"
+          fi
+          
+          # Definir variáveis para os próximos steps e outputs
+          echo "TOTAL_IMAGES=$total_images" >> $GITHUB_ENV
+          echo "EXISTING_IMAGES=$existing_count" >> $GITHUB_ENV
+          echo "MIRRORED_IMAGES=$mirrored_count" >> $GITHUB_ENV
+          echo "ERROR_IMAGES=$error_count" >> $GITHUB_ENV
+          
+          # Definir outputs para uso em outros steps (nova sintaxe do GitHub Actions)
+          echo "total_count=$total_images" >> $GITHUB_OUTPUT
+          echo "existing_count=$existing_count" >> $GITHUB_OUTPUT
+          echo "mirrored_count=$mirrored_count" >> $GITHUB_OUTPUT
+          echo "error_count=$error_count" >> $GITHUB_OUTPUT
+          
+          # Sair com código de erro se houver falhas
+          if [ $error_count -gt 0 ]; then
+            exit 1
+          fi
+      
+      - name: Escanear Vulnerabilidades das Novas Imagens
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.mirror-images.outputs.mirrored_count > 0 }}
+        run: |
+          # Instalar Trivy
+          echo "Instalando Trivy..."
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          
+          echo "Instalação do Trivy concluída. Iniciando escaneamento de vulnerabilidades..."
+          
+          # Parâmetros de escaneamento
+          OUTPUT_FILE="${{ github.workspace }}/vulnerabilities-report.md"
+          SEVERITY="HIGH,CRITICAL"
+          
+          # Criar cabeçalho do relatório
+          cat > $OUTPUT_FILE << EOF
+          # Relatório de Vulnerabilidades de Imagens Docker
+          Gerado em: $(date '+%Y-%m-%d %H:%M:%S')
+          
+          ## Resumo
+          
+          EOF
+          
+          # Inicializar contadores
+          total_vulns=0
+          critical_vulns=0
+          high_vulns=0
+          images_with_vulns=0
+          
+          # Processar cada imagem da configuração que foi espelhada
+          echo "Escaneando imagens espelhadas por vulnerabilidades..."
+          
+          # Processar cada imagem da configuração
+          for (( i=0; i<$(jq '.images | length' $CONFIG_FILE); i++ ))
+          do
+            # Extrair informações da imagem do JSON
+            source_repo=$(jq -r ".images[$i].repository" $CONFIG_FILE)
+            tag=$(jq -r ".images[$i].tag" $CONFIG_FILE)
+            description=$(jq -r ".images[$i].description" $CONFIG_FILE)
+            target_repo=$(jq -r ".images[$i].targetRepository // \"mirrors\"" $CONFIG_FILE)
+            
+            prefixed_repo_name="${PREFIX}${source_repo}"
+            target_image="$ACR_NAME.azurecr.io/$target_repo/$prefixed_repo_name:$tag"
+            
+            echo "Escaneando imagem: $target_image"
+            
+            # Executar Trivy para escanear a imagem
+            trivy_output=$(trivy image --no-progress --severity $SEVERITY --format json $target_image)
+            
+            # Contar vulnerabilidades
+            if [ -n "$trivy_output" ]; then
+              vulns_count=$(echo $trivy_output | jq -r '.Results | map(.Vulnerabilities | length) | add // 0')
+              critical_count=$(echo $trivy_output | jq -r '.Results | map(.Vulnerabilities | map(select(.Severity == "CRITICAL")) | length) | add // 0')
+              high_count=$(echo $trivy_output | jq -r '.Results | map(.Vulnerabilities | map(select(.Severity == "HIGH")) | length) | add // 0')
+              
+              if [ "$vulns_count" -gt 0 ]; then
+                images_with_vulns=$((images_with_vulns+1))
+                total_vulns=$((total_vulns+vulns_count))
+                critical_vulns=$((critical_vulns+critical_count))
+                high_vulns=$((high_vulns+high_count))
+                
+                # Adicionar detalhes da imagem ao relatório
+                cat >> $OUTPUT_FILE << EOF
+          
+          ### Imagem: \`$target_image\`
+          - Descrição: $description
+          - Vulnerabilidades encontradas: $vulns_count (Críticas: $critical_count, Altas: $high_count)
+          
+          EOF
+                
+                # Incluir as vulnerabilidades críticas no relatório
+                if [ "$critical_count" -gt 0 ] || [ "$high_count" -gt 0 ]; then
+                  cat >> $OUTPUT_FILE << EOF
+          #### Vulnerabilidades Principais:
+          
+          | ID | Severidade | Descrição | Pacote Afetado | Versão Fixa |
+          |----|------------|-----------|----------------|-------------|
+          EOF
+                  
+                  # Adicionar as primeiras 10 vulnerabilidades críticas e altas ao relatório
+                  echo $trivy_output | jq -r '.Results[] | .Vulnerabilities[] | select(.Severity == "CRITICAL" or .Severity == "HIGH") | [.VulnerabilityID, .Severity, .Title, .PkgName + ":" + .InstalledVersion, .FixedVersion] | @tsv' | head -10 | while IFS=$'\t' read -r id severity title pkg fixed; do
+                    cat >> $OUTPUT_FILE << EOF
+          | $id | $severity | $title | $pkg | $fixed |
+          EOF
+                  done
+                  
+                  cat >> $OUTPUT_FILE << EOF
+          
+          Para ver todas as vulnerabilidades, execute:
+          \`\`\`bash
+          trivy image $target_image
+          \`\`\`
+          
+          EOF
+                fi
+              fi
+            fi
+          done
+          
+          # Adicionar resumo ao início do relatório
+          cat > "${OUTPUT_FILE}.tmp" << EOF
+          # Relatório de Vulnerabilidades de Imagens Docker
+          Gerado em: $(date '+%Y-%m-%d %H:%M:%S')
+          
+          ## Resumo
+          - **Total de imagens analisadas:** $MIRRORED_IMAGES
+          - **Imagens com vulnerabilidades:** $images_with_vulns
+          - **Vulnerabilidades por severidade:**
+            - Críticas: $critical_vulns
+            - Altas: $high_vulns
+            - **Total:** $total_vulns
+          
+          EOF
+          
+          # Concatenar os arquivos
+          cat $OUTPUT_FILE >> "${OUTPUT_FILE}.tmp"
+          mv "${OUTPUT_FILE}.tmp" $OUTPUT_FILE
+          
+          echo "Escaneamento de vulnerabilidades concluído. Relatório gerado em: $OUTPUT_FILE"
+          
+          # Definir variáveis para os próximos steps
+          echo "IMAGES_WITH_VULNS=$images_with_vulns" >> $GITHUB_ENV
+          echo "TOTAL_VULNS=$total_vulns" >> $GITHUB_ENV
+          echo "CRITICAL_VULNS=$critical_vulns" >> $GITHUB_ENV
+          echo "HIGH_VULNS=$high_vulns" >> $GITHUB_ENV
+      
+      - name: Publicar Relatório de Vulnerabilidades
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.mirror-images.outputs.mirrored_count > 0 }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: vulnerability-report
+          path: ${{ github.workspace }}/vulnerabilities-report.md
+          retention-days: 30
+      
+      - name: Notificar Conclusão
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const total = process.env.TOTAL_IMAGES;
+            const existing = process.env.EXISTING_IMAGES;
+            const mirrored = process.env.MIRRORED_IMAGES;
+            const errors = process.env.ERROR_IMAGES;
+            const vulns = process.env.TOTAL_VULNS || '0';
+            const criticalVulns = process.env.CRITICAL_VULNS || '0';
+            const highVulns = process.env.HIGH_VULNS || '0';
+            
+            const message = `## Resumo de Espelhamento de Imagens 🐳
+            
+            * **Total de imagens:** ${total}
+            * **Já existentes no ACR:** ${existing}
+            * **Novas imagens espelhadas:** ${mirrored}
+            * **Erros:** ${errors}
+            ${mirrored > 0 ? `\n* **Vulnerabilidades encontradas:** ${vulns} (Críticas: ${criticalVulns}, Altas: ${highVulns})` : ''}
+            
+            ${mirrored > 0 ? '⚠️ **Novas imagens foram espelhadas!** Por favor, verifique o relatório de vulnerabilidades.' : '✅ **Nenhuma nova imagem foi necessária.**'}
+            ${errors > 0 ? '❌ **ATENÇÃO: Ocorreram erros durante o espelhamento de algumas imagens.**' : ''}
+            ${(criticalVulns > 0 || highVulns > 0) ? '🔒 **ALERTA DE SEGURANÇA: Vulnerabilidades críticas ou altas foram encontradas!**' : ''}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            }).catch(e => {
+              // Se não estiver em um PR ou Issue, cria uma nova issue
+              if (e.message.includes('Resource not accessible by integration')) {
+                github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: 'Resumo de Espelhamento de Imagens Docker',
+                  body: message
+                });
+              }
+            });

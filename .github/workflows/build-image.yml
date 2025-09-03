@@ -36,8 +36,8 @@ jobs:
       - name: Build Docker image (cache in GHA)
         uses: docker/build-push-action@v6
         with:
-          context: ./embracon/app/nodejs
-          file: ./embracon/app/nodejs/Dockerfile
+          context: ./app/nodejs
+          file: ./app/nodejs/Dockerfile
           push: false
           tags: toolbox-tech/embracon:ci-${{ github.sha }}
           cache-from: type=gha

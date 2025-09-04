@@ -18,7 +18,7 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 - [🎯 Sobre o Módulo](#-sobre-o-módulo)
 - [🚀 Proposta](#proposta)
 - [🚀 Início Rápido](#-início-rápido)
-- [�️ Criação e Configuração do ACR](#️-criação-e-configuração-do-acr)
+- [🛠️ Criação e Configuração do ACR](#-criação-e-configuração-do-acr)
   - [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)
   - [Habilitando recursos avançados](#2-habilitando-recursos-avançados)
   - [Configurando geo-replicação para alta disponibilidade](#3-configurando-geo-replicação-para-alta-disponibilidade)
@@ -31,13 +31,10 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
   - [Importação em massa de várias tags de uma imagem](#4-importação-em-massa-de-várias-tags-de-uma-imagem)
   - [Boas práticas para importação](#5-boas-práticas-para-importação)
   - [Automação com Azure Logic Apps](#6-automação-com-azure-logic-apps)
+- [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
 - [🔄 Integração com Azure Kubernetes Service (AKS)](#-integração-com-azure-kubernetes-service-aks)
 - [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
 - [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
-- [🔄 Integração dos Scripts de Espelhamento](#-integração-dos-scripts-de-espelhamento)
-
-- [🐳 Internalização de Imagens Docker](#-internalização-de-imagens-docker)
-  - [� Índice Completo](#-índice-completo)
 
 ## Proposta
 
@@ -144,7 +141,7 @@ az acr config retention update --registry $acrName --resource-group $resourceGro
 az acr replication create --registry $acrName --resource-group $resourceGroupName --location eastus
 ```
 
-## Segurança do ACR
+## 🔒 Segurança do ACR
 
 ### 1. Autenticação com Azure AD
 
@@ -161,7 +158,7 @@ $acrId = az acr show --name $acrName --resource-group $resourceGroupName --query
 az role assignment create --assignee $identityPrincipalId --scope $acrId --role AcrPull
 ```
 
-## Importando Imagens do Docker Hub
+## 📥 Importando Imagens do Docker Hub
 
 A Azure oferece uma maneira simplificada de importar imagens diretamente do Docker Hub (ou de outros registros) para o ACR sem precisar baixar e fazer upload manualmente.
 
@@ -231,7 +228,72 @@ Você pode criar um workflow no Azure Logic Apps para importar automaticamente n
 3. **Condição**: Se houver novas tags, importar para o ACR
 4. **Notificação**: Enviar email ou mensagem quando novas imagens forem importadas
 
-## Integração com Azure Kubernetes Service (AKS)
+## 🔄 Workflow GitHub Actions para Espelhamento
+
+Implementamos um workflow GitHub Actions que automaticamente espelha imagens Docker definidas no arquivo `docker-images.json` para o ACR usando autenticação OIDC com o Azure:
+
+```yaml
+name: Mirror Docker Images to ACR
+
+on:
+  # Executa diariamente à meia-noite
+  schedule:
+    - cron: '0 0 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-images.json é modificado
+  push:
+    paths:
+      - 'internalization-docker-images/docker-images.json'
+
+jobs:
+  mirror-images:
+    name: Mirror Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      # Lógica para espelhar as imagens
+      - name: Mirror Docker Images
+        run: |
+          ACR_NAME="embraconacr"
+          PREFIX="embracon-"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            
+            # Verificar se a imagem já existe no ACR
+            # Importar apenas se não existir
+            az acr import \
+              --name "$ACR_NAME" \
+              --source "docker.io/library/$REPO:$TAG" \
+              --image "$PREFIX$TARGET_REPO:$TAG" \
+              --force
+          done
+```
+
+Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.
+
+## 🔄 Integração com Azure Kubernetes Service (AKS)
 
 ### 1. Configurar AKS para usar o ACR
 
@@ -261,7 +323,7 @@ kubectl create secret docker-registry acr-auth \
     --docker-email="admin@embracon.com.br"
 ```
 
-## Políticas de Retenção e Limpeza
+## 🧹 Políticas de Retenção e Limpeza
 
 ### 1. Configurando políticas de limpeza
 
@@ -302,7 +364,7 @@ az acr import \
     --image mirrors/node:stable
 ```
 
-## Monitoramento e Alertas
+## 📊 Monitoramento e Alertas
 
 ### 1. Configurando métricas e logs
 
@@ -329,24 +391,6 @@ az monitor alert create \
     --condition "count 'ContainerRegistryLoginEvents' where OperationName == 'Authenticate' and ResultType == 'Failure' > 5" \
     --description "Alerta para múltiplas falhas de autenticação no ACR" \
     --action-group "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/microsoft.insights/actionGroups/{actionGroupName}"
-```
-
-## Integração dos Scripts de Espelhamento
-
-Para integrar os scripts de espelhamento com a configuração do ACR:
-
-```powershell
-# Definir permissões para o usuário/serviço que vai executar o script de espelhamento
-$spId = az ad sp create-for-rbac --name "acr-mirror-service" --query appId -o tsv
-az role assignment create --assignee $spId --scope $acrId --role Contributor
-
-# Configurar ambiente para execução dos scripts
-$env:AZURE_CLIENT_ID = $spId
-$env:AZURE_TENANT_ID = "<tenant-id>"
-$env:AZURE_CLIENT_SECRET = "<client-secret>"
-
-# Executar script de espelhamento com autenticação de serviço
-./mirror-dockerhub-to-acr.ps1 -ConfigFile ./docker-images.json -AcrName $acrName -AcrResourceGroup $resourceGroupName -SubscriptionId "<subscription-id>"
 ```
 
 ## 📚 Recursos Adicionais

@@ -1,0 +1,56 @@
+name: Mirror Docker Images to ACR
+
+on:
+  # Executa diariamente à meia-noite
+  schedule:
+    - cron: '0 0 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-images.json é modificado
+  push:
+    paths:
+      - 'internalization-docker-images/docker-images.json'
+
+jobs:
+  mirror-images:
+    name: Mirror Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      # Lógica para espelhar as imagens
+      - name: Mirror Docker Images
+        run: |
+          ACR_NAME="embraconacr"
+          PREFIX="embracon-"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            
+            # Verificar se a imagem já existe no ACR
+            # Importar apenas se não existir
+            az acr import \
+              --name "$ACR_NAME" \
+              --source "docker.io/library/$REPO:$TAG" \
+              --image "$PREFIX$TARGET_REPO:$TAG" \
+              --force
+          done

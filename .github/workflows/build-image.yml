@@ -29,15 +29,16 @@ jobs:
           restore-keys: |
             npm-${{ runner.os }}-
 
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: app/nodejs
+        
       - name: Check dependencies
         run: | 
               ls app/nodejs -lha
               ls app -lha
               ls -lha
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: app/nodejs
 
       - name: Build Docker image
         uses: docker/build-push-action@v6

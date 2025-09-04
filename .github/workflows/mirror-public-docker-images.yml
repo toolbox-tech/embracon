@@ -35,8 +35,11 @@ jobs:
       # Lógica para espelhar as imagens públicas
       - name: Mirror Public Docker Images
         run: |
-          ACR_NAME="embraconacr"
+          ACR_NAME="${{ vars.ACR_NAME }}"
+          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
           PREFIX="embracon-"
+          
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP"
           
           # Ler imagens do arquivo JSON
           IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
@@ -46,10 +49,11 @@ jobs:
             TAG=$(echo "$image" | jq -r '.tag')
             TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
             
-            # Verificar se a imagem já existe no ACR
-            # Importar apenas se não existir
+            echo "Importing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            
             az acr import \
               --name "$ACR_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
               --source "docker.io/library/$REPO:$TAG" \
               --image "$PREFIX$TARGET_REPO:$TAG" \
               --force

@@ -1,0 +1,100 @@
+name: Mirror Public Docker Images to ACR
+
+on:
+  # Executa diariamente à meia-noite
+  schedule:
+    - cron: '0 0 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-public-images.json é modificado
+  push:
+    branches:
+      - main
+    paths:
+      - 'internalization-docker-images/docker-public-images.json'
+
+jobs:
+  mirror-public-images:
+    name: Mirror Public Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n ${{ vars.ACR_NAME }}
+
+      - name: Mirror Public Docker Images
+        run: |
+          ACR_NAME="${{ vars.ACR_NAME }}"
+          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
+          PREFIX="embracon-"
+          
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            
+            echo "Processing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            
+            # Pull da imagem do Docker Hub
+            echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
+            docker pull docker.io/library/$REPO:$TAG
+            
+            # Tag para o ACR
+            echo "Tagging for ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            docker tag docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG
+            
+            # Push para o ACR
+            echo "Pushing to ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            docker push $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG
+            
+            # Limpar imagens locais para economizar espaço
+            echo "Cleaning up local images"
+            docker rmi docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
+          done
+    
+      # Lógica para espelhar as imagens públicas
+      # - name: Mirror Public Docker Images
+      #   run: |
+      #     ACR_NAME="${{ vars.ACR_NAME }}"
+      #     RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
+      #     PREFIX="embracon-"
+          
+      #     echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP"
+          
+      #     # Ler imagens do arquivo JSON
+      #     IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
+          
+      #     echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+      #       REPO=$(echo "$image" | jq -r '.repository')
+      #       TAG=$(echo "$image" | jq -r '.tag')
+      #       TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            
+      #       echo "Importing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            
+      #       az acr import \
+      #         --name "$ACR_NAME" \
+      #         --resource-group "$RESOURCE_GROUP" \
+      #         --source "docker.io/library/$REPO:$TAG" \
+      #         --image "$PREFIX$TARGET_REPO:$TAG" \
+      #         --force
+      #     done

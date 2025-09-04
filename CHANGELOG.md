@@ -1,3 +1,47 @@
+## 0.7.5 (2025-09-04)
+
+### Fix
+
+- **acr**: correct identity
+
+## 0.7.4 (2025-09-04)
+
+### Fix
+
+- **acr**: docker pull and push
+- **acr**: docker pull and push
+
+## 0.7.3 (2025-09-04)
+
+### Fix
+
+- **acr**: private docker images workflow
+- **acr**: managed identity
+
+## 0.7.2 (2025-09-04)
+
+### Fix
+
+- **acr**: login to acr
+
+## 0.7.1 (2025-09-04)
+
+### Fix
+
+- **acr**: out acr and resource group as vars
+
+## 0.7.0 (2025-09-04)
+
+### Feat
+
+- **acr**: create workflow to mirror private docker images
+- **acr**: workflow to pull public docker images to acr
+- **acr**: start internalization of docker images using claude sonnet
+
+### Fix
+
+- **acr**: remove unused files
+
 ## 0.6.1 (2025-08-29)
 
 ### Fix

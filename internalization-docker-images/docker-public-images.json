@@ -1,0 +1,112 @@
+{
+    "images": [
+        {
+            "repository": "maven",
+            "tag": "3.6.3-openjdk-17-slim",
+            "description": "Maven com OpenJDK 17 Slim",
+            "targetRepository": "maven"
+        },
+        {
+            "repository": "maven",
+            "tag": "3.8.1-jdk-11-slim",
+            "description": "Maven com JDK 11 Slim",
+            "targetRepository": "maven"
+        },
+        {
+            "repository": "maven",
+            "tag": "3.9.6-eclipse-temurin-21",
+            "description": "Maven com Eclipse Temurin 21",
+            "targetRepository": "maven"
+        },
+        {
+            "repository": "openjdk",
+            "tag": "11.0.15-jre-slim",
+            "description": "OpenJDK 11 JRE Slim",
+            "targetRepository": "java"
+        },
+        {
+            "repository": "openjdk",
+            "tag": "17-slim-buster",
+            "description": "OpenJDK 17 Slim Buster",
+            "targetRepository": "java"
+        },
+        {
+            "repository": "openjdk",
+            "tag": "18-slim-buster",
+            "description": "OpenJDK 18 Slim Buster",
+            "targetRepository": "java"
+        },
+        {
+            "repository": "openjdk",
+            "tag": "21-slim-buster",
+            "description": "OpenJDK 21 Slim Buster",
+            "targetRepository": "java"
+        },
+        {
+            "repository": "eclipse-temurin",
+            "tag": "21-jdk",
+            "description": "Eclipse Temurin 21 JDK",
+            "targetRepository": "java"
+        },
+        {
+            "repository": "ubuntu",
+            "tag": "18.04",
+            "description": "Ubuntu 18.04",
+            "targetRepository": "os"
+        },
+        {
+            "repository": "ubuntu",
+            "tag": "20.04",
+            "description": "Ubuntu 20.04",
+            "targetRepository": "os"
+        },
+        {
+            "repository": "oraclelinux",
+            "tag": "7-slim",
+            "description": "Oracle Linux 7 Slim",
+            "targetRepository": "os"
+        },
+        {
+            "repository": "debian",
+            "tag": "bullseye-slim",
+            "description": "Debian Bullseye Slim",
+            "targetRepository": "os"
+        },
+        {
+            "repository": "node",
+            "tag": "18",
+            "description": "Node.js 18",
+            "targetRepository": "node"
+        },
+        {
+            "repository": "php",
+            "tag": "7.2-apache",
+            "description": "PHP 7.2 com Apache",
+            "targetRepository": "php"
+        },
+        {
+            "repository": "redis",
+            "tag": "7.4.2",
+            "description": "Redis 7.4.2",
+            "targetRepository": "redis"
+        },
+        {
+            "repository": "confluentinc/cp-server-connect",
+            "tag": "7.1.0",
+            "description": "Confluent Platform Kafka Connect 7.1.0",
+            "targetRepository": "confluent"
+        },
+        {
+            "repository": "confluentinc/cp-server-connect",
+            "tag": "7.7.0",
+            "description": "Confluent Platform Kafka Connect 7.7.0",
+            "targetRepository": "confluent"
+        },
+        {
+            "repository": "confluentinc/cp-ksqldb-cli",
+            "tag": "7.6.0",
+            "description": "Confluent Platform KSQL CLI 7.6.0",
+            "targetRepository": "confluent"
+        }
+    ]
+}

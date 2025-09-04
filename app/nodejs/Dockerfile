@@ -38,9 +38,6 @@ RUN addgroup -g 1001 -S nodejs \
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar apenas package files para otimizar cache do Docker
-COPY . .
-
 # Configurações de segurança
 ENV NODE_ENV=production
 ENV NPM_CONFIG_LOGLEVEL=warn

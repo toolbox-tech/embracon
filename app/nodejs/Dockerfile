@@ -9,12 +9,6 @@ LABEL description="Secure Node.js application with vulnerability fixes"
 RUN addgroup -g 1001 -S nodejs \
     && adduser -S nodejs -u 1001 -G nodejs
 
-RUN ls -lhs
-
-COPY . usr/app
-
-RUN ls -lhs
-
 WORKDIR usr/app
 
 RUN ls -lhs
@@ -37,5 +31,6 @@ EXPOSE 8080
 ENTRYPOINT ["dumb-init", "--"]
 
 CMD ["node", "server.js"]
+
 
 

@@ -40,17 +40,11 @@ Siga os passos descritos no documento [github-actions-oidc.md](../oidc/github-ac
 
 ## Configuração de Segredos no GitHub
 
-### Segredos para Autenticação Azure (Ambos os Workflows)
+### Segredos Necessários para Ambos os Workflows
 
-Adicione os seguintes segredos ao seu repositório GitHub para a autenticação OIDC com Azure:
+Adicione os seguintes segredos ao seu repositório GitHub:
 
-1. `AZURE_CLIENT_ID`: O ID do cliente da identidade gerenciada criada
-2. `AZURE_TENANT_ID`: O ID do tenant do Azure AD
-3. `AZURE_SUBSCRIPTION_ID`: O ID da assinatura do Azure
-
-### Credenciais para Imagens Privadas
-
-Para o workflow de imagens privadas, você precisa configurar as seguintes secrets no GitHub:
+#### Autenticação no Docker Hub
 
 1. **`DOCKERHUB_USERNAME`**: Nome de usuário do Docker Hub
 2. **`DOCKERHUB_TOKEN`**: Token de acesso do Docker Hub (não use senha, use token)
@@ -61,7 +55,28 @@ Para criar um token do Docker Hub:
 3. Dê um nome para o token e configure as permissões necessárias
 4. Copie o token gerado e adicione como secret no GitHub
 
-Para maior segurança, sempre use tokens com permissões limitadas e prazo de validade, não senhas.
+#### Autenticação no Azure Container Registry
+
+1. **`ACR_USERNAME`**: Nome de usuário do ACR (geralmente o nome do ACR)
+2. **`ACR_PASSWORD`**: Senha ou token de acesso do ACR
+
+Para obter as credenciais do ACR:
+```bash
+# Obter as credenciais de admin do ACR
+az acr credential show --name embraconacr --resource-group embracon-infra
+```
+
+Se as credenciais admin estiverem desabilitadas, você pode habilitá-las:
+```bash
+# Habilitar credenciais de admin
+az acr update --name embraconacr --resource-group embracon-infra --admin-enabled true
+```
+
+Para maior segurança, considere criar um token do ACR com permissões limitadas:
+```bash
+# Criar um token para uso nos workflows
+az acr token create --name github-actions --registry embraconacr --repository "*" --scope-map _repositories_pull_push
+```
 
 ### Como adicionar os segredos:
 

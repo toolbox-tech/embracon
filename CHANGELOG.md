@@ -1,3 +1,15 @@
+## 0.7.0 (2025-09-04)
+
+### Feat
+
+- **acr**: create workflow to mirror private docker images
+- **acr**: workflow to pull public docker images to acr
+- **acr**: start internalization of docker images using claude sonnet
+
+### Fix
+
+- **acr**: remove unused files
+
 ## 0.6.1 (2025-08-29)
 
 ### Fix

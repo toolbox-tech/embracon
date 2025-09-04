@@ -5,19 +5,17 @@ LABEL maintainer="Time Toolbox <dev@tbxtech.com>"
 LABEL version="1.0.0"
 LABEL description="Secure Node.js application with vulnerability fixes"
 
-# Instalar dependências de sistema necessárias
-RUN apk add --no-cache dumb-init \
-    && rm -rf /var/cache/apk/*
-
 # Criar usuário não-root
 RUN addgroup -g 1001 -S nodejs \
     && adduser -S nodejs -u 1001 -G nodejs
 
-# Configurar diretório de trabalho
-WORKDIR /app
+RUN ls -lhs
 
-# Copiar código fonte (sem node_modules, só o necessário)
-COPY . .
+COPY app/ usr/app
+
+RUN ls -lhs
+
+WORKDIR usr/app
 
 RUN ls -lhs
 
@@ -39,3 +37,4 @@ EXPOSE 8080
 ENTRYPOINT ["dumb-init", "--"]
 
 CMD ["node", "server.js"]
+

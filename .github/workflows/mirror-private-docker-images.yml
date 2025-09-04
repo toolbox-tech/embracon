@@ -1,0 +1,102 @@
+name: Mirror Private Docker Images to ACR
+
+on:
+  # Executa diariamente às 2 da manhã
+  schedule:
+    - cron: '0 2 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-private-images.json é modificado
+  push:
+    paths:
+      - 'internalization-docker-images/docker-private-images.json'
+
+# Definir variáveis de ambiente em nível de workflow
+env:
+  ACR_NAME: "embraconacr"
+  PREFIX: "embracon-"
+
+jobs:
+  mirror-private-images:
+    name: Mirror Private Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      # Login no Docker Hub usando token
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Login to Azure Container Registry
+        run: |
+          # Usar az acr login para autenticação no ACR
+          echo "Conectando ao Azure Container Registry"
+          az acr login --name ${{ env.ACR_NAME }}
+      
+      # Lógica para espelhar as imagens privadas
+      - name: Mirror Private Docker Images
+        run: |
+          # Verificar se o arquivo existe
+          if [ ! -f "internalization-docker-images/docker-private-images.json" ]; then
+            echo "Arquivo de imagens privadas não encontrado. Pulando importação."
+            exit 0
+          fi
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-private-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            REGISTRY=$(echo "$image" | jq -r '.registry')
+            
+            # Tentar importação direta via ACR Import se possível
+            # Isso funciona para alguns registros que não requerem autenticação ou integrados ao ACR
+            echo "Tentando importar via ACR Import: $REGISTRY/$REPO:$TAG"
+            if az acr import --name "$ACR_NAME" \
+                --source "$REGISTRY/$REPO:$TAG" \
+                --image "$PREFIX$TARGET_REPO:$TAG" \
+                --force 2>/dev/null; then
+              echo "Importação via ACR Import bem-sucedida"
+              continue
+            fi
+            
+            # Se ACR Import falhar, tentar o método pull/push
+            echo "ACR Import falhou, usando método pull/push"
+            echo "Puxando imagem: $REGISTRY/$REPO:$TAG"
+            docker pull "$REGISTRY/$REPO:$TAG" || {
+              echo "Falha ao puxar imagem $REGISTRY/$REPO:$TAG"
+              continue
+            }
+            
+            # Taguear para o ACR
+            echo "Tagueando imagem para: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            docker tag "$REGISTRY/$REPO:$TAG" "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            
+            # Enviar para o ACR
+            echo "Enviando para o ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            docker push "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            
+            # Limpar imagens locais para liberar espaço
+            echo "Limpando imagens locais"
+            docker rmi "$REGISTRY/$REPO:$TAG" "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG" || true
+            docker rmi "$REGISTRY/$REPO:$TAG" "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG" || true
+          done

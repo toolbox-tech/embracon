@@ -1,4 +1,4 @@
-name: Mirror Docker Images to ACR
+name: Mirror Public Docker Images to ACR
 
 on:
   # Executa diariamente à meia-noite
@@ -6,14 +6,14 @@ on:
     - cron: '0 0 * * *'
   # Permite execução manual pelo GitHub UI
   workflow_dispatch:
-  # Executa quando o arquivo docker-images.json é modificado
+  # Executa quando o arquivo docker-public-images.json é modificado
   push:
     paths:
-      - 'internalization-docker-images/docker-images.json'
+      - 'internalization-docker-images/docker-public-images.json'
 
 jobs:
-  mirror-images:
-    name: Mirror Docker Images to ACR
+  mirror-public-images:
+    name: Mirror Public Docker Images to ACR
     runs-on: ubuntu-latest
     
     # Permissões necessárias para autenticação OIDC
@@ -32,8 +32,8 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
-      # Lógica para espelhar as imagens
-      - name: Mirror Docker Images
+      # Lógica para espelhar as imagens públicas
+      - name: Mirror Public Docker Images
         run: |
           ACR_NAME="embraconacr"
           PREFIX="embracon-"

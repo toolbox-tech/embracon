@@ -31,7 +31,9 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
   - [Importação em massa de várias tags de uma imagem](#4-importação-em-massa-de-várias-tags-de-uma-imagem)
   - [Boas práticas para importação](#5-boas-práticas-para-importação)
   - [Automação com Azure Logic Apps](#6-automação-com-azure-logic-apps)
-- [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
+- [🔄 Workflows GitHub Actions para Espelhamento](#-workflows-github-actions-para-espelhamento)
+  - [Workflow para Imagens Públicas](#workflow-para-imagens-públicas)
+  - [Workflow para Imagens Privadas](#workflow-para-imagens-privadas)
 - [🔄 Integração com Azure Kubernetes Service (AKS)](#-integração-com-azure-kubernetes-service-aks)
 - [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
 - [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
@@ -228,12 +230,19 @@ Você pode criar um workflow no Azure Logic Apps para importar automaticamente n
 3. **Condição**: Se houver novas tags, importar para o ACR
 4. **Notificação**: Enviar email ou mensagem quando novas imagens forem importadas
 
-## 🔄 Workflow GitHub Actions para Espelhamento
+## 🔄 Workflows GitHub Actions para Espelhamento
 
-Implementamos um workflow GitHub Actions que automaticamente espelha imagens Docker definidas no arquivo `docker-images.json` para o ACR usando autenticação OIDC com o Azure:
+Implementamos dois workflows GitHub Actions para espelhamento de imagens Docker para o ACR usando autenticação OIDC com o Azure:
+
+1. Workflow para imagens públicas (Docker Hub)
+2. Workflow para imagens privadas (registros privados)
+
+### Workflow para Imagens Públicas
+
+Este workflow espelha imagens públicas do Docker Hub definidas no arquivo `docker-public-images.json`:
 
 ```yaml
-name: Mirror Docker Images to ACR
+name: Mirror Public Docker Images to ACR
 
 on:
   # Executa diariamente à meia-noite
@@ -241,14 +250,14 @@ on:
     - cron: '0 0 * * *'
   # Permite execução manual pelo GitHub UI
   workflow_dispatch:
-  # Executa quando o arquivo docker-images.json é modificado
+  # Executa quando o arquivo docker-public-images.json é modificado
   push:
     paths:
-      - 'internalization-docker-images/docker-images.json'
+      - 'internalization-docker-images/docker-public-images.json'
 
 jobs:
-  mirror-images:
-    name: Mirror Docker Images to ACR
+  mirror-public-images:
+    name: Mirror Public Docker Images to ACR
     runs-on: ubuntu-latest
     
     # Permissões necessárias para autenticação OIDC
@@ -267,14 +276,14 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
-      # Lógica para espelhar as imagens
-      - name: Mirror Docker Images
+      # Lógica para espelhar as imagens públicas
+      - name: Mirror Public Docker Images
         run: |
           ACR_NAME="embraconacr"
           PREFIX="embracon-"
           
           # Ler imagens do arquivo JSON
-          IMAGES=$(cat "internalization-docker-images/docker-images.json" | jq -c '.images')
+          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
           
           echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
@@ -291,7 +300,90 @@ jobs:
           done
 ```
 
-Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.
+### Workflow para Imagens Privadas
+
+Este workflow espelha imagens de registros Docker privados definidas no arquivo `docker-private-images.json`:
+
+```yaml
+name: Mirror Private Docker Images to ACR
+
+on:
+  # Executa diariamente às 2 da manhã
+  schedule:
+    - cron: '0 2 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-private-images.json é modificado
+  push:
+    paths:
+      - 'internalization-docker-images/docker-private-images.json'
+
+jobs:
+  mirror-private-images:
+    name: Mirror Private Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      
+      # Login no Docker Hub usando token
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Login to Azure Container Registry
+        run: |
+          # Usar az acr login para autenticação no ACR
+          echo "Conectando ao Azure Container Registry"
+          az acr login --name ${{ env.ACR_NAME }}
+      
+      # Lógica para espelhar as imagens privadas
+      - name: Mirror Private Docker Images
+        run: |
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-private-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            REGISTRY=$(echo "$image" | jq -r '.registry')
+            
+            # Tentar importação direta via ACR Import se possível
+            echo "Tentando importar via ACR Import: $REGISTRY/$REPO:$TAG"
+            if az acr import --name "$ACR_NAME" \
+                --source "$REGISTRY/$REPO:$TAG" \
+                --image "$PREFIX$TARGET_REPO:$TAG" \
+                --force 2>/dev/null; then
+              echo "Importação via ACR Import bem-sucedida"
+              continue
+            fi
+            
+            # Se ACR Import falhar, tentar o método pull/push
+            echo "ACR Import falhou, usando método pull/push"
+            docker pull "$REGISTRY/$REPO:$TAG"
+            docker tag "$REGISTRY/$REPO:$TAG" "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            docker push "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            docker rmi "$REGISTRY/$REPO:$TAG" "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG" || true
+          done
+```
+
+Para configurar estes workflows, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.
 
 ## 🔄 Integração com Azure Kubernetes Service (AKS)
 

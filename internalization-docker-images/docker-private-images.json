@@ -1,0 +1,25 @@
+{
+    "images": [
+        {
+            "registry": "private-registry.company.com",
+            "repository": "my-private-repo/app",
+            "tag": "1.0.0",
+            "description": "Aplicação privada versão 1.0.0",
+            "targetRepository": "private-app"
+        },
+        {
+            "registry": "private-registry.company.com",
+            "repository": "my-private-repo/api",
+            "tag": "2.1.5",
+            "description": "API privada versão 2.1.5",
+            "targetRepository": "private-api"
+        },
+        {
+            "registry": "autre-registry.org",
+            "repository": "my-other-repo/service",
+            "tag": "3.0.0",
+            "description": "Serviço de outro registro privado",
+            "targetRepository": "external-service"
+        }
+    ]
+}

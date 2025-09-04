@@ -1,15 +1,26 @@
-# Configuração do Workflow de Espelhamento de Imagens Docker
+# Configuração dos Workflows de Espelhamento de Imagens Docker
 
-Este documento explica como configurar o workflow `mirror-docker-images.yml` para espelhar imagens Docker do Docker Hub para o Azure Container Registry (ACR).
+Este documento explica como configurar os workflows de espelhamento de imagens Docker para o Azure Container Registry (ACR).
 
-## Sobre o Workflow
+## Sobre os Workflows
 
-O workflow `mirror-docker-images.yml` automaticamente importa imagens Docker listadas no arquivo `docker-images.json` para o ACR usando autenticação OIDC com o Azure. 
+Existem dois workflows para espelhamento de imagens:
 
-O workflow é executado:
-- Automaticamente todos os dias à meia-noite
-- Quando o arquivo `docker-images.json` é modificado
-- Manualmente através da interface do GitHub
+1. **`mirror-docker-images.yml`**: Espelha imagens públicas do Docker Hub listadas no arquivo `docker-public-images.json`
+2. **`mirror-private-docker-images.yml`**: Espelha imagens privadas de registros personalizados listadas no arquivo `docker-private-images.json`
+
+Ambos os workflows utilizam autenticação OIDC com o Azure para acesso ao ACR. 
+
+Os workflows são executados:
+- **Workflow de imagens públicas**:
+  - Automaticamente todos os dias à meia-noite
+  - Quando o arquivo `docker-public-images.json` é modificado
+  - Manualmente através da interface do GitHub
+
+- **Workflow de imagens privadas**:
+  - Automaticamente todos os dias às 2 da manhã
+  - Quando o arquivo `docker-private-images.json` é modificado
+  - Manualmente através da interface do GitHub
 
 ## Pré-requisitos
 
@@ -29,11 +40,28 @@ Siga os passos descritos no documento [github-actions-oidc.md](../oidc/github-ac
 
 ## Configuração de Segredos no GitHub
 
-Adicione os seguintes segredos ao seu repositório GitHub:
+### Segredos para Autenticação Azure (Ambos os Workflows)
+
+Adicione os seguintes segredos ao seu repositório GitHub para a autenticação OIDC com Azure:
 
 1. `AZURE_CLIENT_ID`: O ID do cliente da identidade gerenciada criada
 2. `AZURE_TENANT_ID`: O ID do tenant do Azure AD
 3. `AZURE_SUBSCRIPTION_ID`: O ID da assinatura do Azure
+
+### Credenciais para Imagens Privadas
+
+Para o workflow de imagens privadas, você precisa configurar as seguintes secrets no GitHub:
+
+1. **`DOCKERHUB_USERNAME`**: Nome de usuário do Docker Hub
+2. **`DOCKERHUB_TOKEN`**: Token de acesso do Docker Hub (não use senha, use token)
+
+Para criar um token do Docker Hub:
+1. Faça login na sua conta Docker Hub
+2. Acesse "Account Settings" > "Security" > "New Access Token"
+3. Dê um nome para o token e configure as permissões necessárias
+4. Copie o token gerado e adicione como secret no GitHub
+
+Para maior segurança, sempre use tokens com permissões limitadas e prazo de validade, não senhas.
 
 ### Como adicionar os segredos:
 
@@ -41,9 +69,11 @@ Adicione os seguintes segredos ao seu repositório GitHub:
 2. Vá para "Settings" > "Secrets and variables" > "Actions"
 3. Clique em "New repository secret" para cada segredo
 
-## Formato do Arquivo docker-images.json
+## Formato dos Arquivos de Configuração
 
-O arquivo `docker-images.json` deve estar no seguinte formato:
+### Arquivo `docker-public-images.json`
+
+O arquivo para imagens públicas deve estar no seguinte formato:
 
 ```json
 {
@@ -69,6 +99,33 @@ Onde:
 - `tag`: A tag específica da imagem
 - `description`: Descrição da imagem (usado para documentação)
 - `targetRepository`: O nome do repositório de destino no ACR (será prefixado com "embracon-")
+
+### Arquivo `docker-private-images.json`
+
+O arquivo para imagens privadas deve estar no seguinte formato:
+
+```json
+{
+  "images": [
+    {
+      "registry": "private-registry.company.com",
+      "repository": "my-private-repo/app",
+      "tag": "1.0.0",
+      "description": "Aplicação privada versão 1.0.0",
+      "targetRepository": "private-app"
+    }
+  ]
+}
+```
+
+Onde:
+- `registry`: O endereço do registro privado
+- `repository`: O caminho completo do repositório no registro privado
+- `tag`: A tag específica da imagem
+- `description`: Descrição da imagem (usado para documentação)
+- `targetRepository`: O nome do repositório de destino no ACR (será prefixado com "embracon-")
+
+**Observação de Segurança**: As credenciais de autenticação são armazenadas como secrets no GitHub, não no arquivo JSON.
 
 ## Verificando a Execução
 

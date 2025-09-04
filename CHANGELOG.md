@@ -1,3 +1,10 @@
+## 0.7.3 (2025-09-04)
+
+### Fix
+
+- **acr**: private docker images workflow
+- **acr**: managed identity
+
 ## 0.7.2 (2025-09-04)
 
 ### Fix

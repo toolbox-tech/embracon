@@ -44,5 +44,5 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Checking Docker Image
-        run: docker run -it toolbox-tech/embracon:ci-nodejs-${{ github.sha }} ls
+        run: docker run toolbox-tech/embracon:ci-nodejs-${{ github.sha }} ls
         working-directory: app/nodejs

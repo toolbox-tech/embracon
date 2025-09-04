@@ -38,12 +38,6 @@ RUN addgroup -g 1001 -S nodejs \
 
 WORKDIR /app
 
-# Copiar node_modules do stage anterior
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-
-# Copiar código fonte
-COPY --from=builder --chown=nodejs:nodejs /app . 
-
 # Configurações de segurança
 ENV NODE_ENV=production
 ENV NPM_CONFIG_LOGLEVEL=warn
@@ -65,3 +59,4 @@ EXPOSE 8080
 ENTRYPOINT ["dumb-init", "--"]
 
 CMD ["node", "server.js"]
+

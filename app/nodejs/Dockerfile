@@ -26,6 +26,8 @@ COPY package*.json ./
 # Copiar código fonte (sem node_modules, só o necessário)
 COPY . .
 
+RUN apk add curl
+
 RUN ls -lhs
 
 # Stage 2: Production
@@ -61,5 +63,6 @@ EXPOSE 8080
 ENTRYPOINT ["dumb-init", "--"]
 
 CMD ["node", "server.js"]
+
 
 

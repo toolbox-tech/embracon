@@ -21,13 +21,6 @@ RUN addgroup -g 1001 -S nodejs \
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar apenas package files para otimizar cache do Docker
-COPY package*.json ./
-
-# Instalar dependências (apenas produção)
-RUN npm ci --only=production --no-optional --no-fund \
-    && npm cache clean --force
-
 # Stage 2: Production
 FROM node:20-alpine AS production
 
@@ -42,11 +35,8 @@ RUN addgroup -g 1001 -S nodejs \
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar node_modules do stage anterior
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-
-# Copiar código fonte
-COPY --chown=nodejs:nodejs . .
+# Copiar apenas package files para otimizar cache do Docker
+COPY . .
 
 # Configurações de segurança
 ENV NODE_ENV=production
@@ -72,3 +62,4 @@ ENTRYPOINT ["dumb-init", "--"]
 
 # Comando para iniciar a aplicação
 CMD ["node", "server.js"]
+

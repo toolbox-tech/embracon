@@ -32,13 +32,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      
       # Login no Docker Hub usando token
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -46,11 +39,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
+      # Login no Azure Container Registry
       - name: Login to Azure Container Registry
-        run: |
-          # Usar az acr login para autenticação no ACR
-          echo "Conectando ao Azure Container Registry"
-          az acr login --name ${{ env.ACR_NAME }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_NAME }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
       
       # Lógica para espelhar as imagens privadas
       - name: Mirror Private Docker Images
@@ -70,19 +65,8 @@ jobs:
             TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
             REGISTRY=$(echo "$image" | jq -r '.registry')
             
-            # Tentar importação direta via ACR Import se possível
-            # Isso funciona para alguns registros que não requerem autenticação ou integrados ao ACR
-            echo "Tentando importar via ACR Import: $REGISTRY/$REPO:$TAG"
-            if az acr import --name "$ACR_NAME" \
-                --source "$REGISTRY/$REPO:$TAG" \
-                --image "$PREFIX$TARGET_REPO:$TAG" \
-                --force 2>/dev/null; then
-              echo "Importação via ACR Import bem-sucedida"
-              continue
-            fi
-            
-            # Se ACR Import falhar, tentar o método pull/push
-            echo "ACR Import falhou, usando método pull/push"
+            # Usar método pull/push para espelhar imagens
+            # Este método é mais confiável e não requer permissões especiais no Azure
             echo "Puxando imagem: $REGISTRY/$REPO:$TAG"
             docker pull "$REGISTRY/$REPO:$TAG" || {
               echo "Falha ao puxar imagem $REGISTRY/$REPO:$TAG"

@@ -39,6 +39,6 @@ jobs:
           context: ./app/nodejs
           file: ./app/nodejs/Dockerfile
           push: false
-          tags: toolbox-tech/embracon:ci-${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: toolbox-tech/embracon:ci-nodejs-${{ github.sha }}
+          #cache-from: type=gha
+          #cache-to: type=gha,mode=max

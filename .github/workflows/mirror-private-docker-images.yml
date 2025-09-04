@@ -8,6 +8,8 @@ on:
   workflow_dispatch:
   # Executa quando o arquivo docker-private-images.json é modificado
   push:
+    branches:
+      - main
     paths:
       - 'internalization-docker-images/docker-private-images.json'
 

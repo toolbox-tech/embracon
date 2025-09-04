@@ -29,6 +29,12 @@ jobs:
           restore-keys: |
             npm-${{ runner.os }}-
 
+      - name: Check dependencies
+        run: | 
+              ls app/nodejs -lha
+              ls app -lha
+              ls -lha
+
       - name: Install dependencies
         run: npm ci
         working-directory: app/nodejs

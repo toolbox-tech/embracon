@@ -11,7 +11,7 @@ RUN addgroup -g 1001 -S nodejs \
 
 RUN ls -lhs
 
-COPY app/ usr/app
+COPY . usr/app
 
 RUN ls -lhs
 
@@ -37,4 +37,5 @@ EXPOSE 8080
 ENTRYPOINT ["dumb-init", "--"]
 
 CMD ["node", "server.js"]
+
 

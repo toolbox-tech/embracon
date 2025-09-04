@@ -1,3 +1,10 @@
+## 0.7.4 (2025-09-04)
+
+### Fix
+
+- **acr**: docker pull and push
+- **acr**: docker pull and push
+
 ## 0.7.3 (2025-09-04)
 
 ### Fix

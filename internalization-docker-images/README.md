@@ -155,9 +155,48 @@ az identity create --name $identityName --resource-group $resourceGroupName
 # Obter o ID da identidade
 $identityPrincipalId = az identity show --name $identityName --resource-group $resourceGroupName --query principalId --output tsv
 
+# Criar um grupo do Azure AD para usuários do ACR
+$groupName = "ACR-Users"
+$groupDescription = "Grupo para usuários com acesso total ao Azure Container Registry"
+
+# Criar o grupo
+az ad group create --display-name $groupName --mail-nickname "acr-users" --description $groupDescription
+
+# Obter o ID do grupo criado
+$groupId = az ad group show --group $groupName --query id --output tsv
+
+# Adicionar usuário criado ao grupo
+az ad group member add --group $groupName --member-id $identityPrincipalId
+
+# Obter o ID do ACR
+$acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
+
+# Conceder permissão total (Owner) ao grupo sobre o ACR
+az role assignment create --assignee $groupId --scope $acrId --role Owner
+
+# Alternativamente, conceder permissões específicas do ACR
+az role assignment create --assignee $groupId --scope $acrId --role AcrPush
+az role assignment create --assignee $groupId --scope $acrId --role AcrPull
+az role assignment create --assignee $groupId --scope $acrId --role AcrDelete
+az role assignment create --assignee $groupId --scope $acrId --role AcrRead
+
+# Verificar as permissões atribuídas
+az role assignment list --scope $acrId --output table
+```
+
+```powershell
+# Para adicionar mais usuários ao grupo posteriormente
+$novoUsuario = "novo.usuario@embracon.com.br"
+az ad group member add --group $groupName --member-id $(az ad user show --id $novoUsuario --query id --output tsv)
+
+# Listar membros do grupo
+az ad group member list --group $groupName --query "[].{Name:displayName, Email:userPrincipalName}" --output table
 # Conceder acesso de AcrPull à identidade
 $acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
 az role assignment create --assignee $identityPrincipalId --scope $acrId --role AcrPull
+
+# Conceder acesso de push
+az role assignment create --assignee $identityPrincipalId --scope $acrId --role AcrPush
 ```
 
 ## 📥 Importando Imagens do Docker Hub

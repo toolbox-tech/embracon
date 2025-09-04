@@ -1,3 +1,9 @@
+## 0.7.1 (2025-09-04)
+
+### Fix
+
+- **acr**: out acr and resource group as vars
+
 ## 0.7.0 (2025-09-04)
 
 ### Feat

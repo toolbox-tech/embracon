@@ -50,12 +50,6 @@
         },
         {
             "repository": "ubuntu",
-            "tag": "18.04",
-            "description": "Ubuntu 18.04",
-            "targetRepository": "os"
-        },
-        {
-            "repository": "ubuntu",
             "tag": "20.04",
             "description": "Ubuntu 20.04",
             "targetRepository": "os"

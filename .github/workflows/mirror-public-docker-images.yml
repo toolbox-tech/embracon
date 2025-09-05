@@ -71,16 +71,30 @@ jobs:
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
               
-              # Obter o digest da imagem de origem de forma mais robusta
+              # Obter o digest da imagem de origem usando manifest inspect (método mais eficiente)
               echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
-              echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
-              docker pull docker.io/library/$REPO:$TAG > /dev/null
               
-              # Tentar obter o digest de várias maneiras
-              SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              # Método 1: Usar docker manifest inspect (não requer download completo da imagem)
+              echo "Tentando obter digest via docker manifest inspect..."
+              docker manifest inspect docker.io/library/$REPO:$TAG > /dev/null 2>&1
+              if [ $? -eq 0 ]; then
+                SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | jq -r '.[0].Digest' 2>/dev/null || echo "")
+              else
+                SOURCE_DIGEST=""
+              fi
+              
+              # Se falhar, tentar métodos alternativos que requerem pull da imagem
               if [ -z "$SOURCE_DIGEST" ]; then
-                # Tentar método alternativo para obter digest
-                SOURCE_DIGEST=$(docker inspect docker.io/library/$REPO:$TAG | jq -r '.[0].RepoDigests[0]' 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+                echo "Manifest inspect falhou. Tentando obter digest através do pull da imagem..."
+                echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
+                docker pull docker.io/library/$REPO:$TAG > /dev/null
+                
+                # Tentar obter o digest de várias maneiras
+                SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+                if [ -z "$SOURCE_DIGEST" ]; then
+                  # Tentar método alternativo para obter digest
+                  SOURCE_DIGEST=$(docker inspect docker.io/library/$REPO:$TAG | jq -r '.[0].RepoDigests[0]' 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+                fi
               fi
               
               # Verificar se obteve um digest válido
@@ -173,16 +187,30 @@ jobs:
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
               
-              # Para verificar o digest no caso do import, precisamos fazer um pull temporário de forma mais robusta
+              # Para verificar o digest no caso do import, primeiro tentamos usar manifest inspect
               echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
-              echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
-              docker pull docker.io/library/$REPO:$TAG > /dev/null
               
-              # Tentar obter o digest de várias maneiras
-              SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              # Método 1: Usar docker manifest inspect (não requer download completo da imagem)
+              echo "Tentando obter digest via docker manifest inspect..."
+              docker manifest inspect docker.io/library/$REPO:$TAG > /dev/null 2>&1
+              if [ $? -eq 0 ]; then
+                SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | jq -r '.[0].Digest' 2>/dev/null || echo "")
+              else
+                SOURCE_DIGEST=""
+              fi
+              
+              # Se falhar, tentar métodos alternativos que requerem pull da imagem
               if [ -z "$SOURCE_DIGEST" ]; then
-                # Tentar método alternativo para obter digest
-                SOURCE_DIGEST=$(docker inspect docker.io/library/$REPO:$TAG | jq -r '.[0].RepoDigests[0]' 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+                echo "Manifest inspect falhou. Tentando obter digest através do pull da imagem..."
+                echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
+                docker pull docker.io/library/$REPO:$TAG > /dev/null
+                
+                # Tentar obter o digest de várias maneiras
+                SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+                if [ -z "$SOURCE_DIGEST" ]; then
+                  # Tentar método alternativo para obter digest
+                  SOURCE_DIGEST=$(docker inspect docker.io/library/$REPO:$TAG | jq -r '.[0].RepoDigests[0]' 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+                fi
               fi
               
               # Verificar se obteve um digest válido

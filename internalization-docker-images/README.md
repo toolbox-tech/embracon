@@ -20,7 +20,34 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 - [🚀 Início Rápido](#-início-rápido)
 - [🛠️ Criação e Configuração do ACR](#-criação-e-configuração-do-acr)
   - [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)
-  - [Habilitando recursos avançados](#2-habilitando-recursos-avançados)
+ ## 🚀 Otimização e Economia de Recursos
+
+A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
+
+### 1. Verificação Otimizada com Docker Manifest
+
+A utilização do comando `docker manifest inspect` representa uma evolução significativa no processo de verificação:
+
+```bash
+# Verificação eficiente do digest sem download da imagem completa
+SOURCE_DIGEST=$(docker manifest inspect docker.io/library/maven:3.8.1-jdk-11-slim | jq -r '.[0].Digest')
+```
+
+Benefícios desta abordagem:
+- **Download mínimo**: Apenas o manifesto (alguns KB) é baixado, não a imagem completa (potencialmente GB)
+- **Verificação mais rápida**: Redução de dezenas de segundos para milissegundos na verificação
+- **Menor pressão nos registros**: Diminuição significativa no número de requests e volume de dados
+
+### 2. Economia de largura de banda
+
+Ao verificar tanto as tags quanto os digests das imagens através de manifests, os workflows evitam o download desnecessário de imagens que não mudaram. Isso pode representar economia significativa de largura de banda, especialmente para imagens grandes como as baseadas em JDK.
+
+### 3. Redução de custos
+
+Menos transferência de dados entre registros significa:
+- Menor custo de rede (entrada/saída)
+- Menor utilização de recursos computacionais
+- Menor tempo de execução dos workflowso recursos avançados](#2-habilitando-recursos-avançados)
   - [Configurando geo-replicação para alta disponibilidade](#3-configurando-geo-replicação-para-alta-disponibilidade)
 - [🔒 Segurança do ACR](#-segurança-do-acr)
   - [Autenticação com Azure AD](#1-autenticação-com-azure-ad)
@@ -277,7 +304,7 @@ foreach ($imageInfo in $imagesData.images) {
 
 1. **Use prefixos organizacionais**: Organize suas imagens com prefixos como `prod/`, `dev/`, `mirrors/`
 2. **Importe versões específicas**: Evite usar a tag `latest` e prefira versões específicas
-3. **Verifique os digests das imagens**: Compare os digests antes de importar para garantir que o conteúdo foi realmente alterado
+3. **Verifique os digests das imagens**: Use `docker manifest inspect` para verificar digests de forma eficiente sem downloads completos
 4. **Documente as imagens importadas**: Mantenha um registro de quais imagens foram importadas e quando
 5. **Configure importação automática**: Use tarefas agendadas para manter imagens atualizadas
 6. **Economize largura de banda**: Implemente verificação por tag e digest para evitar downloads desnecessários
@@ -300,18 +327,22 @@ Os workflows incluem as seguintes funcionalidades:
 
 #### Verificação por Digest
 
-A verificação por digest é uma funcionalidade importante que foi implementada nos workflows para garantir que as imagens sejam atualizadas somente quando seu conteúdo for realmente alterado, mesmo que a tag permaneça a mesma. O processo funciona da seguinte forma:
+A verificação por digest é uma funcionalidade importante que foi implementada nos workflows para garantir que as imagens sejam atualizadas somente quando seu conteúdo for realmente alterado, mesmo que a tag permaneça a mesma. O processo otimizado funciona da seguinte forma:
 
 1. **Verificação inicial por tag**: O workflow verifica primeiro se a tag da imagem já existe no ACR
-2. **Obtenção do digest da origem**: Se a tag existir, o workflow obtém o digest da imagem de origem (Docker Hub ou registro privado)
+2. **Obtenção eficiente do digest da origem**: 
+   - **Usando Docker Manifest Inspect**: Primeiro tentamos obter o digest usando `docker manifest inspect`, que não requer o download completo da imagem
+   - **Fallback para download**: Se o método acima falhar, fazemos o download da imagem e extraímos o digest localmente
 3. **Obtenção do digest no ACR**: Em seguida, obtém o digest da imagem já existente no ACR
 4. **Comparação**: Compara os dois digests para verificar se o conteúdo é idêntico
 5. **Decisão**: Se os digests forem iguais, a imagem é ignorada (economizando largura de banda e processamento). Se forem diferentes, a imagem é atualizada.
 
-Esta abordagem é mais robusta do que apenas verificar por tags, pois protege contra:
-- Imagens que foram atualizadas sem mudar a tag (prática comum em tags como "latest")
-- Garantia de integridade do conteúdo
-- Redução significativa no consumo de largura de banda e custo de transferência
+Esta abordagem traz múltiplos benefícios:
+- **Máxima eficiência**: Verificação inicial do digest sem download completo da imagem
+- **Alta confiabilidade**: Método em camadas com fallbacks robustos para garantir o funcionamento
+- **Proteção contra alterações silenciosas**: Detecta quando imagens foram atualizadas sem mudar a tag (prática comum em tags como "latest")
+- **Economia significativa**: Redução drástica no consumo de largura de banda e custo de transferência
+- **Execução mais rápida**: Workflows completam em menos tempo devido à verificação otimizada
 
 ### Workflow para Imagens Públicas
 
@@ -387,9 +418,25 @@ jobs:
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
               
-              # Obter o digest da imagem de origem
+              # Obter o digest da imagem de origem usando manifest inspect (método mais eficiente)
               echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
-              SOURCE_DIGEST=$(docker pull docker.io/library/$REPO:$TAG -q 2>/dev/null && docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG | cut -d'@' -f2)
+              
+              # Método 1: Usar docker manifest inspect (não requer download completo da imagem)
+              echo "Tentando obter digest via docker manifest inspect..."
+              docker manifest inspect docker.io/library/$REPO:$TAG > /dev/null 2>&1
+              if [ $? -eq 0 ]; then
+                SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | jq -r '.[0].Digest' 2>/dev/null || echo "")
+              else
+                SOURCE_DIGEST=""
+              fi
+              
+              # Se falhar, tentar métodos alternativos que requerem pull da imagem
+              if [ -z "$SOURCE_DIGEST" ]; then
+                echo "Manifest inspect falhou. Tentando obter digest através do pull da imagem..."
+                echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
+                docker pull docker.io/library/$REPO:$TAG > /dev/null
+                SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              fi
               
               if [ -n "$SOURCE_DIGEST" ]; then
                 # Obter o digest da imagem no ACR
@@ -914,13 +961,43 @@ az monitor alert create \
 
 ---
 
-## 📝 Histórico de Alterações
+## � Solução de Problemas com Verificação de Digest
+
+Ao trabalhar com a verificação de digest das imagens Docker, você pode encontrar alguns desafios:
+
+### 1. Problemas com Docker Manifest
+
+Se o comando `docker manifest inspect` falhar, verifique os seguintes pontos:
+
+```bash
+# Habilitando recursos experimentais (se necessário)
+export DOCKER_CLI_EXPERIMENTAL=enabled
+
+# Verificando se o manifesto está disponível
+docker manifest inspect docker.io/library/maven:3.8.1-jdk-11-slim
+
+# Se falhar, tentar métodos alternativos
+docker pull docker.io/library/maven:3.8.1-jdk-11-slim
+docker inspect docker.io/library/maven:3.8.1-jdk-11-slim | jq '.[0].RepoDigests'
+```
+
+### 2. Diferenças de Digest entre Registros
+
+Em alguns casos, o digest pode diferir entre o registro de origem e o ACR devido a:
+- Normalização de layers nas imagens
+- Diferenças nos formatos de manifesto
+- Conversão automática entre formatos (v1, v2, OCI)
+
+Nestes casos, considere verificar apenas tags específicas ou implementar lógica personalizada.
+
+## �📝 Histórico de Alterações
 
 | Data | Versão | Descrição | Autor |
 |------|--------|-----------|-------|
 | 04/09/2025 | 1.0.0 | Criação do documento com instruções para ACR | Equipe DevOps |
 | 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
 | 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
+| 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
 
 ## 📞 Suporte e Contribuição
 

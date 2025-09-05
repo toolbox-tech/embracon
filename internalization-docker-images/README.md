@@ -235,6 +235,8 @@ az acr import `
 
 ### 4. Importação em massa de várias tags de uma imagem
 
+#### Via CLI
+
 ```powershell
 # Definir as tags a serem importadas
 $imageTags = @("18-alpine", "18.12-alpine", "18.13-alpine", "20-alpine")
@@ -250,6 +252,26 @@ foreach ($tag in $imageTags) {
       --image "${targetRepo}:${tag}"
 }
 ```
+#### JSON
+```powershell
+# Definir as tags a serem importadas a partir do arquivo JSON
+$jsonFile = "internalization-docker-images/docker-public-images.json"
+$imagesData = Get-Content $jsonFile | ConvertFrom-Json
+
+# Importar cada imagem definida no arquivo JSON
+foreach ($imageInfo in $imagesData.images) {
+  $sourceRepo = "docker.io/library/$($imageInfo.repository)"
+  $targetRepo = $imageInfo.targetRepository
+  $tag = $imageInfo.tag
+  
+  Write-Host "Importando ${sourceRepo}:${tag} para ${targetRepo}:${tag}..."
+  az acr import `
+    --name $acrName `
+    --source "${sourceRepo}:${tag}" `
+    --image "${targetRepo}:${tag}"
+}
+```
+
 
 ### 5. Boas práticas para importação
 

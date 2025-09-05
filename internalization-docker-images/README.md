@@ -10,7 +10,30 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 
 - 🛡️ Reduzir dependências externas do Docker Hub
 - 🚫 Evitar problemas com limites de rate limiting
-- 🔒 Melhorar a segurança com escaneamento de vulnerabilidades
+- 🔒 Melhorar a segurança com escaneamento## 🚀 Otimização e Economia de Recursos
+
+A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
+
+### 1. Sincronização completa com arquivo JSON
+
+O processo agora gerencia o ciclo de vida completo das imagens no ACR:
+- **Importação** de imagens definidas no arquivo JSON
+- **Verificação de digest** para evitar transferências desnecessárias
+- **Remoção automática** de imagens que não estão mais no JSON
+
+Isso garante que apenas as imagens oficialmente aprovadas e documentadas no JSON permaneçam no registro, mantendo-o limpo e atualizado.
+
+### 2. Economia de largura de banda
+
+Ao verificar tanto as tags quanto os digests das imagens, os workflows evitam o download desnecessário de imagens que não mudaram. Isso pode representar economia significativa de largura de banda, especialmente para imagens grandes como as baseadas em JDK.
+
+### 3. Redução de custos
+
+Menos transferência de dados entre registros significa:
+- Menor custo de rede (entrada/saída)
+- Menor utilização de recursos computacionais
+- Menor tempo de execução dos workflows
+- Menos armazenamento usado no ACR (remoção automática de imagens obsoletas)idades
 - ⚡ Acelerar o tempo de deploy dos seus containers
 
 ## 📑 Índice
@@ -26,6 +49,9 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 | 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
 | 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
 | 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
+| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
+| 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |
+| 05/09/2025 | 1.5.0 | Implementação de remoção automática de imagens ausentes do JSON | Equipe DevOps |
 | 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
 | 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |o-acr)
   - [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)

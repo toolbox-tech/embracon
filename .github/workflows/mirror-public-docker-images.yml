@@ -126,3 +126,37 @@ jobs:
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi
           done
+          
+          # Parte 2: Remover imagens que não estão no JSON
+          echo "Verificando e removendo imagens que não estão no arquivo JSON..."
+          
+          # Cria um arquivo temporário com as imagens válidas listadas no JSON
+          echo "Criando lista de imagens válidas..."
+          jq -r '.images[] | "\(.targetRepository):\(.tag)"' internalization-docker-images/docker-public-images.json > /tmp/valid_images.txt
+          
+          # Listar todos os repositórios no ACR
+          echo "Listando repositórios no ACR..."
+          az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
+            # Remove o prefixo para comparar com o targetRepository do JSON
+            BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
+            
+            echo "Verificando imagens no repositório $repo..."
+            
+            # Listar todas as tags neste repositório
+            az acr repository show-tags --name $ACR_NAME --repository $repo -o tsv | while read -r tag; do
+              # Verifica se a combinação repositório:tag está na lista de imagens válidas
+                if ! grep -q "^$BASE_REPO:$tag$" /tmp/valid_images.txt; then
+                echo "A imagem $repo:$tag não está no arquivo JSON. Removendo..."
+                
+                # Remover a imagem
+                if ! az acr repository delete --name $ACR_NAME --image "$repo:$tag" --yes; then
+                  echo "Erro: Falha ao remover $repo:$tag - $?"
+                  echo "Continuando com o próximo item..."
+                fi
+              else
+                echo "A imagem $repo:$tag está na lista de imagens válidas. Mantendo."
+              fi
+            done
+          done
+          
+          echo "Processo de sincronização concluído."

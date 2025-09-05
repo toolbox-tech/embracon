@@ -307,12 +307,12 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKER_USERNAME || secrets.DOCKERHUB_USERNAME }}
-          password: ${{ vars.DOCKER_TOKEN || secrets.DOCKERHUB_TOKEN }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -335,7 +335,7 @@ jobs:
           # Ler imagens do arquivo JSON
           IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
           
-          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
             TAG=$(echo "$image" | jq -r '.tag')
             TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
@@ -365,12 +365,7 @@ jobs:
             # Limpar imagens locais para economizar espaço
             echo "Cleaning up local images"
             docker rmi docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
-          done
-```
-
-Além disso, o workflow possui uma abordagem alternativa usando o comando `az acr import`:
-
-```yaml
+            done
   mirror-public-images-with-az-acr-import:
     name: Mirror Public Docker Images to ACR (using az acr import)
     runs-on: ubuntu-latest
@@ -382,12 +377,6 @@ Além disso, o workflow possui uma abordagem alternativa usando o comando `az ac
       - name: Checkout Repository
         uses: actions/checkout@v4
       
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKER_USERNAME || secrets.DOCKERHUB_USERNAME }}
-          password: ${{ vars.DOCKER_TOKEN || secrets.DOCKERHUB_TOKEN }}
-      
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -397,7 +386,6 @@ Além disso, o workflow possui uma abordagem alternativa usando o comando `az ac
 
       - name: Log in to Azure Container Registry
         run: az acr login -n ${{ vars.ACR_NAME }}
-      
       - name: Mirror Public Docker Images
         run: |
           ACR_NAME="${{ vars.ACR_NAME }}"
@@ -421,6 +409,8 @@ Além disso, o workflow possui uma abordagem alternativa usando o comando `az ac
               --resource-group "$RESOURCE_GROUP" \
               --source "docker.io/library/$REPO:$TAG" \
               --image "$PREFIX$TARGET_REPO:$TAG" \
+              --username ${{ vars.DOCKERHUB_USERNAME }} \
+              --password ${{ secrets.DOCKERHUB_TOKEN }} \
               --force; then
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi
@@ -464,8 +454,8 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKER_USERNAME || secrets.DOCKERHUB_USERNAME }}
-          password: ${{ vars.DOCKER_TOKEN || secrets.DOCKERHUB_TOKEN }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -526,11 +516,7 @@ jobs:
             echo "Cleaning up local images"
             docker rmi $REGISTRY/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
           done
-```
-
-O workflow também possui uma abordagem alternativa que utiliza o comando `az acr import`:
-
-```yaml
+  
   mirror-private-images-with-az-acr-import:
     name: Mirror Private Docker Images to ACR (using az acr import)
     runs-on: ubuntu-latest
@@ -582,6 +568,8 @@ O workflow também possui uma abordagem alternativa que utiliza o comando `az ac
               --resource-group "$RESOURCE_GROUP" \
               --source "$REGISTRY/$REPO:$TAG" \
               --image "$PREFIX$TARGET_REPO:$TAG" \
+              --username ${{ vars.DOCKERHUB_USERNAME }} \
+              --password ${{ secrets.DOCKERHUB_TOKEN }} \
               --force; then
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi

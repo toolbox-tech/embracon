@@ -235,6 +235,8 @@ az acr import `
 
 ### 4. Importação em massa de várias tags de uma imagem
 
+#### Via CLI
+
 ```powershell
 # Definir as tags a serem importadas
 $imageTags = @("18-alpine", "18.12-alpine", "18.13-alpine", "20-alpine")
@@ -250,6 +252,26 @@ foreach ($tag in $imageTags) {
       --image "${targetRepo}:${tag}"
 }
 ```
+#### JSON
+```powershell
+# Definir as tags a serem importadas a partir do arquivo JSON
+$jsonFile = "internalization-docker-images/docker-public-images.json"
+$imagesData = Get-Content $jsonFile | ConvertFrom-Json
+
+# Importar cada imagem definida no arquivo JSON
+foreach ($imageInfo in $imagesData.images) {
+  $sourceRepo = "docker.io/library/$($imageInfo.repository)"
+  $targetRepo = $imageInfo.targetRepository
+  $tag = $imageInfo.tag
+  
+  Write-Host "Importando ${sourceRepo}:${tag} para ${targetRepo}:${tag}..."
+  az acr import `
+    --name $acrName `
+    --source "${sourceRepo}:${tag}" `
+    --image "${targetRepo}:${tag}"
+}
+```
+
 
 ### 5. Boas práticas para importação
 
@@ -257,15 +279,6 @@ foreach ($tag in $imageTags) {
 2. **Importe versões específicas**: Evite usar a tag `latest` e prefira versões específicas
 3. **Documente as imagens importadas**: Mantenha um registro de quais imagens foram importadas e quando
 4. **Configure importação automática**: Use tarefas agendadas para manter imagens atualizadas
-
-### 6. Automação com Azure Logic Apps
-
-Você pode criar um workflow no Azure Logic Apps para importar automaticamente novas versões:
-
-1. **Gatilho**: Timer recorrente (ex: uma vez por semana)
-2. **Ação**: Verificar novas tags em repositórios específicos
-3. **Condição**: Se houver novas tags, importar para o ACR
-4. **Notificação**: Enviar email ou mensagem quando novas imagens forem importadas
 
 ## 🔄 Workflows GitHub Actions para Espelhamento
 

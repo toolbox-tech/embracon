@@ -2,29 +2,22 @@
 
 Este documento explica como configurar os workflows de espelhamento de imagens Docker para o Azure Container Registry (ACR).
 
-## Sobre os Workflows
+## Sobre o Workflow
 
-Existem dois workflows para espelhamento de imagens:
+O workflow para espelhamento de imagens é:
 
 1. **`mirror-public-docker-images.yml`**: Espelha imagens públicas do Docker Hub listadas no arquivo `docker-public-images.json`
-2. **`mirror-private-docker-images.yml`**: Espelha imagens privadas de registros personalizados listadas no arquivo `docker-private-images.json`
 
-Ambos os workflows possuem duas abordagens de implementação:
+O workflow possui duas abordagens de implementação:
 - Usando Docker pull e push direto
 - Usando o comando `az acr import` (requer permissões especiais no Azure)
 
-## Execução dos Workflows
+## Execução do Workflow
 
-Os workflows são executados:
-- **Workflow de imagens públicas**:
-  - Automaticamente todos os dias à meia-noite
-  - Quando o arquivo `docker-public-images.json` é modificado
-  - Manualmente através da interface do GitHub
-
-- **Workflow de imagens privadas**:
-  - Automaticamente todos os dias às 2 da manhã
-  - Quando o arquivo `docker-private-images.json` é modificado
-  - Manualmente através da interface do GitHub
+O workflow é executado:
+- Automaticamente todos os dias à meia-noite
+- Quando o arquivo `docker-public-images.json` é modificado
+- Manualmente através da interface do GitHub
 
 ## Configuração das Variáveis
 
@@ -84,29 +77,6 @@ Configure os seguintes segredos no GitHub:
 
 Onde:
 - `repository`: O nome do repositório no Docker Hub
-- `tag`: A tag específica da imagem
-- `description`: Descrição da imagem (usado para documentação)
-- `targetRepository`: O nome do repositório de destino no ACR (será prefixado com "embracon-")
-
-### Arquivo `docker-private-images.json`
-
-```json
-{
-  "images": [
-    {
-      "registry": "private-registry.company.com",
-      "repository": "my-private-repo/app",
-      "tag": "1.0.0",
-      "description": "Aplicação privada versão 1.0.0",
-      "targetRepository": "private-app"
-    }
-  ]
-}
-```
-
-Onde:
-- `registry`: O endereço do registro privado
-- `repository`: O caminho completo do repositório no registro privado
 - `tag`: A tag específica da imagem
 - `description`: Descrição da imagem (usado para documentação)
 - `targetRepository`: O nome do repositório de destino no ACR (será prefixado com "embracon-")

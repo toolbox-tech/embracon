@@ -1,3 +1,9 @@
+## 0.11.0 (2025-09-05)
+
+### Feat
+
+- **acr**: remove images that not in json file but in acr
+
 ## 0.10.6 (2025-09-05)
 
 ### Refactor

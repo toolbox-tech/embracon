@@ -277,8 +277,10 @@ foreach ($imageInfo in $imagesData.images) {
 
 1. **Use prefixos organizacionais**: Organize suas imagens com prefixos como `prod/`, `dev/`, `mirrors/`
 2. **Importe versões específicas**: Evite usar a tag `latest` e prefira versões específicas
-3. **Documente as imagens importadas**: Mantenha um registro de quais imagens foram importadas e quando
-4. **Configure importação automática**: Use tarefas agendadas para manter imagens atualizadas
+3. **Verifique os digests das imagens**: Compare os digests antes de importar para garantir que o conteúdo foi realmente alterado
+4. **Documente as imagens importadas**: Mantenha um registro de quais imagens foram importadas e quando
+5. **Configure importação automática**: Use tarefas agendadas para manter imagens atualizadas
+6. **Economize largura de banda**: Implemente verificação por tag e digest para evitar downloads desnecessários
 
 ## 🔄 Workflows GitHub Actions para Espelhamento
 
@@ -292,8 +294,24 @@ Os workflows incluem as seguintes funcionalidades:
 - ✅ Autenticação no Docker Hub para evitar problemas de rate limiting
 - ✅ Autenticação federada com Azure (OIDC)
 - ✅ Verificação de existência da imagem no ACR antes de baixar (evita tráfego desnecessário)
+- ✅ Verificação por digest para garantir a integridade do conteúdo das imagens
 - ✅ Suporte a duas abordagens: Docker pull/push e az acr import
 - ✅ Tratamento de erros e limpeza de imagens locais
+
+#### Verificação por Digest
+
+A verificação por digest é uma funcionalidade importante que foi implementada nos workflows para garantir que as imagens sejam atualizadas somente quando seu conteúdo for realmente alterado, mesmo que a tag permaneça a mesma. O processo funciona da seguinte forma:
+
+1. **Verificação inicial por tag**: O workflow verifica primeiro se a tag da imagem já existe no ACR
+2. **Obtenção do digest da origem**: Se a tag existir, o workflow obtém o digest da imagem de origem (Docker Hub ou registro privado)
+3. **Obtenção do digest no ACR**: Em seguida, obtém o digest da imagem já existente no ACR
+4. **Comparação**: Compara os dois digests para verificar se o conteúdo é idêntico
+5. **Decisão**: Se os digests forem iguais, a imagem é ignorada (economizando largura de banda e processamento). Se forem diferentes, a imagem é atualizada.
+
+Esta abordagem é mais robusta do que apenas verificar por tags, pois protege contra:
+- Imagens que foram atualizadas sem mudar a tag (prática comum em tags como "latest")
+- Garantia de integridade do conteúdo
+- Redução significativa no consumo de largura de banda e custo de transferência
 
 ### Workflow para Imagens Públicas
 
@@ -318,6 +336,76 @@ on:
 jobs:
   mirror-public-images:
     name: Mirror Public Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n ${{ vars.ACR_NAME }}
+
+      - name: Mirror Public Docker Images
+        run: |
+          ACR_NAME="${{ vars.ACR_NAME }}"
+          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
+          PREFIX="embracon-"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            
+            # Verificar se a imagem já existe no ACR
+            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
+            echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
+            
+            # Verificar primeiro pela tag
+            TAG_EXISTS=false
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
+              
+              # Obter o digest da imagem de origem
+              echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
+              SOURCE_DIGEST=$(docker pull docker.io/library/$REPO:$TAG -q 2>/dev/null && docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG | cut -d'@' -f2)
+              
+              if [ -n "$SOURCE_DIGEST" ]; then
+                # Obter o digest da imagem no ACR
+                ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
+                
+                if [ "$SOURCE_DIGEST" = "$ACR_DIGEST" ]; then
+                  echo "A imagem $TARGET_IMAGE já existe no ACR e tem o mesmo digest ($SOURCE_DIGEST). Pulando importação."
+                  continue
+                else
+                  echo "A imagem $TARGET_IMAGE existe, mas o digest é diferente. Source: $SOURCE_DIGEST, ACR: $ACR_DIGEST. Atualizando..."
+                fi
+              else
+                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
+                continue
+              fi
+            fi
     runs-on: ubuntu-latest
     
     # Permissões necessárias para autenticação OIDC
@@ -447,6 +535,91 @@ name: Mirror Private Docker Images to ACR
 
 on:
   # Executa diariamente às 2 da manhã
+  schedule:
+    - cron: '0 2 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-private-images.json é modificado
+  push:
+    branches:
+      - main
+    paths:
+      - 'internalization-docker-images/docker-private-images.json'
+
+jobs:
+  mirror-private-images:
+    name: Mirror Private Docker Images to ACR
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para autenticação OIDC
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n ${{ vars.ACR_NAME }}
+
+      - name: Mirror Private Docker Images
+        run: |
+          ACR_NAME="${{ vars.ACR_NAME }}"
+          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
+          PREFIX="embracon-"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-private-images.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            REGISTRY=$(echo "$image" | jq -r '.registry')
+            
+            # Verificar se a imagem já existe no ACR
+            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
+            echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
+            
+            # Verificar primeiro pela tag
+            TAG_EXISTS=false
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
+              
+              # Obter o digest da imagem de origem
+              echo "Obtendo digest da imagem de origem $REGISTRY/$REPO:$TAG"
+              SOURCE_DIGEST=$(docker pull $REGISTRY/$REPO:$TAG -q 2>/dev/null && docker inspect --format='{{index .RepoDigests 0}}' $REGISTRY/$REPO:$TAG | cut -d'@' -f2)
+              
+              if [ -n "$SOURCE_DIGEST" ]; then
+                # Obter o digest da imagem no ACR
+                ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
+                
+                if [ "$SOURCE_DIGEST" = "$ACR_DIGEST" ]; then
+                  echo "A imagem $TARGET_IMAGE já existe no ACR e tem o mesmo digest ($SOURCE_DIGEST). Pulando importação."
+                  continue
+                else
+                  echo "A imagem $TARGET_IMAGE existe, mas o digest é diferente. Source: $SOURCE_DIGEST, ACR: $ACR_DIGEST. Atualizando..."
+                fi
+              else
+                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
+                continue
+              fi
+            fi
   schedule:
     - cron: '0 2 * * *'
   # Permite execução manual pelo GitHub UI
@@ -670,7 +843,37 @@ az acr import \
     --image mirrors/node:stable
 ```
 
-## 📊 Monitoramento e Alertas
+## � Otimização e Economia de Recursos
+
+A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
+
+### 1. Economia de largura de banda
+
+Ao verificar tanto as tags quanto os digests das imagens, os workflows evitam o download desnecessário de imagens que não mudaram. Isso pode representar economia significativa de largura de banda, especialmente para imagens grandes como as baseadas em JDK.
+
+### 2. Redução de custos
+
+Menos transferência de dados entre registros significa:
+- Menor custo de rede (entrada/saída)
+- Menor utilização de recursos computacionais
+- Menor tempo de execução dos workflows
+
+### 3. Métricas de economia
+
+Para avaliar os benefícios da verificação por digest, você pode acompanhar:
+
+```powershell
+# Script para calcular economia com base nos logs
+$startDate = (Get-Date).AddDays(-30)
+$endDate = Get-Date
+$logs = az monitor log-analytics query --workspace $workspaceId --query-string "ContainerRegistryRepositoryEvents | where TimeGenerated between (datetime($startDate) .. datetime($endDate)) | where Message contains 'mesmo digest' | summarize EconomiaBytes=sum(tolong(SizeInBytes)) by bin(TimeGenerated, 1d)" -o tsv
+
+# Converter bytes para MB/GB para melhor visualização
+$totalEconomia = $logs | Measure-Object -Property EconomiaBytes -Sum
+Write-Output "Economia total no último mês: $($totalEconomia.Sum / 1GB) GB"
+```
+
+## �📊 Monitoramento e Alertas
 
 ### 1. Configurando métricas e logs
 

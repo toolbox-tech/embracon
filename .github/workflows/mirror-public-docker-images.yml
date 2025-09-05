@@ -65,12 +65,33 @@ jobs:
             TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
             echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
             
+            # Verificar primeiro pela tag
+            TAG_EXISTS=false
             if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
-              echo "A imagem $TARGET_IMAGE já existe no ACR. Pulando importação."
-              continue
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
+              
+              # Obter o digest da imagem de origem
+              echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
+              SOURCE_DIGEST=$(docker pull docker.io/library/$REPO:$TAG -q 2>/dev/null && docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG | cut -d'@' -f2)
+              
+              if [ -n "$SOURCE_DIGEST" ]; then
+                # Obter o digest da imagem no ACR
+                ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
+                
+                if [ "$SOURCE_DIGEST" = "$ACR_DIGEST" ]; then
+                  echo "A imagem $TARGET_IMAGE já existe no ACR e tem o mesmo digest ($SOURCE_DIGEST). Pulando importação."
+                  continue
+                else
+                  echo "A imagem $TARGET_IMAGE existe, mas o digest é diferente. Source: $SOURCE_DIGEST, ACR: $ACR_DIGEST. Atualizando..."
+                fi
+              else
+                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
+                continue
+              fi
             fi
             
-            echo "A imagem $TARGET_IMAGE não existe no ACR. Procedendo com importação."
+            echo "A imagem $TARGET_IMAGE não existe no ACR ou precisa ser atualizada. Procedendo com importação."
             
             # Pull da imagem do Docker Hub
             echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
@@ -136,12 +157,38 @@ jobs:
             TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
             echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
             
+            # Verificar primeiro pela tag
+            TAG_EXISTS=false
             if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
-              echo "A imagem $TARGET_IMAGE já existe no ACR. Pulando importação."
-              continue
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
+              
+              # Para verificar o digest no caso do import, precisamos fazer um pull temporário
+              echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
+              docker pull docker.io/library/$REPO:$TAG -q > /dev/null 2>&1
+              SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | cut -d'@' -f2)
+              
+              if [ -n "$SOURCE_DIGEST" ]; then
+                # Obter o digest da imagem no ACR
+                ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
+                
+                if [ "$SOURCE_DIGEST" = "$ACR_DIGEST" ]; then
+                  echo "A imagem $TARGET_IMAGE já existe no ACR e tem o mesmo digest ($SOURCE_DIGEST). Pulando importação."
+                  # Limpar imagem temporária
+                  docker rmi docker.io/library/$REPO:$TAG > /dev/null 2>&1 || true
+                  continue
+                else
+                  echo "A imagem $TARGET_IMAGE existe, mas o digest é diferente. Source: $SOURCE_DIGEST, ACR: $ACR_DIGEST. Atualizando..."
+                  # Limpar imagem temporária
+                  docker rmi docker.io/library/$REPO:$TAG > /dev/null 2>&1 || true
+                fi
+              else
+                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
+                continue
+              fi
             fi
             
-            echo "A imagem $TARGET_IMAGE não existe no ACR. Procedendo com importação."
+            echo "A imagem $TARGET_IMAGE não existe no ACR ou precisa ser atualizada. Procedendo com importação."
             echo "Importing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             
             if ! az acr import \

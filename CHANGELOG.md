@@ -1,3 +1,9 @@
+## 0.8.2 (2025-09-05)
+
+### Fix
+
+- **acr**: add docker username and token
+
 ## 0.8.1 (2025-09-05)
 
 ### Fix

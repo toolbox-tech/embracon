@@ -80,7 +80,7 @@ jobs:
             docker rmi docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
             done
   mirror-public-images-with-az-acr-import:
-    name: Mirror Public Docker Images to ACR
+    name: Mirror Public Docker Images to ACR (using az acr import)
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -117,10 +117,12 @@ jobs:
             
             echo "Importing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             
-            az acr import \
+            if ! az acr import \
               --name "$ACR_NAME" \
               --resource-group "$RESOURCE_GROUP" \
               --source "docker.io/library/$REPO:$TAG" \
               --image "$PREFIX$TARGET_REPO:$TAG" \
-              --force
+              --force; then
+              echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            fi
           done

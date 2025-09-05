@@ -1,3 +1,9 @@
+## 0.11.1 (2025-09-05)
+
+### Perf
+
+- **acr**: create another job to clean images
+
 ## 0.11.0 (2025-09-05)
 
 ### Feat

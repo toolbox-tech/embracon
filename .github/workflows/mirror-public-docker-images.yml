@@ -156,15 +156,30 @@ jobs:
           # Remover imagens que não estão no JSON
           echo "Verificando e removendo imagens que não estão no arquivo JSON..."
           
-          # Cria um arquivo temporário com as imagens válidas listadas no JSON
-          echo "Criando lista de imagens válidas..."
+          # Cria arquivos temporários com as imagens e repositórios válidos listados no JSON
+          echo "Criando listas de imagens e repositórios válidos..."
           jq -r '.images[] | "\(.targetRepository):\(.tag)"' internalization-docker-images/docker-public-images.json > /tmp/valid_images.txt
+          jq -r '.images[] | .targetRepository' internalization-docker-images/docker-public-images.json | sort -u > /tmp/valid_repos.txt
           
           # Listar todos os repositórios no ACR
           echo "Listando repositórios no ACR..."
           az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
             # Remove o prefixo para comparar com o targetRepository do JSON
             BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
+            
+            # Verifica se o repositório está na lista de repositórios válidos
+            if ! grep -q "^$BASE_REPO$" /tmp/valid_repos.txt; then
+              echo "O repositório $repo não está no arquivo JSON. Removendo o repositório inteiro..."
+              
+              # Remover o repositório completo
+              if ! az acr repository delete --name $ACR_NAME --repository $repo --yes; then
+                echo "Erro: Falha ao remover o repositório $repo"
+                echo "Continuando com o próximo item..."
+              fi
+              
+              # Pula para o próximo repositório
+              continue
+            fi
             
             echo "Verificando imagens no repositório $repo..."
             
@@ -176,7 +191,7 @@ jobs:
                 
                 # Remover a imagem
                 if ! az acr repository delete --name $ACR_NAME --image "$repo:$tag" --yes; then
-                  echo "Erro: Falha ao remover $repo:$tag - $?"
+                  echo "Erro: Falha ao remover $repo:$tag"
                   echo "Continuando com o próximo item..."
                 fi
               else

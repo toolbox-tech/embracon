@@ -1,3 +1,9 @@
+## 0.10.3 (2025-09-05)
+
+### Refactor
+
+- **acr**: get digest using bash commands
+
 ## 0.10.2 (2025-09-05)
 
 ### Perf

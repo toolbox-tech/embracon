@@ -48,7 +48,7 @@ jobs:
           # Ler imagens do arquivo JSON
           IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
           
-          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
             TAG=$(echo "$image" | jq -r '.tag')
             TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
@@ -57,20 +57,28 @@ jobs:
             
             # Pull da imagem do Docker Hub
             echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
-            docker pull docker.io/library/$REPO:$TAG
+            if ! docker pull docker.io/library/$REPO:$TAG; then
+              echo "Error: Failed to pull docker.io/library/$REPO:$TAG"
+              continue
+            fi
             
             # Tag para o ACR
             echo "Tagging for ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-            docker tag docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG
+            if ! docker tag docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG; then
+              echo "Error: Failed to tag $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+              continue
+            fi
             
             # Push para o ACR
             echo "Pushing to ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-            docker push $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG
+            if ! docker push $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG; then
+              echo "Error: Failed to push $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            fi
             
             # Limpar imagens locais para economizar espaço
             echo "Cleaning up local images"
             docker rmi docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
-          done
+            done
     
       # Lógica para espelhar as imagens públicas
       # - name: Mirror Public Docker Images

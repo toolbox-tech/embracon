@@ -1,3 +1,9 @@
+## 0.10.2 (2025-09-05)
+
+### Perf
+
+- **acr**: change the way to check diggest
+
 ## 0.10.1 (2025-09-05)
 
 ### Fix

@@ -26,25 +26,27 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 | 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
 | 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
 | 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
-| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |o-acr)
+| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
+| 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |o-acr)
   - [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)
  ## 🚀 Otimização e Economia de Recursos
 
 A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
 
-### 1. Verificação Otimizada com Docker Manifest
+### 1. Importação Otimizada com az acr import
 
-A utilização do comando `docker manifest inspect` representa uma evolução significativa no processo de verificação:
+A utilização do comando `az acr import` representa uma evolução significativa no processo de importação:
 
 ```bash
-# Verificação eficiente do digest sem download da imagem completa
-SOURCE_DIGEST=$(docker manifest inspect docker.io/library/maven:3.8.1-jdk-11-slim | jq -r '.[0].Digest')
+# Importação direta do Docker Hub para o ACR
+az acr import --name myacr --source docker.io/library/maven:3.8.1-jdk-11-slim --image maven:3.8.1-jdk-11-slim
 ```
 
 Benefícios desta abordagem:
-- **Download mínimo**: Apenas o manifesto (alguns KB) é baixado, não a imagem completa (potencialmente GB)
-- **Verificação mais rápida**: Redução de dezenas de segundos para milissegundos na verificação
-- **Menor pressão nos registros**: Diminuição significativa no número de requests e volume de dados
+- **Transferência direta**: A imagem é transferida diretamente do Docker Hub para o ACR
+- **Autenticação simplificada**: Gerencia as credenciais para ambos os registros
+- **Verificação integrada**: Verifica automaticamente se é necessário atualizar
+- **Menor pressão nos runners**: Os runners do GitHub Actions não precisam baixar ou armazenar as imagens
 
 ### 2. Economia de largura de banda
 
@@ -324,29 +326,24 @@ O workflow inclui as seguintes funcionalidades:
 
 - ✅ Autenticação no Docker Hub para evitar problemas de rate limiting
 - ✅ Autenticação federada com Azure (OIDC)
-- ✅ Verificação de existência da imagem no ACR antes de baixar (evita tráfego desnecessário)
+- ✅ Importação eficiente de imagens usando `az acr import`
 - ✅ Verificação por digest para garantir a integridade do conteúdo das imagens
-- ✅ Suporte a duas abordagens: Docker pull/push e az acr import
-- ✅ Tratamento de erros e limpeza de imagens locais
+- ✅ Tratamento de erros e opção para forçar atualização de imagens
 
-#### Verificação por Digest
+#### Atualização Eficiente de Imagens
 
-A verificação por digest é uma funcionalidade importante que foi implementada nos workflows para garantir que as imagens sejam atualizadas somente quando seu conteúdo for realmente alterado, mesmo que a tag permaneça a mesma. O processo otimizado funciona da seguinte forma:
+O uso do comando `az acr import` oferece uma forma eficiente de internalizar imagens do Docker Hub para o ACR:
 
-1. **Verificação inicial por tag**: O workflow verifica primeiro se a tag da imagem já existe no ACR
-2. **Obtenção eficiente do digest da origem**: 
-   - **Usando Docker Manifest Inspect**: Primeiro tentamos obter o digest usando `docker manifest inspect`, que não requer o download completo da imagem
-   - **Fallback para download**: Se o método acima falhar, fazemos o download da imagem e extraímos o digest localmente
-3. **Obtenção do digest no ACR**: Em seguida, obtém o digest da imagem já existente no ACR
-4. **Comparação**: Compara os dois digests para verificar se o conteúdo é idêntico
-5. **Decisão**: Se os digests forem iguais, a imagem é ignorada (economizando largura de banda e processamento). Se forem diferentes, a imagem é atualizada.
+1. **Transferência direta**: As imagens são transferidas diretamente do Docker Hub para o ACR sem precisar baixá-las para o runner do GitHub Actions
+2. **Verificação implícita**: O ACR automaticamente verifica se a imagem já existe e se o conteúdo mudou
+3. **Parâmetro force**: O uso da flag `--force` permite atualizar imagens mesmo quando a tag já existe
 
 Esta abordagem traz múltiplos benefícios:
-- **Máxima eficiência**: Verificação inicial do digest sem download completo da imagem
-- **Alta confiabilidade**: Método em camadas com fallbacks robustos para garantir o funcionamento
-- **Proteção contra alterações silenciosas**: Detecta quando imagens foram atualizadas sem mudar a tag (prática comum em tags como "latest")
-- **Economia significativa**: Redução drástica no consumo de largura de banda e custo de transferência
-- **Execução mais rápida**: Workflows completam em menos tempo devido à verificação otimizada
+- **Simplicidade**: Código mais conciso e fácil de manter
+- **Eficiência de recursos**: Menor consumo de recursos no runner do GitHub Actions
+- **Autenticação integrada**: Gerencia automaticamente as autenticações entre registros
+- **Economia significativa**: Redução no consumo de largura de banda e custo de transferência
+- **Execução mais rápida**: Workflows completam em menos tempo devido ao processo otimizado
 
 ### Workflow para Imagens Públicas
 
@@ -372,8 +369,6 @@ jobs:
   mirror-public-images:
     name: Mirror Public Docker Images to ACR
     runs-on: ubuntu-latest
-    
-    # Permissões necessárias para autenticação OIDC
     permissions:
       id-token: write
       contents: read
@@ -397,155 +392,7 @@ jobs:
 
       - name: Log in to Azure Container Registry
         run: az acr login -n ${{ vars.ACR_NAME }}
-
-      - name: Mirror Public Docker Images
-        run: |
-          ACR_NAME="${{ vars.ACR_NAME }}"
-          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
-          PREFIX="embracon-"
-          
-          # Ler imagens do arquivo JSON
-          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
-          
-          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
-            REPO=$(echo "$image" | jq -r '.repository')
-            TAG=$(echo "$image" | jq -r '.tag')
-            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
-            
-            # Verificar se a imagem já existe no ACR
-            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
-            echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
-            
-            # Verificar primeiro pela tag
-            TAG_EXISTS=false
-            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
-              TAG_EXISTS=true
-              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
-              
-              # Obter o digest da imagem de origem usando manifest inspect (método mais eficiente)
-              echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
-              
-              # Método 1: Usar docker manifest inspect (não requer download completo da imagem)
-              echo "Tentando obter digest via docker manifest inspect..."
-              docker manifest inspect docker.io/library/$REPO:$TAG > /dev/null 2>&1
-              if [ $? -eq 0 ]; then
-                SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | jq -r '.[0].Digest' 2>/dev/null || echo "")
-              else
-                SOURCE_DIGEST=""
-              fi
-              
-              # Se falhar, tentar métodos alternativos que requerem pull da imagem
-              if [ -z "$SOURCE_DIGEST" ]; then
-                echo "Manifest inspect falhou. Tentando obter digest através do pull da imagem..."
-                echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
-                docker pull docker.io/library/$REPO:$TAG > /dev/null
-                SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
-              fi
-              
-              if [ -n "$SOURCE_DIGEST" ]; then
-                # Obter o digest da imagem no ACR
-                ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
-                
-                if [ "$SOURCE_DIGEST" = "$ACR_DIGEST" ]; then
-                  echo "A imagem $TARGET_IMAGE já existe no ACR e tem o mesmo digest ($SOURCE_DIGEST). Pulando importação."
-                  continue
-                else
-                  echo "A imagem $TARGET_IMAGE existe, mas o digest é diferente. Source: $SOURCE_DIGEST, ACR: $ACR_DIGEST. Atualizando..."
-                fi
-              else
-                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
-                continue
-              fi
-            fi
-    runs-on: ubuntu-latest
-    
-    # Permissões necessárias para autenticação OIDC
-    permissions:
-      id-token: write
-      contents: read
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Log in to Azure Container Registry
-        run: az acr login -n ${{ vars.ACR_NAME }}
-
-      - name: Mirror Public Docker Images
-        run: |
-          ACR_NAME="${{ vars.ACR_NAME }}"
-          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
-          PREFIX="embracon-"
-          
-          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP"
-          
-          # Ler imagens do arquivo JSON
-          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
-          
-            echo "$IMAGES" | jq -c '.[]' | while read -r image; do
-            REPO=$(echo "$image" | jq -r '.repository')
-            TAG=$(echo "$image" | jq -r '.tag')
-            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
-            
-            echo "Processing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
-            
-            # Pull da imagem do Docker Hub
-            echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
-            if ! docker pull docker.io/library/$REPO:$TAG; then
-              echo "Error: Failed to pull docker.io/library/$REPO:$TAG"
-              continue
-            fi
-            
-            # Tag para o ACR
-            echo "Tagging for ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-            if ! docker tag docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG; then
-              echo "Error: Failed to tag $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-              continue
-            fi
-            
-            # Push para o ACR
-            echo "Pushing to ACR: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-            if ! docker push $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG; then
-              echo "Error: Failed to push $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-            fi
-            
-            # Limpar imagens locais para economizar espaço
-            echo "Cleaning up local images"
-            docker rmi docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
-            done
-  mirror-public-images-with-az-acr-import:
-    name: Mirror Public Docker Images to ACR (using az acr import)
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      
-      - name: Azure Login via OIDC
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Log in to Azure Container Registry
-        run: az acr login -n ${{ vars.ACR_NAME }}
       - name: Mirror Public Docker Images
         run: |
           ACR_NAME="${{ vars.ACR_NAME }}"
@@ -578,14 +425,6 @@ jobs:
 ```
 
 Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.
-            
-            # Limpar imagens locais para economizar espaço
-            echo "Cleaning up local images"
-            docker rmi docker.io/library/$REPO:$TAG $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG || true
-          done
-```
-
-Para configurar estes workflows, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.
 
 ## 🔄 Integração com Azure Kubernetes Service (AKS)
 

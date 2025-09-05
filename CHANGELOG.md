@@ -1,3 +1,9 @@
+## 0.8.1 (2025-09-05)
+
+### Fix
+
+- **acr**: az acr import continue if error
+
 ## 0.8.0 (2025-09-05)
 
 ### Feat

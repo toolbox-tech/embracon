@@ -83,9 +83,13 @@ jobs:
               
               # Método 1: Usar docker manifest inspect (não requer download completo da imagem)
               echo "Tentando obter digest via docker manifest inspect..."
+              # Habilitar recursos experimentais do Docker CLI
+              export DOCKER_CLI_EXPERIMENTAL=enabled
+              
               docker manifest inspect $REGISTRY/$REPO:$TAG > /dev/null 2>&1
               if [ $? -eq 0 ]; then
-                SOURCE_DIGEST=$(docker manifest inspect $REGISTRY/$REPO:$TAG | jq -r '.[0].Digest' 2>/dev/null || echo "")
+                # Usar grep + awk em vez de jq para extrair o digest
+                SOURCE_DIGEST=$(docker manifest inspect $REGISTRY/$REPO:$TAG | grep digest | head -n 1 | awk '{print $2}' | tr -d ',"' || echo "")
               else
                 SOURCE_DIGEST=""
               fi
@@ -208,9 +212,13 @@ jobs:
               
               # Método 1: Usar docker manifest inspect (não requer download completo da imagem)
               echo "Tentando obter digest via docker manifest inspect..."
+              # Habilitar recursos experimentais do Docker CLI
+              export DOCKER_CLI_EXPERIMENTAL=enabled
+              
               docker manifest inspect $REGISTRY/$REPO:$TAG > /dev/null 2>&1
               if [ $? -eq 0 ]; then
-                SOURCE_DIGEST=$(docker manifest inspect $REGISTRY/$REPO:$TAG | jq -r '.[0].Digest' 2>/dev/null || echo "")
+                # Usar grep + awk em vez de jq para extrair o digest
+                SOURCE_DIGEST=$(docker manifest inspect $REGISTRY/$REPO:$TAG | grep digest | head -n 1 | awk '{print $2}' | tr -d ',"' || echo "")
               else
                 SOURCE_DIGEST=""
               fi

@@ -126,8 +126,29 @@ jobs:
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi
           done
-          
-          # Parte 2: Remover imagens que não estão no JSON
+  cleanup-images-not-in-json:
+    name: Cleanup Images Not in JSON
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n ${{ vars.ACR_NAME }}
+      - name: Mirror Public Docker Images
+        run: |
+          # Remover imagens que não estão no JSON
           echo "Verificando e removendo imagens que não estão no arquivo JSON..."
           
           # Cria um arquivo temporário com as imagens válidas listadas no JSON

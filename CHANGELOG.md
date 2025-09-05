@@ -1,3 +1,9 @@
+## 0.10.0 (2025-09-05)
+
+### Feat
+
+- **acr**: check digest before pull
+
 ## 0.9.0 (2025-09-05)
 
 ### Feat

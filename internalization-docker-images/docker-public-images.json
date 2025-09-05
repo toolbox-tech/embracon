@@ -50,21 +50,27 @@
         },
         {
             "repository": "ubuntu",
+            "tag": "18.04",
+            "description": "Ubuntu 18.04",
+            "targetRepository": "linux"
+        },
+        {
+            "repository": "ubuntu",
             "tag": "20.04",
             "description": "Ubuntu 20.04",
-            "targetRepository": "os"
+            "targetRepository": "linux"
         },
         {
             "repository": "oraclelinux",
             "tag": "7-slim",
             "description": "Oracle Linux 7 Slim",
-            "targetRepository": "os"
+            "targetRepository": "linux"
         },
         {
             "repository": "debian",
             "tag": "bullseye-slim",
             "description": "Debian Bullseye Slim",
-            "targetRepository": "os"
+            "targetRepository": "linux"
         },
         {
             "repository": "node",

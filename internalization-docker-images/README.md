@@ -280,15 +280,6 @@ foreach ($imageInfo in $imagesData.images) {
 3. **Documente as imagens importadas**: Mantenha um registro de quais imagens foram importadas e quando
 4. **Configure importação automática**: Use tarefas agendadas para manter imagens atualizadas
 
-### 6. Automação com Azure Logic Apps
-
-Você pode criar um workflow no Azure Logic Apps para importar automaticamente novas versões:
-
-1. **Gatilho**: Timer recorrente (ex: uma vez por semana)
-2. **Ação**: Verificar novas tags em repositórios específicos
-3. **Condição**: Se houver novas tags, importar para o ACR
-4. **Notificação**: Enviar email ou mensagem quando novas imagens forem importadas
-
 ## 🔄 Workflows GitHub Actions para Espelhamento
 
 Implementamos dois workflows GitHub Actions para espelhamento de imagens Docker para o ACR usando autenticação OIDC com o Azure:

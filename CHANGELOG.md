@@ -1,3 +1,9 @@
+## 0.9.0 (2025-09-05)
+
+### Feat
+
+- **acr**: check if exists docker image in acr before pull
+
 ## 0.8.3 (2025-09-05)
 
 ### Fix

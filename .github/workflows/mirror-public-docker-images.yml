@@ -13,6 +13,13 @@ on:
     paths:
       - 'internalization-docker-images/docker-public-images.json'
 
+env:
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  PREFIX: "embracon-"
+  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+  # As variáveis sensíveis (tokens, secrets) devem ser referenciadas diretamente onde são usadas
+
 jobs:
   mirror-public-images-with-az-acr-import:
     name: Mirror Public Docker Images to ACR (using az acr import)
@@ -33,14 +40,10 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Log in to Azure Container Registry
-        run: az acr login -n ${{ vars.ACR_NAME }}
+        run: az acr login -n $ACR_NAME
       - name: Mirror Public Docker Images
         run: |
-          ACR_NAME="${{ vars.ACR_NAME }}"
-          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
-          PREFIX="embracon-"
-          
-          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP"
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
           
           # Ler imagens do arquivo JSON
           IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
@@ -120,8 +123,8 @@ jobs:
               --resource-group "$RESOURCE_GROUP" \
               --source "docker.io/library/$REPO:$TAG" \
               --image "$PREFIX$TARGET_REPO:$TAG" \
-              --username ${{ vars.DOCKERHUB_USERNAME }} \
-              --password ${{ secrets.DOCKERHUB_TOKEN }} \
+              --username "$DOCKERHUB_USERNAME" \
+              --password "${{ secrets.DOCKERHUB_TOKEN }}" \
               --force; then
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi
@@ -145,9 +148,11 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Log in to Azure Container Registry
-        run: az acr login -n ${{ vars.ACR_NAME }}
-      - name: Mirror Public Docker Images
+        run: az acr login -n $ACR_NAME
+      - name: Remove Images Not in JSON
         run: |
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
+          
           # Remover imagens que não estão no JSON
           echo "Verificando e removendo imagens que não estão no arquivo JSON..."
           

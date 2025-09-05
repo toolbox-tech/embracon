@@ -12,7 +12,18 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 - 🚫 Evitar problemas com limites de rate limiting
 - 🔒 Melhorar a segurança com escaneamento## 🚀 Otimização e Economia de Recursos
 
-A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
+A implementação de verificação por digest nos workflows de espelhamento de imagens ofer## �📝 Histórico de Alterações
+
+| Data | Versão | Descrição | Autor |
+|------|--------|-----------|-------|
+| 04/09/2025 | 1.0.0 | Criação do documento com instruções para ACR | Equipe DevOps |
+| 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
+| 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
+| 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
+| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
+| 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |
+| 05/09/2025 | 1.5.0 | Implementação de remoção automática de imagens ausentes do JSON | Equipe DevOps |
+| 05/09/2025 | 1.6.0 | Limpeza completa: remoção de repositórios não referenciados no JSON | Equipe DevOps |rsos benefícios:
 
 ### 1. Sincronização completa com arquivo JSON
 
@@ -20,8 +31,9 @@ O processo agora gerencia o ciclo de vida completo das imagens no ACR:
 - **Importação** de imagens definidas no arquivo JSON
 - **Verificação de digest** para evitar transferências desnecessárias
 - **Remoção automática** de imagens que não estão mais no JSON
+- **Limpeza total** de repositórios que não estão no JSON
 
-Isso garante que apenas as imagens oficialmente aprovadas e documentadas no JSON permaneçam no registro, mantendo-o limpo e atualizado.
+Isso garante que apenas as imagens oficialmente aprovadas e documentadas no JSON permaneçam no registro, mantendo-o limpo e atualizado. A eliminação completa de repositórios não referenciados também evita o acúmulo de recursos não utilizados.
 
 ### 2. Economia de largura de banda
 

@@ -1,5 +1,35 @@
 .DS_Store
 
+## Para JS - NodeJS
+Gitignore para projetos Node.js
+Para criar um arquivo .gitignore para seu projeto Node.js, você precisa ignorar os arquivos e diretórios gerados automaticamente que não devem ser versionados no Git. O principal deles é a pasta node_modules, que armazena todas as dependências do seu projeto.
+
+Exemplo básico
+Este é um arquivo .gitignore simples e eficaz para a maioria dos projetos Node.js:
+
+# Dependências
+/node_modules
+/dist
+/build
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# Outros
+npm-shrinkwrap.json
+pnpm-lock.yaml
+yarn.lock
+
+
+
 *.class
 *.jar
 *.war

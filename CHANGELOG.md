@@ -1,3 +1,13 @@
+## 0.10.6 (2025-09-05)
+
+### Refactor
+
+- **acr**: remove private repos
+
+### Perf
+
+- **acr**: remove docker pull and push
+
 ## 0.10.5 (2025-09-05)
 
 ### Refactor

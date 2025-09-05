@@ -68,6 +68,17 @@ jobs:
             
             echo "Processing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             
+            # Verificar se a imagem já existe no ACR
+            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
+            echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
+            
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              echo "A imagem $TARGET_IMAGE já existe no ACR. Pulando importação."
+              continue
+            fi
+            
+            echo "A imagem $TARGET_IMAGE não existe no ACR. Procedendo com importação."
+            
             # Pull da imagem do registro privado
             echo "Pulling image from registry: $REGISTRY/$REPO:$TAG"
             if ! docker pull $REGISTRY/$REPO:$TAG; then
@@ -137,6 +148,16 @@ jobs:
             TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
             REGISTRY=$(echo "$image" | jq -r '.registry')
             
+            # Verificar se a imagem já existe no ACR
+            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
+            echo "Verificando se a imagem $TARGET_IMAGE já existe no ACR..."
+            
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              echo "A imagem $TARGET_IMAGE já existe no ACR. Pulando importação."
+              continue
+            fi
+            
+            echo "A imagem $TARGET_IMAGE não existe no ACR. Procedendo com importação."
             echo "Importing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             
             if ! az acr import \

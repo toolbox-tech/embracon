@@ -150,4 +150,3 @@ jobs:
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi
           done
-          done

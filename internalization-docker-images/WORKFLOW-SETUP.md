@@ -35,13 +35,11 @@ Configure as seguintes variáveis de ambiente no GitHub:
 1. Acesse seu repositório no GitHub
 2. Vá para "Settings" > "Secrets and variables" > "Actions" > aba "Variables"
 3. Adicione as seguintes variáveis:
-
-| Nome | Descrição | Exemplo |
-|------|-----------|---------|
-| `ACR_NAME` | Nome do Azure Container Registry | `embraconacr` |
-| `RESOURCE_GROUP` | Grupo de recursos do ACR | `embracon-infra` |
-| `DOCKER_USERNAME` | Nome de usuário do Docker Hub | `embraconuser` |
-| `DOCKER_TOKEN` | Token de acesso do Docker Hub (opcional, preferir segredo) | - |
+| Nome | Tipo | Descrição | Exemplo |
+|------|------|-----------|---------|
+| `ACR_NAME` | Variável | Nome do Azure Container Registry | `embraconacr` |
+| `RESOURCE_GROUP` | Variável | Grupo de recursos do ACR | `embracon-infra` |
+| `DOCKERHUB_USERNAME` | Variável | Nome de usuário do Docker Hub | `embraconuser` |
 
 ### Segredos no GitHub
 
@@ -59,11 +57,10 @@ Configure os seguintes segredos no GitHub:
 | `AZURE_TENANT_ID` | ID do tenant do Azure AD |
 | `AZURE_SUBSCRIPTION_ID` | ID da assinatura do Azure |
 
-#### Autenticação no Docker Hub (se não usar variáveis)
+#### Token de autenticação do Docker Hub
 
 | Nome | Descrição |
 |------|-----------|
-| `DOCKERHUB_USERNAME` | Nome de usuário do Docker Hub |
 | `DOCKERHUB_TOKEN` | Token de acesso do Docker Hub |
 
 > **Importante**: Para maior segurança, use tokens com escopo limitado e validade definida, não senhas.

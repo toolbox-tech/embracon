@@ -287,6 +287,14 @@ Implementamos dois workflows GitHub Actions para espelhamento de imagens Docker 
 1. Workflow para imagens públicas (Docker Hub)
 2. Workflow para imagens privadas (registros privados)
 
+Os workflows incluem as seguintes funcionalidades:
+
+- ✅ Autenticação no Docker Hub para evitar problemas de rate limiting
+- ✅ Autenticação federada com Azure (OIDC)
+- ✅ Verificação de existência da imagem no ACR antes de baixar (evita tráfego desnecessário)
+- ✅ Suporte a duas abordagens: Docker pull/push e az acr import
+- ✅ Tratamento de erros e limpeza de imagens locais
+
 ### Workflow para Imagens Públicas
 
 Este workflow espelha imagens públicas do Docker Hub definidas no arquivo `docker-public-images.json`:

@@ -1,3 +1,9 @@
+## 0.8.3 (2025-09-05)
+
+### Fix
+
+- **acr**: use correct var and secret docker hub
+
 ## 0.8.2 (2025-09-05)
 
 ### Fix

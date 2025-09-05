@@ -171,10 +171,8 @@ az ad group member add --group $groupName --member-id $identityPrincipalId
 # Obter o ID do ACR
 $acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
 
-# Conceder permissão total (Owner) ao grupo sobre o ACR
-az role assignment create --assignee $groupId --scope $acrId --role Owner
-
 # Alternativamente, conceder permissões específicas do ACR
+az role assignment create --assignee $groupId --scope $acrId --role "Container Registry Data Importer and Data Reader"
 az role assignment create --assignee $groupId --scope $acrId --role AcrPush
 az role assignment create --assignee $groupId --scope $acrId --role AcrPull
 az role assignment create --assignee $groupId --scope $acrId --role AcrDelete
@@ -530,6 +528,7 @@ az monitor alert create \
 - [Melhores práticas para ACR](https://docs.microsoft.com/pt-br/azure/container-registry/container-registry-best-practices)
 - [Integração de ACR com AKS](https://docs.microsoft.com/pt-br/azure/aks/cluster-container-registry-integration)
 - [Azure Policy para ACR](https://docs.microsoft.com/pt-br/azure/governance/policy/samples/built-in-policies#container-registries)
+- [Visão geral das permissões e atribuições de função do Registro de Contêiner do Azure Entra](https://learn.microsoft.com/pt-br/azure/container-registry/container-registry-rbac-built-in-roles-overview?tabs=registries-configured-with-rbac-registry-permissions)
 - [Limites de rate limiting do Docker Hub](https://docs.docker.com/docker-hub/download-rate-limit/)
 - [Trivy - Scanner de Vulnerabilidades para Containers](https://github.com/aquasecurity/trivy)
 

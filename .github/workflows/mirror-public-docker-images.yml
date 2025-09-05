@@ -71,11 +71,21 @@ jobs:
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
               
-              # Obter o digest da imagem de origem
+              # Obter o digest da imagem de origem de forma mais robusta
               echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
-              SOURCE_DIGEST=$(docker pull docker.io/library/$REPO:$TAG -q 2>/dev/null && docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG | cut -d'@' -f2)
+              echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
+              docker pull docker.io/library/$REPO:$TAG > /dev/null
               
+              # Tentar obter o digest de várias maneiras
+              SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              if [ -z "$SOURCE_DIGEST" ]; then
+                # Tentar método alternativo para obter digest
+                SOURCE_DIGEST=$(docker inspect docker.io/library/$REPO:$TAG | jq -r '.[0].RepoDigests[0]' 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              fi
+              
+              # Verificar se obteve um digest válido
               if [ -n "$SOURCE_DIGEST" ]; then
+                echo "Digest da imagem de origem: $SOURCE_DIGEST"
                 # Obter o digest da imagem no ACR
                 ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
                 
@@ -86,8 +96,8 @@ jobs:
                   echo "A imagem $TARGET_IMAGE existe, mas o digest é diferente. Source: $SOURCE_DIGEST, ACR: $ACR_DIGEST. Atualizando..."
                 fi
               else
-                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
-                continue
+                echo "Aviso: Não foi possível obter o digest da imagem de origem. Procedendo com a importação da imagem."
+                # Continuamos para importar a imagem mesmo sem conseguir o digest
               fi
             fi
             
@@ -163,12 +173,21 @@ jobs:
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO. Verificando digest..."
               
-              # Para verificar o digest no caso do import, precisamos fazer um pull temporário
+              # Para verificar o digest no caso do import, precisamos fazer um pull temporário de forma mais robusta
               echo "Obtendo digest da imagem de origem docker.io/library/$REPO:$TAG"
-              docker pull docker.io/library/$REPO:$TAG -q > /dev/null 2>&1
-              SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | cut -d'@' -f2)
+              echo "Pulling image from Docker Hub: docker.io/library/$REPO:$TAG"
+              docker pull docker.io/library/$REPO:$TAG > /dev/null
               
+              # Tentar obter o digest de várias maneiras
+              SOURCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' docker.io/library/$REPO:$TAG 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              if [ -z "$SOURCE_DIGEST" ]; then
+                # Tentar método alternativo para obter digest
+                SOURCE_DIGEST=$(docker inspect docker.io/library/$REPO:$TAG | jq -r '.[0].RepoDigests[0]' 2>/dev/null | awk -F '@' '{print $2}' || echo "")
+              fi
+              
+              # Verificar se obteve um digest válido
               if [ -n "$SOURCE_DIGEST" ]; then
+                echo "Digest da imagem de origem: $SOURCE_DIGEST"
                 # Obter o digest da imagem no ACR
                 ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
                 
@@ -183,8 +202,8 @@ jobs:
                   docker rmi docker.io/library/$REPO:$TAG > /dev/null 2>&1 || true
                 fi
               else
-                echo "Não foi possível obter o digest da imagem de origem. Prosseguindo com verificação por tag."
-                continue
+                echo "Aviso: Não foi possível obter o digest da imagem de origem. Procedendo com a importação da imagem."
+                # Continuamos com a importação mesmo sem conseguir o digest
               fi
             fi
             

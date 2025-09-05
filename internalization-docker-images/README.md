@@ -970,15 +970,18 @@ Ao trabalhar com a verificação de digest das imagens Docker, você pode encont
 Se o comando `docker manifest inspect` falhar, verifique os seguintes pontos:
 
 ```bash
-# Habilitando recursos experimentais (se necessário)
+# Habilitando recursos experimentais (obrigatório para docker manifest)
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
 # Verificando se o manifesto está disponível
 docker manifest inspect docker.io/library/maven:3.8.1-jdk-11-slim
 
+# Extraindo digest sem usar jq (mais compatível)
+docker manifest inspect docker.io/library/maven:3.8.1-jdk-11-slim | grep digest | head -n 1 | awk '{print $2}' | tr -d ',"'
+
 # Se falhar, tentar métodos alternativos
 docker pull docker.io/library/maven:3.8.1-jdk-11-slim
-docker inspect docker.io/library/maven:3.8.1-jdk-11-slim | jq '.[0].RepoDigests'
+docker inspect docker.io/library/maven:3.8.1-jdk-11-slim | grep RepoDigests -A 1 | tail -n 1 | awk -F '@' '{print $2}' | tr -d '",'
 ```
 
 ### 2. Diferenças de Digest entre Registros

@@ -26,6 +26,18 @@ O cache é salvo/restaurado para otimizar o build:
     - BREAKING CHANGE → major
     - outros → patch (default)
 
+- **Pré-requisito**
+
+Habilitar o **GITHUB_TOKEN** com permissão de escrita:
+
+Vá em: Settings → Actions → General → Workflow permissions
+
+Habilitar o GITHUB_TOKEN com permissão de escrita:
+
+Vá em: Settings → Actions → General → Workflow permissions
+
+Marque: ✅ Read and write permissions
+
 ### 🔹 Trivy Scan
 - **Trigger**: Pode rodar em PRs ou pushes
 - Objetivo: Rodas scan de vulnerabilidades na imagem Docker

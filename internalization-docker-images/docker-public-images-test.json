@@ -1,0 +1,9 @@
+{
+    "images": [
+        {
+            "repository": "ubuntu",
+            "tag": "20.04",
+            "description": "Ubuntu 20.04"
+        }
+    ]
+}

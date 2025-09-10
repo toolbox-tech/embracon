@@ -6,12 +6,12 @@ on:
     - cron: '0 0 * * *'
   # Permite execução manual pelo GitHub UI
   workflow_dispatch:
-  # Executa quando o arquivo docker-public-images.json é modificado
+  # Executa quando o arquivo docker-public-images-test.json é modificado
   push:
     branches:
       - main
     paths:
-      - 'internalization-docker-images/docker-public-images.json'
+      - 'internalization-docker-images/docker-public-images-test.json'
 
 env:
   ACR_NAME: ${{ vars.ACR_NAME }}
@@ -46,7 +46,7 @@ jobs:
           echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
           
           # Ler imagens do arquivo JSON
-          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
+          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
           
           echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
@@ -159,8 +159,8 @@ jobs:
           
           # Cria arquivos temporários com as imagens e repositórios válidos listados no JSON
           echo "Criando listas de imagens e repositórios válidos..."
-          jq -r '.images[] | "\(.repository):\(.tag)"' internalization-docker-images/docker-public-images.json > /tmp/valid_images.txt
-          jq -r '.images[] | .repository' internalization-docker-images/docker-public-images.json | sort -u > /tmp/valid_repos.txt
+          jq -r '.images[] | "\(.repository):\(.tag)"' internalization-docker-images/docker-public-images-test.json > /tmp/valid_images.txt
+          jq -r '.images[] | .repository' internalization-docker-images/docker-public-images-test.json | sort -u > /tmp/valid_repos.txt
           
           # Listar todos os repositórios no ACR
           echo "Listando repositórios no ACR..."

@@ -73,8 +73,8 @@ jobs:
               
               docker manifest inspect docker.io/library/$REPO:$TAG > /dev/null 2>&1
               if [ $? -eq 0 ]; then
-                # Usar grep + awk em vez de jq para extrair o digest
-                SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | grep digest | head -n 1 | awk '{print $2}' | tr -d ',"' || echo "")
+                # Extrair o digest específico para a arquitetura amd64
+                SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' || echo "")
               else
                 SOURCE_DIGEST=""
               fi

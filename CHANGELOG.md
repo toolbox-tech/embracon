@@ -1,3 +1,11 @@
+## 1.0.0 (2025-09-10)
+
+### Fix
+
+- **bump**: major_version_zero = false
+- **acr**: remove targetRepository and put repository name on acr like this $PREFIX$TARGET_REPO:$TAG
+- **acr**: use jq to get digest
+
 ## 0.12.0 (2025-09-05)
 
 ### Feat

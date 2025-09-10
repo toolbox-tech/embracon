@@ -51,7 +51,8 @@ jobs:
           echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
             TAG=$(echo "$image" | jq -r '.tag')
-            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+            # Usar o mesmo nome do repositório de origem
+            TARGET_REPO=$(echo "$image" | jq -r '.repository')
             
             # Verificar se a imagem já existe no ACR
             TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
@@ -158,13 +159,13 @@ jobs:
           
           # Cria arquivos temporários com as imagens e repositórios válidos listados no JSON
           echo "Criando listas de imagens e repositórios válidos..."
-          jq -r '.images[] | "\(.targetRepository):\(.tag)"' internalization-docker-images/docker-public-images.json > /tmp/valid_images.txt
-          jq -r '.images[] | .targetRepository' internalization-docker-images/docker-public-images.json | sort -u > /tmp/valid_repos.txt
+          jq -r '.images[] | "\(.repository):\(.tag)"' internalization-docker-images/docker-public-images.json > /tmp/valid_images.txt
+          jq -r '.images[] | .repository' internalization-docker-images/docker-public-images.json | sort -u > /tmp/valid_repos.txt
           
           # Listar todos os repositórios no ACR
           echo "Listando repositórios no ACR..."
           az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
-            # Remove o prefixo para comparar com o targetRepository do JSON
+            # Remove o prefixo para comparar com o repository do JSON
             BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
             
             # Verifica se o repositório está na lista de repositórios válidos

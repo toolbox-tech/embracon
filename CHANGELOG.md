@@ -1,3 +1,9 @@
+## 1.1.0 (2025-09-11)
+
+### Feat
+
+- **acr**: checks digest and store in json file
+
 ## 1.0.0 (2025-09-10)
 
 ### Fix

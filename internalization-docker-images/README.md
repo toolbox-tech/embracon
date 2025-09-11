@@ -1,5 +1,19 @@
 <p align="center">
-  <img src="../img/tbx.png" alt="Logo Toolbox" width="400"/>
+  <img src="../img/tbx.png" alt="Logo Toolbox" wi## 📑 Índice
+
+- [🎯 Sobre o Módulo](#-sobre-o-módulo)
+- [🏗️ Boas Práticas de Infraestrutura](#-boas-práticas-de-infraestrutura)
+- [🚀 Otimização e Economia de Recursos](#-otimização-e-economia-de-recursos)
+- [🛠️ Criação e Configuração do ACR](#-criação-e-configuração-do-acr)
+- [🔒 Segurança do ACR](#-segurança-do-acr)
+- [📥 Importando Imagens do Docker Hub](#-importando-imagens-do-docker-hub)
+- [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
+- [🔄 Integração com Kubernetes](#-integração-com-kubernetes)
+  - [Configuração com AKS](#1-configuração-com-azure-kubernetes-service-aks)
+  - [Configuração com OKE](#2-configuração-com-oracle-kubernetes-engine-oke)
+- [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
+- [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
+- [📚 Recursos Adicionais](#-recursos-adicionais)
 </p>
 
 # 🐳 Internalização de Imagens Docker
@@ -66,35 +80,21 @@ Menos transferência de dados entre registros significa:
 - Menor utilização de recursos computacionais
 - Menor tempo de execução dos workflows
 - Menos armazenamento usado no ACR (remoção automática de imagens obsoletas)
-- ⚡ Acelerar o tempo de deploy dos seus containers
 
 ## 📑 Índice
 
 - [🎯 Sobre o Módulo](#-sobre-o-módulo)
 - [🏗️ Boas Práticas de Infraestrutura](#-boas-práticas-de-infraestrutura)
 - [🚀 Otimização e Economia de Recursos](#-otimização-e-economia-de-recursos)
-- [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)
+- [🛠️ Criação e Configuração do ACR](#-criação-e-configuração-do-acr)
+- [🔒 Segurança do ACR](#-segurança-do-acr)
+- [� Importando Imagens do Docker Hub](#-importando-imagens-do-docker-hub)
+- [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
+- [🔄 Integração com Azure Kubernetes Service (AKS)](#-integração-com-azure-kubernetes-service-aks)
+- [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
+- [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
 
- ## 🚀 Otimização e Economia de Recursos
-
-A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
-
-### 1. Importação Otimizada com az acr import
-
-A utilização do comando `az acr import` representa uma evolução significativa no processo de importação:
-
-```bash
-# Importação direta do Docker Hub para o ACR
-az acr import --name myacr --source docker.io/library/maven:3.8.1-jdk-11-slim --image maven:3.8.1-jdk-11-slim
-```
-
-Benefícios desta abordagem:
-- **Transferência direta**: A imagem é transferida diretamente do Docker Hub para o ACR
-- **Autenticação simplificada**: Gerencia as credenciais para ambos os registros
-- **Verificação integrada**: Verifica automaticamente se é necessário atualizar
-- **Menor pressão nos runners**: Os runners do GitHub Actions não precisam baixar ou armazenar as imagens
-
-### 2. Importação Otimizada com az acr import
+### 4. Importação Otimizada com az acr import
 
 A utilização do comando `az acr import` representa uma evolução significativa no processo de importação:
 
@@ -109,41 +109,28 @@ Benefícios desta abordagem:
 - **Verificação integrada**: Verifica automaticamente se é necessário atualizar
 - **Menor pressão nos runners**: Os runners do GitHub Actions não precisam baixar ou armazenar as imagens
 
-### 3. Economia de largura de banda e custos
+A utilização do comando `az acr import` representa uma evolução significativa no processo de importação:
+
+```bash
+# Importação direta do Docker Hub para o ACR
+az acr import --name myacr --source docker.io/library/maven:3.8.1-jdk-11-slim --image maven:3.8.1-jdk-11-slim
+```
+
+Benefícios desta abordagem:
+- **Transferência direta**: A imagem é transferida diretamente do Docker Hub para o ACR
+- **Autenticação simplificada**: Gerencia as credenciais para ambos os registros
+- **Verificação integrada**: Verifica automaticamente se é necessário atualizar
+- **Menor pressão nos runners**: Os runners do GitHub Actions não precisam baixar ou armazenar as imagens
+
+### 5. Economia de largura de banda e custos
 
 Ao verificar os digests das imagens através de manifests, os workflows evitam o download desnecessário de imagens que não mudaram. Isso resulta em:
 - Menor custo de rede (entrada/saída)
 - Menor utilização de recursos computacionais
 - Menor tempo de execução dos workflows
 - Economia significativa de largura de banda, especialmente para imagens grandes
-  - [Autenticação com Azure AD](#1-autenticação-com-azure-ad)
-- [📥 Importando Imagens do Docker Hub](#-importando-imagens-do-docker-hub)
-  - [Importação básica de imagens](#1-importação-básica-de-imagens)
-  - [Importação com namespace personalizado](#2-importação-com-namespace-personalizado)
-  - [Importação com autenticação para registros privados](#3-importação-com-autenticação-para-registros-privados)
-  - [Importação em massa de várias tags de uma imagem](#4-importação-em-massa-de-várias-tags-de-uma-imagem)
-  - [Boas práticas para importação](#5-boas-práticas-para-importação)
-- [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
-  - [Workflow para Imagens Públicas](#workflow-para-imagens-públicas)
-- [🔄 Integração com Azure Kubernetes Service (AKS)](#-integração-com-azure-kubernetes-service-aks)
-- [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
-- [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
 
-## Proposta
-
-```mermaid
-flowchart TB
-  %% Orientação: Vertical (Top to Bottom)
-  classDef dashed stroke-dasharray: 5 5
-
-  subgraph CI[CI • GitHub Actions]
-    EXT["Fonte Externa (Docker Hub / Temurin OpenJDK)" ]
-    CACHE["(Opcional) Cache/Proxy de Registry (ACR Tasks/Cache)"]:::dashed
-    GHA["Workflow de Internalização"]
-    PULL["Step: Pull imagem base (OpenJDK) + pin por digest (sha256)"]
-    CUST["Step: Customização (Dockerfile: CA internos, timezone, hardening)"]
-    BUILD["Step: Build & Tag (ex.: openjdk:17-internal → 17.0.12-internal-YYYYMMDD)"]
-  end
+## 🛠️ Criação e Configuração do ACR
 
   subgraph SEC[Segurança]
     TRIVY["Trivy Scan (CVE/Secrets/Misconfig) + SBOM (spdx/json)"]
@@ -597,9 +584,9 @@ jobs:
 
 Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.
 
-## 🔄 Integração com Azure Kubernetes Service (AKS)
+## 🔄 Integração com Kubernetes
 
-### 1. Configurar AKS para usar o ACR
+### 1. Configuração com Azure Kubernetes Service (AKS)
 
 ```powershell
 $aksName = "embracon-aks"
@@ -634,7 +621,99 @@ az role assignment list --assignee $groupId --output table
 
 > **Benefícios desta abordagem**: Ao usar grupos para gerenciar permissões, você pode facilmente adicionar múltiplos clusters AKS ao mesmo grupo, simplificando o gerenciamento de acesso ao ACR. Esta prática também facilita a auditoria e a revogação de permissões quando necessário.
 
-### 2. Configurando Pull Secrets (caso necessário)
+### 2. Configuração com Oracle Kubernetes Engine (OKE)
+
+O Oracle Kubernetes Engine (OKE) também pode acessar o ACR usando autenticação federada (OIDC) e aproveitar o mesmo grupo "aks-acr-pull" que criamos anteriormente para gerenciar permissões.
+
+```powershell
+# Variáveis para configuração
+$acrName = "embraconacr"
+$resourceGroupName = "embracon-infra"
+$managedIdentityName = "oke-workload-identity"
+$okeNamespace = "default"
+$okeServiceAccount = "workload-identity-sa"
+$groupName = "aks-acr-pull"
+
+# 1. Criar uma Managed Identity para o OKE
+az identity create --name $managedIdentityName --resource-group $resourceGroupName
+$identityClientId = az identity show --name $managedIdentityName --resource-group $resourceGroupName --query clientId --output tsv
+$identityPrincipalId = az identity show --name $managedIdentityName --resource-group $resourceGroupName --query principalId --output tsv
+$tenantId = az account show --query tenantId --output tsv
+
+# 2. Adicionar a Managed Identity ao grupo aks-acr-pull
+az ad group member add --group $groupName --member-id $identityPrincipalId
+
+# 3. Verificar que o grupo tem permissão AcrPull no ACR
+$acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
+az role assignment list --scope $acrId --assignee-object-id $(az ad group show --group $groupName --query id --output tsv) --output table
+```
+
+#### Criar Federated Credential para OKE
+
+```powershell
+# Obter o Issuer URL do OKE (deve ser fornecido pelo administrador do OKE)
+$okeIssuerUrl = "<open-id-connect-discovery-endpoint>"
+
+# Criar Federated Credential
+az identity federated-credential create \
+  --name "oke-federated-credential" \
+  --identity-name $managedIdentityName \
+  --resource-group $resourceGroupName \
+  --issuer $okeIssuerUrl \
+  --subject "system:serviceaccount:$okeNamespace:$okeServiceAccount"
+```
+
+#### Configurar o OKE
+
+Conecte-se ao cluster OKE usando o CLI da Oracle:
+
+```bash
+oci ce cluster create-kubeconfig --cluster-id "$CLUSTER_OCID" --file $HOME/.kube/config --region "$REGION" --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT
+```
+
+#### Criar a ServiceAccount no OKE
+
+Crie um arquivo `service-account.yaml`:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workload-identity-sa
+  namespace: default
+  annotations:
+    azure.workload.identity/client-id: "$identityClientId"
+    azure.workload.identity/tenant-id: "$tenantId"
+```
+
+Aplique o arquivo:
+
+```bash
+kubectl apply -f service-account.yaml
+```
+
+#### Criar um pod de teste para acesso ao ACR
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: acr-test
+  namespace: default
+spec:
+  serviceAccountName: workload-identity-sa
+  containers:
+  - name: acr-test
+    image: embraconacr.azurecr.io/embracon-hello-world:latest
+    imagePullPolicy: Always
+  nodeSelector:
+    kubernetes.io/os: linux
+```
+
+> **Nota:** Esta abordagem integrada permite que ambos os ambientes Kubernetes (AKS e OKE) compartilhem o mesmo controle de acesso ao ACR através do grupo "aks-acr-pull", simplificando a gestão de permissões em ambientes híbridos.
+
+
+### 3. Configurando Pull Secrets (caso necessário)
 
 ```powershell
 # Obter credenciais do ACR (se autenticação de admin estiver habilitada)

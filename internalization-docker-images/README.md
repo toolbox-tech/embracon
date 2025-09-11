@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="../img/tbx.png" alt="Logo Toolbox" wi## 📑 Índice
+  <img src="../img/tbx.png" alt="Logo Toolbox" width="400px">
+</p>
+  
+## 📑 Índice
 
 - [🎯 Sobre o Módulo](#-sobre-o-módulo)
 - [🏗️ Boas Práticas de Infraestrutura](#-boas-práticas-de-infraestrutura)
@@ -14,7 +17,6 @@
 - [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
 - [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
 - [📚 Recursos Adicionais](#-recursos-adicionais)
-</p>
 
 # 🐳 Internalização de Imagens Docker
 
@@ -80,19 +82,6 @@ Menos transferência de dados entre registros significa:
 - Menor utilização de recursos computacionais
 - Menor tempo de execução dos workflows
 - Menos armazenamento usado no ACR (remoção automática de imagens obsoletas)
-
-## 📑 Índice
-
-- [🎯 Sobre o Módulo](#-sobre-o-módulo)
-- [🏗️ Boas Práticas de Infraestrutura](#-boas-práticas-de-infraestrutura)
-- [🚀 Otimização e Economia de Recursos](#-otimização-e-economia-de-recursos)
-- [🛠️ Criação e Configuração do ACR](#-criação-e-configuração-do-acr)
-- [🔒 Segurança do ACR](#-segurança-do-acr)
-- [� Importando Imagens do Docker Hub](#-importando-imagens-do-docker-hub)
-- [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
-- [🔄 Integração com Azure Kubernetes Service (AKS)](#-integração-com-azure-kubernetes-service-aks)
-- [🧹 Políticas de Retenção e Limpeza](#-políticas-de-retenção-e-limpeza)
-- [📊 Monitoramento e Alertas](#-monitoramento-e-alertas)
 
 ### 4. Importação Otimizada com az acr import
 
@@ -871,15 +860,6 @@ Em alguns casos, o digest pode diferir entre o registro de origem e o ACR devido
 - Conversão automática entre formatos (v1, v2, OCI)
 
 Nestes casos, considere verificar apenas tags específicas ou implementar lógica personalizada.
-
-## �📝 Histórico de Alterações
-
-| Data | Versão | Descrição | Autor |
-|------|--------|-----------|-------|
-| 04/09/2025 | 1.0.0 | Criação do documento com instruções para ACR | Equipe DevOps |
-| 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
-| 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
-| 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
 
 ## 📞 Suporte e Contribuição
 

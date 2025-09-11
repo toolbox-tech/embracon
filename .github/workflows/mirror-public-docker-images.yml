@@ -77,7 +77,7 @@ jobs:
               
               # Obter o digest da imagem no ACR usando az CLI
               echo "Obtendo digest da imagem no ACR..."
-              ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" 2>/dev/null || echo "")
+              ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG"  --output json | jq -r '.digest' 2>/dev/null || echo "")
               echo "ACR Digest: $ACR_DIGEST"
               
               # Obter o digest da imagem no Docker Hub usando docker buildx

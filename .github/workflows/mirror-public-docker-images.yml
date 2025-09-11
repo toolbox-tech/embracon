@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
+      contents: write
     
     steps:
       - name: Checkout Repository
@@ -42,17 +42,27 @@ jobs:
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
       - name: Mirror Public Docker Images
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
           
+          # Arquivo JSON de entrada e saída
+          JSON_FILE="internalization-docker-images/docker-public-images-test.json"
+          
           # Ler imagens do arquivo JSON
-          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+          IMAGES=$(cat "$JSON_FILE" | jq -c '.images')
+          
+          # Array para armazenar as atualizações do JSON
+          declare -a JSON_UPDATES=()
           
           echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
             TAG=$(echo "$image" | jq -r '.tag')
             # Usar o mesmo nome do repositório de origem
             TARGET_REPO=$(echo "$image" | jq -r '.repository')
+            # Verificar se já temos um digest armazenado
+            STORED_DIGEST=$(echo "$image" | jq -r 'if has("originalDigest") then .originalDigest else "" end')
             
             # Verificar se a imagem já existe no ACR
             TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
@@ -76,6 +86,16 @@ jobs:
               if [ $? -eq 0 ]; then
                 # Extrair o digest específico para a arquitetura amd64
                 SOURCE_DIGEST=$(docker manifest inspect docker.io/library/$REPO:$TAG | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' || echo "")
+                
+                # Verificar se o digest mudou em relação ao armazenado no JSON
+                if [ -n "$STORED_DIGEST" ] && [ "$SOURCE_DIGEST" = "$STORED_DIGEST" ]; then
+                  echo "O digest da imagem de origem não mudou desde a última verificação ($SOURCE_DIGEST). Pulando importação."
+                  continue
+                elif [ -n "$SOURCE_DIGEST" ]; then
+                  echo "O digest da imagem mudou ou é novo. Antigo: $STORED_DIGEST, Novo: $SOURCE_DIGEST"
+                  # Armazenar o novo digest para atualização posterior do JSON
+                  JSON_UPDATES+=("$REPO:$TAG:$SOURCE_DIGEST")
+                fi
               else
                 SOURCE_DIGEST=""
               fi
@@ -99,6 +119,15 @@ jobs:
                 echo "Digest da imagem de origem: $SOURCE_DIGEST"
                 # Obter o digest da imagem no ACR
                 ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -o tsv 2>/dev/null)
+                
+                # Verificar se o digest já está armazenado no JSON
+                if [ -n "$STORED_DIGEST" ] && [ "$SOURCE_DIGEST" = "$STORED_DIGEST" ]; then
+                  echo "O digest da imagem não mudou no Docker Hub desde a última verificação ($SOURCE_DIGEST)."
+                else
+                  echo "Novo digest detectado. Adicionando à lista de atualizações."
+                  # Adicionar à lista de atualizações para o JSON
+                  JSON_UPDATES+=("$REPO:$TAG:$SOURCE_DIGEST")
+                fi
                 
                 if [ "$SOURCE_DIGEST" = "$ACR_DIGEST" ]; then
                   echo "A imagem $TARGET_IMAGE já existe no ACR e tem o mesmo digest ($SOURCE_DIGEST). Pulando importação."
@@ -130,6 +159,48 @@ jobs:
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             fi
           done
+          
+          # Atualizar o arquivo JSON com os novos digests
+          if [ ${#JSON_UPDATES[@]} -gt 0 ]; then
+            echo "Atualizando o arquivo JSON com os novos digests..."
+            
+            # Cópia temporária do JSON
+            cp "$JSON_FILE" "${JSON_FILE}.tmp"
+            
+            # Atualizar cada entrada no JSON
+            for update in "${JSON_UPDATES[@]}"; do
+              IFS=':' read -r repo_name tag digest <<< "$update"
+              echo "Atualizando digest para $repo_name:$tag -> $digest"
+              
+              # Usar jq para atualizar o digest no JSON
+              jq --arg repo "$repo_name" \
+                 --arg tag "$tag" \
+                 --arg digest "$digest" \
+                 '(.images[] | select(.repository == $repo and .tag == $tag)) |= . + {"originalDigest": $digest}' \
+                 "${JSON_FILE}.tmp" > "${JSON_FILE}.new"
+              
+              mv "${JSON_FILE}.new" "${JSON_FILE}.tmp"
+            done
+            
+            # Substituir o arquivo original
+            mv "${JSON_FILE}.tmp" "$JSON_FILE"
+            
+            echo "Arquivo JSON atualizado com sucesso com os novos digests"
+            
+            # Commit e push das alterações se estivermos em um workflow do GitHub
+            if [ -n "$GITHUB_TOKEN" ]; then
+              echo "Commitando as alterações no arquivo JSON..."
+              
+              git config --global user.name "GitHub Actions"
+              git config --global user.email "actions@github.com"
+              
+              git add "$JSON_FILE"
+              git commit -m "Update image digests [skip ci]"
+              git push
+            fi
+          else
+            echo "Nenhuma atualização de digest necessária no arquivo JSON."
+          fi
   cleanup-images-not-in-json:
     name: Cleanup Images Not in JSON
     runs-on: ubuntu-latest

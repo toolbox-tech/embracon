@@ -121,6 +121,22 @@ Ao verificar os digests das imagens através de manifests, os workflows evitam o
 
 ## 🛠️ Criação e Configuração do ACR
 
+### Diagrama de Fluxo de Internalização de Imagens
+
+```mermaid
+flowchart TB
+  %% Orientação: Vertical (Top to Bottom)
+  classDef dashed stroke-dasharray: 5 5
+
+  subgraph CI[CI • GitHub Actions]
+    EXT["Fonte Externa (Docker Hub / Temurin OpenJDK)" ]
+    CACHE["(Opcional) Cache/Proxy de Registry (ACR Tasks/Cache)"]:::dashed
+    GHA["Workflow de Internalização"]
+    PULL["Step: Pull imagem base (OpenJDK) + pin por digest (sha256)"]
+    CUST["Step: Customização (Dockerfile: CA internos, timezone, hardening)"]
+    BUILD["Step: Build & Tag (ex.: openjdk:17-internal → 17.0.12-internal-YYYYMMDD)"]
+  end
+
   subgraph SEC[Segurança]
     TRIVY["Trivy Scan (CVE/Secrets/Misconfig) + SBOM (spdx/json)"]
     GATE["Gate: falha se severidade ≥ High/Critical"]
@@ -177,8 +193,6 @@ Para começar rapidamente com a internalização de imagens Docker:
 1. Crie um Azure Container Registry Premium: `az acr create --resource-group embracon-infra --name embraconacr --sku Premium`
 2. Configure políticas de retenção: `az acr config retention update --registry embraconacr --status enabled --days 7 --type UntaggedManifests`
 3. Importe imagens do Docker Hub: `az acr import --name embraconacr --source docker.io/library/nginx:latest --image nginx:latest`
-
-## 🛠️ Criação e Configuração do ACR
 
 ### 1. Criando um novo Azure Container Registry
 

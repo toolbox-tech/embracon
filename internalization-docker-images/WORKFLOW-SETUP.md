@@ -2,15 +2,28 @@
 
 Este documento explica como configurar os workflows de espelhamento de imagens Docker para o Azure Container Registry (ACR).
 
+## Princípio Fundamental: JSON como Fonte Única da Verdade
+
+O sistema de espelhamento de imagens opera sob um princípio fundamental: **o arquivo JSON é a única fonte da verdade**. Isso significa que:
+
+- Somente as imagens listadas no arquivo JSON serão importadas para o ACR
+- Qualquer imagem ou repositório presente no ACR que não esteja definido no JSON será automaticamente removido
+- Todas as atualizações e modificações devem ser feitas através do arquivo JSON
+- O workflow sincroniza completamente o conteúdo do ACR com o que está definido no JSON
+
+Este princípio garante que o processo de internalização de imagens seja totalmente controlado, documentado e auditável.
+
 ## Sobre o Workflow
 
 O workflow para espelhamento de imagens é:
 
-1. **`mirror-public-docker-images.yml`**: Espelha imagens públicas do Docker Hub listadas no arquivo `docker-public-images.json`
+1. **`mirror-public-docker-images.yml`**: Espelha imagens públicas do Docker Hub listadas no arquivo `docker-public-images.json` para o Azure Container Registry (ACR)
 
-O workflow possui duas abordagens de implementação:
-- Usando Docker pull e push direto
-- Usando o comando `az acr import` (requer permissões especiais no Azure)
+O workflow utiliza:
+- Comando `az acr import` para transferência eficiente de imagens
+- Verificação de digest para evitar transferências desnecessárias
+- Docker buildx para inspeção de manifestos e digests
+- Cache para otimizar a execução
 
 ## Execução do Workflow
 
@@ -68,8 +81,7 @@ Configure os seguintes segredos no GitHub:
     {
       "repository": "maven",
       "tag": "3.8.1-jdk-11-slim",
-      "description": "Maven com JDK 11 Slim",
-      "targetRepository": "maven"
+      "description": "Maven com JDK 11 Slim"
     }
   ]
 }
@@ -79,7 +91,35 @@ Onde:
 - `repository`: O nome do repositório no Docker Hub
 - `tag`: A tag específica da imagem
 - `description`: Descrição da imagem (usado para documentação)
-- `targetRepository`: O nome do repositório de destino no ACR (será prefixado com "embracon-")
+
+> **Nota**: O nome do repositório de destino no ACR será o mesmo do Docker Hub, prefixado com "embracon-"
+
+**Importante**: Este arquivo JSON é a única fonte da verdade para o gerenciamento das imagens no ACR. Qualquer alteração desejada no conteúdo do ACR (adição, modificação ou remoção de imagens) deve ser feita através deste arquivo. O workflow garante que o conteúdo do ACR seja sempre um reflexo exato do que está definido neste JSON.
+
+## Verificação de Digest e Limpeza
+
+### Verificação de Digest
+
+O workflow implementa uma verificação de digest para evitar transferências desnecessárias:
+
+1. Verifica se a tag da imagem já existe no ACR
+2. Obtém o digest da imagem no ACR usando `az acr repository show`
+3. Obtém o digest da imagem no Docker Hub usando `docker buildx imagetools inspect`
+4. Compara os digests para determinar se a imagem precisa ser atualizada
+5. Só realiza a importação se os digests forem diferentes ou se a imagem não existir no ACR
+
+### Limpeza Automática - JSON como Fonte da Verdade
+
+O workflow implementa um princípio fundamental: **o arquivo JSON é a única fonte da verdade**. Qualquer imagem presente no ACR que não esteja listada no JSON será automaticamente removida.
+
+O job de limpeza funciona da seguinte forma:
+
+1. Lê a lista de imagens válidas do arquivo JSON
+2. Lista todos os repositórios no ACR que começam com o prefixo definido
+3. Remove repositórios inteiros que não estão listados no JSON
+4. Para repositórios válidos, remove tags específicas que não estão no JSON
+
+Isso garante a sincronização total entre o que está documentado no JSON e o que está efetivamente armazenado no ACR. Se uma imagem for removida do arquivo JSON, ela será automaticamente removida do ACR na próxima execução do workflow, mantendo o registro limpo e atualizado.
 
 ## Resolução de Problemas
 

@@ -10,20 +10,40 @@ Este módulo contém instruções detalhadas para configuração do Azure Contai
 
 - 🛡️ Reduzir dependências externas do Docker Hub
 - 🚫 Evitar problemas com limites de rate limiting
-- 🔒 Melhorar a segurança com escaneamento## 🚀 Otimização e Economia de Recursos
+- 🔒 Melhorar a segurança com escaneamento de vulnerabilidades
+- ⚡ Acelerar o tempo de deploy dos seus containers
 
-A implementação de verificação por digest nos workflows de espelhamento de imagens ofer## �📝 Histórico de Alterações
+## 🏗️ Boas Práticas de Infraestrutura
 
-| Data | Versão | Descrição | Autor |
-|------|--------|-----------|-------|
-| 04/09/2025 | 1.0.0 | Criação do documento com instruções para ACR | Equipe DevOps |
-| 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
-| 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
-| 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
-| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
-| 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |
-| 05/09/2025 | 1.5.0 | Implementação de remoção automática de imagens ausentes do JSON | Equipe DevOps |
-| 05/09/2025 | 1.6.0 | Limpeza completa: remoção de repositórios não referenciados no JSON | Equipe DevOps |rsos benefícios:
+### Segregação de Registros de Containers
+
+É **fortemente recomendado** criar um Azure Container Registry (ACR) dedicado exclusivamente para as imagens internalizadas, mantendo-o separado das imagens que são geradas internamente pela empresa. Esta separação proporciona diversos benefícios:
+
+1. **Segurança aprimorada**: 
+   - Separação clara entre imagens externas e imagens proprietárias
+   - Políticas de acesso específicas para cada registro
+   - Escopo de confiança reduzido para imagens de terceiros
+
+2. **Gerenciamento simplificado**:
+   - Ciclo de vida independente para imagens internalizadas
+   - Políticas de retenção personalizadas para cada tipo de imagem
+   - Clareza sobre origem e propriedade das imagens
+
+3. **Governança e conformidade**:
+   - Aplicação de políticas específicas para imagens externas
+   - Rastreabilidade clara sobre origem das imagens
+   - Auditoria e logging separados por origem
+
+4. **Otimização de custos**:
+   - Faturamento separado para cada registro
+   - Opções de SKU diferentes baseadas em necessidades específicas
+   - Visibilidade clara do custo de armazenamento das imagens externas
+
+A implementação de um ACR dedicado para internalização estabelece uma fronteira clara entre as dependências externas e os artefatos internos da organização.
+
+## 🚀 Otimização e Economia de Recursos
+
+A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
 
 ### 1. Sincronização completa com arquivo JSON
 
@@ -45,28 +65,16 @@ Menos transferência de dados entre registros significa:
 - Menor custo de rede (entrada/saída)
 - Menor utilização de recursos computacionais
 - Menor tempo de execução dos workflows
-- Menos armazenamento usado no ACR (remoção automática de imagens obsoletas)idades
+- Menos armazenamento usado no ACR (remoção automática de imagens obsoletas)
 - ⚡ Acelerar o tempo de deploy dos seus containers
 
 ## 📑 Índice
 
 - [🎯 Sobre o Módulo](#-sobre-o-módulo)
-- [🚀 Proposta](#proposta)
-- [🚀 Início Rápido](#-início-rápido)
-- [🛠️ Criação e Configuração do ACR](#-criação-e-config## 📝 Histórico de Alterações
+- [🏗️ Boas Práticas de Infraestrutura](#-boas-práticas-de-infraestrutura)
+- [🚀 Otimização e Economia de Recursos](#-otimização-e-economia-de-recursos)
+- [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)
 
-| Data | Versão | Descrição | Autor |
-|------|--------|-----------|-------|
-| 04/09/2025 | 1.0.0 | Criação do documento com instruções para ACR | Equipe DevOps |
-| 04/09/2025 | 1.0.1 | Correção de sintaxe em scripts PowerShell | Equipe DevOps |
-| 04/09/2025 | 1.1.0 | Adição de seção de importação em massa de imagens | Equipe DevOps |
-| 05/09/2025 | 1.2.0 | Implementação de verificação por digest com Docker Manifest | Equipe DevOps |
-| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
-| 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |
-| 05/09/2025 | 1.5.0 | Implementação de remoção automática de imagens ausentes do JSON | Equipe DevOps |
-| 05/09/2025 | 1.3.0 | Simplificação do processo: removida implementação para imagens privadas | Equipe DevOps |
-| 05/09/2025 | 1.4.0 | Simplificação: uso exclusivo de `az acr import` para internalização | Equipe DevOps |o-acr)
-  - [Criando um novo Azure Container Registry](#1-criando-um-novo-azure-container-registry)
  ## 🚀 Otimização e Economia de Recursos
 
 A implementação de verificação por digest nos workflows de espelhamento de imagens oferece diversos benefícios:
@@ -86,18 +94,28 @@ Benefícios desta abordagem:
 - **Verificação integrada**: Verifica automaticamente se é necessário atualizar
 - **Menor pressão nos runners**: Os runners do GitHub Actions não precisam baixar ou armazenar as imagens
 
-### 2. Economia de largura de banda
+### 2. Importação Otimizada com az acr import
 
-Ao verificar tanto as tags quanto os digests das imagens através de manifests, os workflows evitam o download desnecessário de imagens que não mudaram. Isso pode representar economia significativa de largura de banda, especialmente para imagens grandes como as baseadas em JDK.
+A utilização do comando `az acr import` representa uma evolução significativa no processo de importação:
 
-### 3. Redução de custos
+```bash
+# Importação direta do Docker Hub para o ACR
+az acr import --name myacr --source docker.io/library/maven:3.8.1-jdk-11-slim --image maven:3.8.1-jdk-11-slim
+```
 
-Menos transferência de dados entre registros significa:
+Benefícios desta abordagem:
+- **Transferência direta**: A imagem é transferida diretamente do Docker Hub para o ACR
+- **Autenticação simplificada**: Gerencia as credenciais para ambos os registros
+- **Verificação integrada**: Verifica automaticamente se é necessário atualizar
+- **Menor pressão nos runners**: Os runners do GitHub Actions não precisam baixar ou armazenar as imagens
+
+### 3. Economia de largura de banda e custos
+
+Ao verificar os digests das imagens através de manifests, os workflows evitam o download desnecessário de imagens que não mudaram. Isso resulta em:
 - Menor custo de rede (entrada/saída)
 - Menor utilização de recursos computacionais
-- Menor tempo de execução dos workflowso recursos avançados](#2-habilitando-recursos-avançados)
-  - [Configurando geo-replicação para alta disponibilidade](#3-configurando-geo-replicação-para-alta-disponibilidade)
-- [🔒 Segurança do ACR](#-segurança-do-acr)
+- Menor tempo de execução dos workflows
+- Economia significativa de largura de banda, especialmente para imagens grandes
   - [Autenticação com Azure AD](#1-autenticação-com-azure-ad)
 - [📥 Importando Imagens do Docker Hub](#-importando-imagens-do-docker-hub)
   - [Importação básica de imagens](#1-importação-básica-de-imagens)
@@ -365,7 +383,7 @@ O workflow inclui as seguintes funcionalidades:
 - ✅ Autenticação no Docker Hub para evitar problemas de rate limiting
 - ✅ Autenticação federada com Azure (OIDC)
 - ✅ Importação eficiente de imagens usando `az acr import`
-- ✅ Verificação por digest para garantir a integridade do conteúdo das imagens
+- ✅ Verificação por index digest para garantir a integridade do conteúdo das imagens
 - ✅ Tratamento de erros e opção para forçar atualização de imagens
 
 #### Atualização Eficiente de Imagens
@@ -385,7 +403,7 @@ Esta abordagem traz múltiplos benefícios:
 
 ### Workflow para Imagens Públicas
 
-Este workflow espelha imagens públicas do Docker Hub definidas no arquivo `docker-public-images.json`:
+Este workflow espelha imagens públicas do Docker Hub definidas no arquivo `docker-public-images.json` e remove as que estão no acr e não constam no arquivo:
 
 ```yaml
 name: Mirror Public Docker Images to ACR
@@ -396,16 +414,23 @@ on:
     - cron: '0 0 * * *'
   # Permite execução manual pelo GitHub UI
   workflow_dispatch:
-  # Executa quando o arquivo docker-public-images.json é modificado
+  # Executa quando o arquivo docker-public-images-test.json é modificado
   push:
     branches:
       - main
     paths:
-      - 'internalization-docker-images/docker-public-images.json'
+      - 'internalization-docker-images/docker-public-images-test.json'
+
+env:
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  PREFIX: "embracon-"
+  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+  # As variáveis sensíveis (tokens, secrets) devem ser referenciadas diretamente onde são usadas
 
 jobs:
-  mirror-public-images:
-    name: Mirror Public Docker Images to ACR
+  mirror-public-images-with-az-acr-import:
+    name: Mirror Public Docker Images to ACR (using az acr import)
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -415,11 +440,98 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n $ACR_NAME
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     docker version
+          
+      - name: Mirror Public Docker Images
+        run: |
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            # Usar o mesmo nome do repositório de origem
+            TARGET_REPO=$(echo "$image" | jq -r '.repository')
+            
+            # Configurar nome da imagem de destino no ACR
+            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
+            echo "Processando imagem: $TARGET_IMAGE"
+            
+            # Verificar se a imagem existe no ACR
+            TAG_EXISTS=false
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO do ACR. Verificando digest..."
+              
+              # Obter o digest da imagem no ACR usando az CLI
+              echo "Obtendo digest da imagem no ACR..."
+              ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG"  --output json | jq -r '.digest' 2>/dev/null || echo "")
+              echo "ACR Digest: $ACR_DIGEST"
+              
+              # Obter o digest da imagem no Docker Hub usando docker buildx
+              echo "Obtendo digest da imagem no Docker Hub..."
+              DOCKERHUB_DIGEST=$(docker buildx imagetools inspect "docker.io/library/$REPO:$TAG" --format "{{json .Manifest}}" | jq -r '.digest' 2>/dev/null || echo "")
+              echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
+
+              # Comparar os digests
+              if [ -n "$ACR_DIGEST" ] && [ -n "$DOCKERHUB_DIGEST" ] && [ "$ACR_DIGEST" = "$DOCKERHUB_DIGEST" ]; then
+                echo "Os digests são idênticos ($ACR_DIGEST). Não é necessário atualizar a imagem."
+                continue
+              else
+                echo "Os digests são diferentes ou não foi possível obter um deles:"
+                echo "ACR Digest: $ACR_DIGEST"
+                echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
+                echo "Prosseguindo com a importação..."
+              fi
+            else
+              echo "Tag $TAG não encontrada no ACR. Importando a imagem..."
+            fi
+            
+            echo "Importando imagem $REPO:$TAG para $PREFIX$TARGET_REPO:$TAG"
+            
+            if ! az acr import \
+              --name "$ACR_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --source "docker.io/library/$REPO:$TAG" \
+              --image "$PREFIX$TARGET_REPO:$TAG" \
+              --username "$DOCKERHUB_USERNAME" \
+              --password "${{ secrets.DOCKERHUB_TOKEN }}" \
+              --force; then
+              echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            else
+              echo "Imagem $REPO:$TAG importada com sucesso para $PREFIX$TARGET_REPO:$TAG"
+            fi
+          done
+  cleanup-images-not-in-json:
+    name: Cleanup Images Not in JSON
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
       
       - name: Azure Login via OIDC
         uses: azure/login@v2
@@ -429,37 +541,59 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Log in to Azure Container Registry
-        run: az acr login -n ${{ vars.ACR_NAME }}
-      
-      - name: Mirror Public Docker Images
+        run: az acr login -n $ACR_NAME
+      - name: Remove Images Not in JSON
         run: |
-          ACR_NAME="${{ vars.ACR_NAME }}"
-          RESOURCE_GROUP="${{ vars.RESOURCE_GROUP }}"
-          PREFIX="embracon-"
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
           
-          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP"
+          # Remover imagens que não estão no JSON
+          echo "Verificando e removendo imagens que não estão no arquivo JSON..."
           
-          # Ler imagens do arquivo JSON
-          IMAGES=$(cat "internalization-docker-images/docker-public-images.json" | jq -c '.images')
+          # Cria arquivos temporários com as imagens e repositórios válidos listados no JSON
+          echo "Criando listas de imagens e repositórios válidos..."
+          jq -r '.images[] | "\(.repository):\(.tag)"' internalization-docker-images/docker-public-images-test.json > /tmp/valid_images.txt
+          jq -r '.images[] | .repository' internalization-docker-images/docker-public-images-test.json | sort -u > /tmp/valid_repos.txt
           
-          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
-            REPO=$(echo "$image" | jq -r '.repository')
-            TAG=$(echo "$image" | jq -r '.tag')
-            TARGET_REPO=$(echo "$image" | jq -r '.targetRepository')
+          # Listar todos os repositórios no ACR
+          echo "Listando repositórios no ACR..."
+          az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
+            # Remove o prefixo para comparar com o repository do JSON
+            BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
             
-            echo "Importing $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
-            
-            if ! az acr import \
-              --name "$ACR_NAME" \
-              --resource-group "$RESOURCE_GROUP" \
-              --source "docker.io/library/$REPO:$TAG" \
-              --image "$PREFIX$TARGET_REPO:$TAG" \
-              --username ${{ vars.DOCKERHUB_USERNAME }} \
-              --password ${{ secrets.DOCKERHUB_TOKEN }} \
-              --force; then
-              echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            # Verifica se o repositório está na lista de repositórios válidos
+            if ! grep -q "^$BASE_REPO$" /tmp/valid_repos.txt; then
+              echo "O repositório $repo não está no arquivo JSON. Removendo o repositório inteiro..."
+              
+              # Remover o repositório completo
+              if ! az acr repository delete --name $ACR_NAME --repository $repo --yes; then
+                echo "Erro: Falha ao remover o repositório $repo"
+                echo "Continuando com o próximo item..."
+              fi
+              
+              # Pula para o próximo repositório
+              continue
             fi
+            
+            echo "Verificando imagens no repositório $repo..."
+            
+            # Listar todas as tags neste repositório
+            az acr repository show-tags --name $ACR_NAME --repository $repo -o tsv | while read -r tag; do
+              # Verifica se a combinação repositório:tag está na lista de imagens válidas
+                if ! grep -q "^$BASE_REPO:$tag$" /tmp/valid_images.txt; then
+                echo "A imagem $repo:$tag não está no arquivo JSON. Removendo..."
+                
+                # Remover a imagem
+                if ! az acr repository delete --name $ACR_NAME --image "$repo:$tag" --yes; then
+                  echo "Erro: Falha ao remover $repo:$tag"
+                  echo "Continuando com o próximo item..."
+                fi
+              else
+                echo "A imagem $repo:$tag está na lista de imagens válidas. Mantendo."
+              fi
+            done
           done
+          
+          echo "Processo de sincronização concluído."
 ```
 
 Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW-SETUP.md) com instruções detalhadas.

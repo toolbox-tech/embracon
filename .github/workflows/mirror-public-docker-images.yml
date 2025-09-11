@@ -41,7 +41,23 @@ jobs:
 
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
+      
+      # - name: Login to Docker registries for manifest inspection
+      #   run: |
+      #     # Obter token de acesso ao ACR para uso com o Docker CLI
+      #     ACR_TOKEN=$(az acr login --name $ACR_NAME --expose-token --output tsv --query accessToken)
+      #     echo $ACR_TOKEN | docker login $ACR_NAME.azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
+          
+      #     # Login no Docker Hub para evitar rate limiting
+      #     echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+          
+      #     # Habilitar recursos experimentais do Docker CLI (necessário para manifest inspect)
+      #     export DOCKER_CLI_EXPERIMENTAL=enabled
+      #     docker version
+          
       - name: Mirror Public Docker Images
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
         run: |
           echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
           
@@ -57,6 +73,38 @@ jobs:
             # Configurar nome da imagem de destino no ACR
             TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
             echo "Processando imagem: $TARGET_IMAGE"
+            
+            # Verificar se a imagem existe no ACR
+            TAG_EXISTS=false
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO do ACR. Verificando digest..."
+              
+              # DOCKER_CLI_EXPERIMENTAL já está habilitado no ambiente do job
+              
+              # Obter o digest da imagem no ACR
+              ACR_IMAGE="$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+              echo "Obtendo digest da imagem $ACR_IMAGE no ACR..."
+              ACR_DIGEST=$(docker manifest inspect $ACR_IMAGE | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' 2>/dev/null || echo "")
+              
+              # Obter o digest da imagem no Docker Hub
+              DOCKERHUB_IMAGE="docker.io/library/$REPO:$TAG"
+              echo "Obtendo digest da imagem $DOCKERHUB_IMAGE no Docker Hub..."
+              DOCKERHUB_DIGEST=$(docker manifest inspect $DOCKERHUB_IMAGE | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' 2>/dev/null || echo "")
+              
+              # Comparar os digests
+              if [ -n "$ACR_DIGEST" ] && [ -n "$DOCKERHUB_DIGEST" ] && [ "$ACR_DIGEST" = "$DOCKERHUB_DIGEST" ]; then
+                echo "Os digests são idênticos ($ACR_DIGEST). Não é necessário atualizar a imagem."
+                continue
+              else
+                echo "Os digests são diferentes ou não foi possível obter um deles:"
+                echo "ACR Digest: $ACR_DIGEST"
+                echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
+                echo "Prosseguindo com a importação..."
+              fi
+            else
+              echo "Tag $TAG não encontrada no ACR. Importando a imagem..."
+            fi
             
             echo "Importando imagem $REPO:$TAG para $PREFIX$TARGET_REPO:$TAG"
             

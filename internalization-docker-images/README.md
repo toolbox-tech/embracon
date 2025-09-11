@@ -123,7 +123,6 @@ Ao verificar os digests das imagens através de manifests, os workflows evitam o
   - [Importação com autenticação para registros privados](#3-importação-com-autenticação-para-registros-privados)
   - [Importação em massa de várias tags de uma imagem](#4-importação-em-massa-de-várias-tags-de-uma-imagem)
   - [Boas práticas para importação](#5-boas-práticas-para-importação)
-  - [Automação com Azure Logic Apps](#6-automação-com-azure-logic-apps)
 - [🔄 Workflow GitHub Actions para Espelhamento](#-workflow-github-actions-para-espelhamento)
   - [Workflow para Imagens Públicas](#workflow-para-imagens-públicas)
 - [🔄 Integração com Azure Kubernetes Service (AKS)](#-integração-com-azure-kubernetes-service-aks)
@@ -604,14 +603,36 @@ Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW
 
 ```powershell
 $aksName = "embracon-aks"
+$acrName = "embraconacr"
+$resourceGroupName = "embracon-infra"
 
-# Conceder ao AKS acesso ao ACR
-az aks update --name $aksName --resource-group $resourceGroupName --attach-acr $acrName
+# Criar um grupo para controle de acesso ao ACR
+$groupName = "aks-acr-pull"
+$groupDescription = "Grupo para clusters AKS com permissão de AcrPull no ACR"
 
-# Ou usando identidade atribuída pelo usuário
+# Criar o grupo
+az ad group create --display-name $groupName --mail-nickname "aks-acr-pull" --description $groupDescription
+
+# Obter o ID do grupo criado
+$groupId = az ad group show --group $groupName --query id --output tsv
+
+# Obter o ID da identidade do kubelet do cluster AKS
 $aksIdentityId = az aks show --name $aksName --resource-group $resourceGroupName --query identityProfile.kubeletidentity.objectId -o tsv
-az role assignment create --assignee $aksIdentityId --scope $acrId --role AcrPull
+
+# Adicionar a identidade do cluster AKS ao grupo
+az ad group member add --group $groupName --member-id $aksIdentityId
+
+# Obter o ID do ACR
+$acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
+
+# Atribuir permissão AcrPull ao grupo
+az role assignment create --assignee $groupId --scope $acrId --role AcrPull
+
+# Verificar as permissões atribuídas
+az role assignment list --assignee $groupId --output table
 ```
+
+> **Benefícios desta abordagem**: Ao usar grupos para gerenciar permissões, você pode facilmente adicionar múltiplos clusters AKS ao mesmo grupo, simplificando o gerenciamento de acesso ao ACR. Esta prática também facilita a auditoria e a revogação de permissões quando necessário.
 
 ### 2. Configurando Pull Secrets (caso necessário)
 

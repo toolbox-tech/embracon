@@ -78,11 +78,13 @@ jobs:
               # Obter o digest da imagem no ACR usando az CLI
               echo "Obtendo digest da imagem no ACR..."
               ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -r 2>/dev/null || echo "")
+              echo "ACR Digest: $ACR_DIGEST"
               
               # Obter o digest da imagem no Docker Hub usando docker buildx
               echo "Obtendo digest da imagem no Docker Hub..."
               DOCKERHUB_DIGEST=$(docker buildx imagetools inspect "docker.io/library/$REPO:$TAG" --format "{{json .Manifest}}" | jq -r '.digest' 2>/dev/null || echo "")
-              
+              echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
+
               # Comparar os digests
               if [ -n "$ACR_DIGEST" ] && [ -n "$DOCKERHUB_DIGEST" ] && [ "$ACR_DIGEST" = "$DOCKERHUB_DIGEST" ]; then
                 echo "Os digests são idênticos ($ACR_DIGEST). Não é necessário atualizar a imagem."

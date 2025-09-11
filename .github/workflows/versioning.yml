@@ -1,0 +1,49 @@
+name: Reusable - Versioning
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: write #garante o push/tag nop repo chamador 
+
+jobs:
+  versioning:
+    runs-on: ubuntu-latest
+    steps:
+      # Necessário para acessar o repo do chamador e poder fazer git log/push
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # pega todo o histórico p/ git log e tags
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install and Build #instala as dependencias (inclusive o standard-version)
+        run: |
+          npm install 
+      - name: Configuring Git Account #necessário pra atribuir identidade no push pro commit ou tag
+        run: |
+          git config --global user.email "pipelines@toolboxdevops.cloud"
+          git config --global user.name "Toolbox Automation"
+      - name: Check commit message for specific keywords
+        run: |
+          text=$(git log -1 --no-merges --pretty=%B)
+          echo $text
+          if [[ $text =~ (fix|patch) ]]; then
+            npm run release -- --release-as patch
+            echo "{{ Patching Versioning }}"
+          elif [[ $text =~ (BREAKING\ CHANGE) ]]; then
+            npm run release -- --release-as patch
+            echo "{{ Major Versioning }}"
+          elif [[ $text =~ (feat) ]]; then
+            echo "{{ Minor Versioning }}"
+            npm run release -- --release-as minor
+          else
+            npm run release -- --release-as patch
+            echo "{{ Default Patching Versioning }}"
+          fi
+          git push --follow-tags origin main

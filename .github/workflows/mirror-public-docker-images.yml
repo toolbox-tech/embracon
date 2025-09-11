@@ -42,22 +42,17 @@ jobs:
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
       
-      # - name: Login to Docker registries for manifest inspection
-      #   run: |
-      #     # Obter token de acesso ao ACR para uso com o Docker CLI
-      #     ACR_TOKEN=$(az acr login --name $ACR_NAME --expose-token --output tsv --query accessToken)
-      #     echo $ACR_TOKEN | docker login $ACR_NAME.azurecr.io -u 00000000-0000-0000-0000-000000000000 --password-stdin
-          
-      #     # Login no Docker Hub para evitar rate limiting
-      #     echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-          
-      #     # Habilitar recursos experimentais do Docker CLI (necessário para manifest inspect)
-      #     export DOCKER_CLI_EXPERIMENTAL=enabled
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       #     docker version
           
       - name: Mirror Public Docker Images
-        env:
-          DOCKER_CLI_EXPERIMENTAL: enabled
         run: |
           echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
           
@@ -80,17 +75,13 @@ jobs:
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO do ACR. Verificando digest..."
               
-              # DOCKER_CLI_EXPERIMENTAL já está habilitado no ambiente do job
+              # Obter o digest da imagem no ACR usando az CLI
+              echo "Obtendo digest da imagem no ACR..."
+              ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG" --query "digest" -r 2>/dev/null || echo "")
               
-              # Obter o digest da imagem no ACR
-              ACR_IMAGE="$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-              echo "Obtendo digest da imagem $ACR_IMAGE no ACR..."
-              ACR_DIGEST=$(docker manifest inspect $ACR_IMAGE | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' 2>/dev/null || echo "")
-              
-              # Obter o digest da imagem no Docker Hub
-              DOCKERHUB_IMAGE="docker.io/library/$REPO:$TAG"
-              echo "Obtendo digest da imagem $DOCKERHUB_IMAGE no Docker Hub..."
-              DOCKERHUB_DIGEST=$(docker manifest inspect $DOCKERHUB_IMAGE | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest' 2>/dev/null || echo "")
+              # Obter o digest da imagem no Docker Hub usando docker buildx
+              echo "Obtendo digest da imagem no Docker Hub..."
+              DOCKERHUB_DIGEST=$(docker buildx imagetools inspect "docker.io/library/$REPO:$TAG" --format "{{json .Manifest}}" | jq -r '.digest' 2>/dev/null || echo "")
               
               # Comparar os digests
               if [ -n "$ACR_DIGEST" ] && [ -n "$DOCKERHUB_DIGEST" ] && [ "$ACR_DIGEST" = "$DOCKERHUB_DIGEST" ]; then

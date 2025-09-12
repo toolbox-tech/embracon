@@ -1,0 +1,37 @@
+# Este é um arquivo de exemplo para demonstrar o acesso ao Azure Container Registry
+# A imagem "nginx" é utilizada para um exemplo mais funcional
+# Substitua pela imagem real do seu projeto em ambientes de produção
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embracon-nginx
+  labels:
+    app: embracon-nginx
+  annotations:
+    description: "Deployment de exemplo para demonstrar acesso ao ACR"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: embracon-nginx
+  template:
+    metadata:
+      labels:
+        app: embracon-nginx
+    spec:
+      # Para usar OIDC com AKS ou OKE, especifique a ServiceAccount configurada
+      # serviceAccountName: workload-identity-sa
+      containers:
+      - name: embracon-nginx
+        # Esta imagem é mais adequada para testes por ser um servidor web
+        image: embraconacr.azurecr.io/embracon-nginx:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"

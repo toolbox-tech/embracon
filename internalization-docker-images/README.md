@@ -595,6 +595,7 @@ Para configurar este workflow, consulte o documento [WORKFLOW-SETUP.md](WORKFLOW
 $aksName = "embracon-aks"
 $acrName = "embraconacr"
 $resourceGroupName = "embracon-infra"
+$localization = "brazilsouth"
 
 # Criar um grupo para controle de acesso ao ACR
 $groupName = "aks-acr-pull"
@@ -606,20 +607,30 @@ az ad group create --display-name $groupName --mail-nickname "aks-acr-pull" --de
 # Obter o ID do grupo criado
 $groupId = az ad group show --group $groupName --query id --output tsv
 
+# Novo cluster:
+az aks create --name $aksName --resource-group $resourceGroupName --location $localization --enable-oidc-issuer --enable-managed-identity --node-count 1 --enable-cluster-autoscaler --min-count 1 --max-count 3 --tier free --generate-ssh-keys
+
 # Obter o ID da identidade do kubelet do cluster AKS
 $aksIdentityId = az aks show --name $aksName --resource-group $resourceGroupName --query identityProfile.kubeletidentity.objectId -o tsv
 
 # Adicionar a identidade do cluster AKS ao grupo
-az ad group member add --group $groupName --member-id $aksIdentityId
+az ad group member add --group $groupName --member-id $aksIdentityId --member-object-type "ManagedIdentity"
 
 # Obter o ID do ACR
 $acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
 
 # Atribuir permissão AcrPull ao grupo
-az role assignment create --assignee $groupId --scope $acrId --role AcrPull
+az role assignment create --assignee-object-id $groupId --scope $acrId --role AcrPull --assignee-principal-type Group
 
 # Verificar as permissões atribuídas
-az role assignment list --assignee $groupId --output table
+az role assignment list --assignee $groupId --all --output table
+
+# Conecte-se ao cluster criado
+az aks get-credentials --name $aksName --resource-group $resourceGroupName
+
+# Use a imagem para teste
+kubectl apply -f .\deployment.yaml
+
 ```
 
 > **Benefícios desta abordagem**: Ao usar grupos para gerenciar permissões, você pode facilmente adicionar múltiplos clusters AKS ao mesmo grupo, simplificando o gerenciamento de acesso ao ACR. Esta prática também facilita a auditoria e a revogação de permissões quando necessário.

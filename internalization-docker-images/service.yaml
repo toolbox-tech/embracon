@@ -1,0 +1,16 @@
+# Este é um Service para expor o deployment do nginx
+apiVersion: v1
+kind: Service
+metadata:
+  name: embracon-nginx
+  labels:
+    app: embracon-nginx
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: embracon-nginx

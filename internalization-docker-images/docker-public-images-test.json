@@ -1,9 +1,9 @@
 {
     "images": [
         {
-            "repository": "hello-world",
+            "repository": "nginx",
             "tag": "latest",
-            "description": "Hello World"
+            "description": "Nginx Web Server"
         }
     ]
 }

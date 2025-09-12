@@ -1,3 +1,9 @@
+## 1.6.0 (2025-09-12)
+
+### Feat
+
+- **acr**: aks config to access acr
+
 ## 1.5.0 (2025-09-12)
 
 ### Feat

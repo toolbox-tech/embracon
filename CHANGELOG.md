@@ -1,3 +1,9 @@
+## 1.5.0 (2025-09-12)
+
+### Feat
+
+- **acr**: change hello-world to nginx
+
 ## 1.4.1 (2025-09-11)
 
 ### Fix

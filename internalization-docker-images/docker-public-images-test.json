@@ -4,6 +4,11 @@
             "repository": "nginx",
             "tag": "latest",
             "description": "Nginx Web Server"
+        },
+        {
+            "repository": "nginx",
+            "tag": "stable-perl",
+            "description": "Nginx Web Server"
         }
     ]
 }

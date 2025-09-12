@@ -2,8 +2,8 @@ name: Mirror Public Docker Images to ACR
 
 on:
   # Executa diariamente à meia-noite
-  schedule:
-    - cron: '0 0 * * *'
+  # schedule:
+  #   - cron: '0 0 * * *'
   # Permite execução manual pelo GitHub UI
   workflow_dispatch:
   # Executa quando o arquivo docker-public-images-test.json é modificado

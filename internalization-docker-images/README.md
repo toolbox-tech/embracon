@@ -597,6 +597,9 @@ $acrName = "embraconacr"
 $resourceGroupName = "embracon-infra"
 $localization = "brazilsouth"
 
+# Novo cluster:
+az aks create --name $aksName --resource-group $resourceGroupName --location $localization --enable-oidc-issuer --enable-managed-identity --node-count 1 --enable-cluster-autoscaler --min-count 1 --max-count 3 --tier free --generate-ssh-keys
+
 # Criar um grupo para controle de acesso ao ACR
 $groupName = "aks-acr-pull"
 $groupDescription = "Grupo para clusters AKS com permissão de AcrPull no ACR"
@@ -607,30 +610,37 @@ az ad group create --display-name $groupName --mail-nickname "aks-acr-pull" --de
 # Obter o ID do grupo criado
 $groupId = az ad group show --group $groupName --query id --output tsv
 
-# Novo cluster:
-az aks create --name $aksName --resource-group $resourceGroupName --location $localization --enable-oidc-issuer --enable-managed-identity --node-count 1 --enable-cluster-autoscaler --min-count 1 --max-count 3 --tier free --generate-ssh-keys
-
 # Obter o ID da identidade do kubelet do cluster AKS
 $aksIdentityId = az aks show --name $aksName --resource-group $resourceGroupName --query identityProfile.kubeletidentity.objectId -o tsv
 
 # Adicionar a identidade do cluster AKS ao grupo
-az ad group member add --group $groupName --member-id $aksIdentityId --member-object-type "ManagedIdentity"
+az ad group member add --group $groupName --member-id $aksIdentityId
 
 # Obter o ID do ACR
 $acrId = az acr show --name $acrName --resource-group $resourceGroupName --query id --output tsv
 
 # Atribuir permissão AcrPull ao grupo
-az role assignment create --assignee-object-id $groupId --scope $acrId --role AcrPull --assignee-principal-type Group
+az role assignment create --assignee $groupId --scope $acrId --role AcrPull
 
 # Verificar as permissões atribuídas
 az role assignment list --assignee $groupId --all --output table
 
+# Obter URL do ACR
+$acrUrl = az acr show --name $acrName --resource-group $resourceGroupName --query loginServer --output tsv
+
+# Checar se o AKS tem acesso ao ACR
+az aks check-acr --resource-group $resourceGroupName --name $aksName --acr $acrUrl
+
 # Conecte-se ao cluster criado
 az aks get-credentials --name $aksName --resource-group $resourceGroupName
 
-# Use a imagem para teste
+# Deploy do NGINX que está no ACR
 kubectl apply -f .\deployment.yaml
+kubectl apply -f .\service.yaml
 
+# Check
+kubectl get pods -l app=embracon-nginx
+kubectl get svc embracon-nginx
 ```
 
 > **Benefícios desta abordagem**: Ao usar grupos para gerenciar permissões, você pode facilmente adicionar múltiplos clusters AKS ao mesmo grupo, simplificando o gerenciamento de acesso ao ACR. Esta prática também facilita a auditoria e a revogação de permissões quando necessário.

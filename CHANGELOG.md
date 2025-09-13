@@ -1,3 +1,14 @@
+## 1.7.0 (2025-09-13)
+
+### Feat
+
+- atualiza workflow de build e add packagelock
+
+### Fix
+
+- remove npm ci duplicado do dockerfile
+- ajusta caminho do Dockerfile no build pra usar o healthcheck.js
+
 ## 1.6.0 (2025-09-12)
 
 ### Feat

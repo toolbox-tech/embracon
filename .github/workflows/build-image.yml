@@ -1,0 +1,48 @@
+name: CI - Docker build with cache
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: app/nodejs
+        
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app/nodejs
+          file: ./app/nodejs/Dockerfile
+          load: true
+          push: false # This loads the image locally
+          tags: embracon:ci-nodejs-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Docker image
+        run: docker run embracon:ci-nodejs-${{ github.sha }} ls

@@ -21,6 +21,9 @@ RUN addgroup -g 1001 -S nodejs \
 # Configurar diretório de trabalho
 WORKDIR /app
 
+# Copiar apenas package files para otimizar cache do Docker
+COPY . .
+
 # Stage 2: Production
 FROM node:20-alpine AS production
 
@@ -35,9 +38,6 @@ RUN addgroup -g 1001 -S nodejs \
 # Configurar diretório de trabalho
 WORKDIR /app
 
-# Copiar apenas package files para otimizar cache do Docker
-COPY . .
-
 # Configurações de segurança
 ENV NODE_ENV=production
 ENV NPM_CONFIG_LOGLEVEL=warn
@@ -46,8 +46,9 @@ ENV NODE_OPTIONS="--max-old-space-size=1024"
 # Remover arquivos desnecessários
 RUN rm -f package-lock.json npm-debug.log* yarn.lock .npmrc 2>/dev/null || true
 
-# Health check
-COPY --chown=nodejs:nodejs healthcheck.js .
+# Copiar apenas package files para otimizar cache do Docker
+COPY . .
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD node healthcheck.js || exit 1
 
@@ -62,4 +63,5 @@ ENTRYPOINT ["dumb-init", "--"]
 
 # Comando para iniciar a aplicação
 CMD ["node", "server.js"]
+
 

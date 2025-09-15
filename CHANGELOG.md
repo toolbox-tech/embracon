@@ -1,3 +1,27 @@
+## 4.0.0 (2025-09-15)
+
+### Fix
+
+- **acr**: change prefix
+
+## 3.0.1 (2025-09-15)
+
+### Fix
+
+- **acr**: identity
+
+## 3.0.0 (2025-09-15)
+
+### Fix
+
+- **acr**: enable-AzPSSession: true
+
+## 2.0.0 (2025-09-15)
+
+### Fix
+
+- **acr**: action auth-type: IDENTITY
+
 ## 1.7.0 (2025-09-13)
 
 ### Feat

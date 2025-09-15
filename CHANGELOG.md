@@ -1,3 +1,9 @@
+## 4.0.1 (2025-09-15)
+
+### Fix
+
+- build image permissions:   contents: write
+
 ## 4.0.0 (2025-09-15)
 
 ### Fix

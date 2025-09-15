@@ -16,7 +16,7 @@ on:
 env:
   ACR_NAME: ${{ vars.ACR_NAME }}
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
-  PREFIX: "embracon-"
+  PREFIX: "images/"
   DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
   # As variáveis sensíveis (tokens, secrets) devem ser referenciadas diretamente onde são usadas
 

@@ -218,7 +218,7 @@ secrets: []
 # secrets:
 #   - name: app-secrets
 #     data:
-#       api-key: "bXktc2VjcmV0LWFwaS1rZXk="
+#       api-key: ""
 
 # Volumes
 volumes: []

@@ -63,6 +63,9 @@ jobs:
           # Ler imagens do arquivo JSON
           IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
           
+          # Criar arquivo para rastrear imagens novas que precisam ser assinadas
+          echo "" > /tmp/new_images_to_sign.txt
+          
           echo "$IMAGES" | jq -c '.[]' | while read -r image; do
             REPO=$(echo "$image" | jq -r '.repository')
             TAG=$(echo "$image" | jq -r '.tag')
@@ -75,6 +78,8 @@ jobs:
             
             # Verificar se a imagem existe no ACR
             TAG_EXISTS=false
+            IMAGE_IS_NEW=false
+            
             if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO do ACR. Verificando digest..."
@@ -98,9 +103,11 @@ jobs:
                 echo "ACR Digest: $ACR_DIGEST"
                 echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
                 echo "Prosseguindo com a importação..."
+                IMAGE_IS_NEW=true
               fi
             else
               echo "Tag $TAG não encontrada no ACR. Importando a imagem..."
+              IMAGE_IS_NEW=true
             fi
             
             echo "Importando imagem $REPO:$TAG para $PREFIX$TARGET_REPO:$TAG"
@@ -116,36 +123,63 @@ jobs:
               echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
             else
               echo "Imagem $REPO:$TAG importada com sucesso para $PREFIX$TARGET_REPO:$TAG"
+              
+              # Se a imagem é nova ou foi atualizada, adicionar à lista para assinatura
+              if [ "$IMAGE_IS_NEW" = true ]; then
+                echo "$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG" >> /tmp/new_images_to_sign.txt
+                echo "Imagem adicionada à lista para assinatura: $ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+              fi
             fi
           done
       
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.10.0
 
+      - name: Download Azure Key Vault key
+        run: |
+          echo "Baixando chave pública do Azure Key Vault..."
+          
+          # Baixar a chave pública do Azure Key Vault
+          az keyvault key download \
+            --vault-name "kms-keys" \
+            --name "cosign" \
+            --file cosign.pub
+          
+          echo "Chave pública baixada com sucesso"
+          ls -la cosign.pub
+
       - name: Sign images with Azure Key Vault key
         run: |
-          echo "Assinando imagens importadas com chave do Azure Key Vault..."
+          echo "Assinando apenas imagens novas com chave do Azure Key Vault..."
           
-          # Ler imagens do arquivo JSON e assinar cada uma
-          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+          # Verificar se há imagens novas para assinar
+          if [ ! -s /tmp/new_images_to_sign.txt ]; then
+            echo "Nenhuma imagem nova encontrada para assinatura. Pulando etapa de assinatura."
+            exit 0
+          fi
           
-          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
-            REPO=$(echo "$image" | jq -r '.repository')
-            TAG=$(echo "$image" | jq -r '.tag')
-            TARGET_REPO=$(echo "$image" | jq -r '.repository')
-            
-            # Nome completo da imagem no ACR
-            ACR_IMAGE="$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
-            
-            echo "Assinando imagem: $ACR_IMAGE"
-            
-            # Assinar com a chave do Azure Key Vault
-            if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
-              echo "Erro: Falha ao assinar $ACR_IMAGE"
-            else
-              echo "Imagem $ACR_IMAGE assinada com sucesso"
+          echo "Imagens novas que serão assinadas:"
+          cat /tmp/new_images_to_sign.txt
+          
+          # Assinar apenas as imagens novas
+          while IFS= read -r ACR_IMAGE; do
+            if [ -n "$ACR_IMAGE" ]; then
+              echo "Assinando imagem nova: $ACR_IMAGE"
+              
+              # Assinar com a chave do Azure Key Vault
+              if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
+                echo "Erro: Falha ao assinar $ACR_IMAGE"
+              else
+                echo "Imagem $ACR_IMAGE assinada com sucesso"
+                
+                # Verificar a assinatura com a chave pública baixada
+                echo "Verificando assinatura..."
+                cosign verify --key cosign.pub "$ACR_IMAGE" || echo "Aviso: Falha na verificação da assinatura"
+              fi
             fi
-          done
+          done < /tmp/new_images_to_sign.txt
+          
+          echo "Processo de assinatura concluído."
 
 
   cleanup-images-not-in-json:

@@ -41,7 +41,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          enable-AzPSSession: true
+          # enable-AzPSSession: true
 
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
@@ -143,10 +143,11 @@ jobs:
           az keyvault key download \
             --vault-name "kms-keys" \
             --name "cosign" \
-            --file cosign.pub
+            -e PEM \  
+            --file cosign.pem
           
           echo "Chave pública baixada com sucesso"
-          ls -la cosign.pub
+          ls -la cosign.pem
 
       - name: Sign images with Azure Key Vault key
         run: |
@@ -169,7 +170,7 @@ jobs:
             echo "Verificando assinatura da imagem: $ACR_IMAGE"
             
             # Verificar se a imagem já está assinada com nossa chave
-            if cosign verify --key cosign.pub "$ACR_IMAGE" >/dev/null 2>&1; then
+            if cosign verify --key cosign.pem "$ACR_IMAGE" >/dev/null 2>&1; then
               echo "✅ Imagem $ACR_IMAGE já está assinada com nossa chave. Pulando..."
             else
               echo "❌ Imagem $ACR_IMAGE não está assinada com nossa chave. Adicionando à lista para assinatura..."
@@ -194,14 +195,14 @@ jobs:
               echo "🔐 Assinando imagem: $ACR_IMAGE"
               
               # Assinar com a chave do Azure Key Vault
-              if ! cosign sign --key cosign.pub --yes "$ACR_IMAGE"; then
+              if ! cosign sign --key cosign.pem --yes "$ACR_IMAGE"; then
                 echo "❌ Erro: Falha ao assinar $ACR_IMAGE"
               else
                 echo "✅ Imagem $ACR_IMAGE assinada com sucesso"
                 
                 # Verificar a assinatura recém-criada
                 echo "🔍 Verificando assinatura..."
-                if cosign verify --key cosign.pub "$ACR_IMAGE" >/dev/null 2>&1; then
+                if cosign verify --key cosign.pem "$ACR_IMAGE" >/dev/null 2>&1; then
                   echo "✅ Assinatura verificada com sucesso"
                 else
                   echo "⚠️ Aviso: Falha na verificação da assinatura"

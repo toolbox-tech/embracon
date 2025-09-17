@@ -1,3 +1,9 @@
+## 4.1.0 (2025-09-17)
+
+### Feat
+
+- **acr**: sign images with cosign
+
 ## 4.0.1 (2025-09-15)
 
 ### Fix

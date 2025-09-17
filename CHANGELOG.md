@@ -1,3 +1,10 @@
+## 4.2.1 (2025-09-17)
+
+### Fix
+
+- **acr**: use local key to sign
+- **acr**: fix sed
+
 ## 4.2.0 (2025-09-17)
 
 ### Feat

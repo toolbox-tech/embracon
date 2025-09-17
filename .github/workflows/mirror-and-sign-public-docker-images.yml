@@ -143,11 +143,10 @@ jobs:
           az keyvault key download \
             --vault-name "kms-keys" \
             --name "cosign" \
-            -e PEM \  
-            --file cosign.pem
+            --file cosign
           
           echo "Chave pública baixada com sucesso"
-          ls -la cosign.pem
+          ls -la cosign
 
       - name: Sign images with Azure Key Vault key
         run: |
@@ -170,7 +169,7 @@ jobs:
             echo "Verificando assinatura da imagem: $ACR_IMAGE"
             
             # Verificar se a imagem já está assinada com nossa chave
-            if cosign verify --key cosign.pem "$ACR_IMAGE" >/dev/null 2>&1; then
+            if cosign verify --key cosign "$ACR_IMAGE" >/dev/null 2>&1; then
               echo "✅ Imagem $ACR_IMAGE já está assinada com nossa chave. Pulando..."
             else
               echo "❌ Imagem $ACR_IMAGE não está assinada com nossa chave. Adicionando à lista para assinatura..."
@@ -195,14 +194,14 @@ jobs:
               echo "🔐 Assinando imagem: $ACR_IMAGE"
               
               # Assinar com a chave do Azure Key Vault
-              if ! cosign sign --key cosign.pem --yes "$ACR_IMAGE"; then
+              if ! cosign sign --key cosign --yes "$ACR_IMAGE"; then
                 echo "❌ Erro: Falha ao assinar $ACR_IMAGE"
               else
                 echo "✅ Imagem $ACR_IMAGE assinada com sucesso"
                 
                 # Verificar a assinatura recém-criada
                 echo "🔍 Verificando assinatura..."
-                if cosign verify --key cosign.pem "$ACR_IMAGE" >/dev/null 2>&1; then
+                if cosign verify --key cosign "$ACR_IMAGE" >/dev/null 2>&1; then
                   echo "✅ Assinatura verificada com sucesso"
                 else
                   echo "⚠️ Aviso: Falha na verificação da assinatura"

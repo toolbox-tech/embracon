@@ -194,7 +194,7 @@ jobs:
               echo "🔐 Assinando imagem: $ACR_IMAGE"
               
               # Assinar com a chave do Azure Key Vault
-              if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
+              if ! cosign sign --key cosign.pub --yes "$ACR_IMAGE"; then
                 echo "❌ Erro: Falha ao assinar $ACR_IMAGE"
               else
                 echo "✅ Imagem $ACR_IMAGE assinada com sucesso"

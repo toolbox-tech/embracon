@@ -1,0 +1,222 @@
+name: Mirror and Sign Public Docker Images to ACR
+
+on:
+  # Executa diariamente à meia-noite
+  # schedule:
+  #   - cron: '0 0 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-public-images-test.json é modificado
+  push:
+    branches:
+      - main
+    paths:
+      - 'internalization-docker-images/docker-public-images-test.json'
+
+env:
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  PREFIX: "images/"
+  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+  AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  # As variáveis sensíveis (tokens, secrets) devem ser referenciadas diretamente onde são usadas
+
+jobs:
+  mirror-public-images-with-az-acr-import:
+    name: Mirror Public Docker Images to ACR (using az acr import)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n $ACR_NAME
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #     docker version
+          
+      - name: Mirror Public Docker Images
+        run: |
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
+          
+          # Ler imagens do arquivo JSON
+          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            # Usar o mesmo nome do repositório de origem
+            TARGET_REPO=$(echo "$image" | jq -r '.repository')
+            
+            # Configurar nome da imagem de destino no ACR
+            TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
+            echo "Processando imagem: $TARGET_IMAGE"
+            
+            # Verificar se a imagem existe no ACR
+            TAG_EXISTS=false
+            if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
+              TAG_EXISTS=true
+              echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO do ACR. Verificando digest..."
+              
+              # Obter o digest da imagem no ACR usando az CLI
+              echo "Obtendo digest da imagem no ACR..."
+              ACR_DIGEST=$(az acr repository show --name "$ACR_NAME" --image "$PREFIX$TARGET_REPO:$TAG"  --output json | jq -r '.digest' 2>/dev/null || echo "")
+              echo "ACR Digest: $ACR_DIGEST"
+              
+              # Obter o digest da imagem no Docker Hub usando docker buildx
+              echo "Obtendo digest da imagem no Docker Hub..."
+              DOCKERHUB_DIGEST=$(docker buildx imagetools inspect "docker.io/library/$REPO:$TAG" --format "{{json .Manifest}}" | jq -r '.digest' 2>/dev/null || echo "")
+              echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
+
+              # Comparar os digests
+              if [ -n "$ACR_DIGEST" ] && [ -n "$DOCKERHUB_DIGEST" ] && [ "$ACR_DIGEST" = "$DOCKERHUB_DIGEST" ]; then
+                echo "Os digests são idênticos ($ACR_DIGEST). Não é necessário atualizar a imagem."
+                continue
+              else
+                echo "Os digests são diferentes ou não foi possível obter um deles:"
+                echo "ACR Digest: $ACR_DIGEST"
+                echo "Docker Hub Digest: $DOCKERHUB_DIGEST"
+                echo "Prosseguindo com a importação..."
+              fi
+            else
+              echo "Tag $TAG não encontrada no ACR. Importando a imagem..."
+            fi
+            
+            echo "Importando imagem $REPO:$TAG para $PREFIX$TARGET_REPO:$TAG"
+            
+            if ! az acr import \
+              --name "$ACR_NAME" \
+              --resource-group "$RESOURCE_GROUP" \
+              --source "docker.io/library/$REPO:$TAG" \
+              --image "$PREFIX$TARGET_REPO:$TAG" \
+              --username "$DOCKERHUB_USERNAME" \
+              --password "${{ secrets.DOCKERHUB_TOKEN }}" \
+              --force; then
+              echo "Error: Failed to import $REPO:$TAG to $PREFIX$TARGET_REPO:$TAG"
+            else
+              echo "Imagem $REPO:$TAG importada com sucesso para $PREFIX$TARGET_REPO:$TAG"
+            fi
+          done
+      
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.10.0
+
+      - name: Sign images with Azure Key Vault key
+        run: |
+          echo "Assinando imagens importadas com chave do Azure Key Vault..."
+          
+          # Ler imagens do arquivo JSON e assinar cada uma
+          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.repository')
+            
+            # Nome completo da imagem no ACR
+            ACR_IMAGE="$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            
+            echo "Assinando imagem: $ACR_IMAGE"
+            
+            # Assinar com a chave do Azure Key Vault
+            if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
+              echo "Erro: Falha ao assinar $ACR_IMAGE"
+            else
+              echo "Imagem $ACR_IMAGE assinada com sucesso"
+            fi
+          done
+
+
+  cleanup-images-not-in-json:
+    name: Cleanup Images Not in JSON
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Log in to Azure Container Registry
+        run: az acr login -n $ACR_NAME
+      - name: Remove Images Not in JSON
+        run: |
+          echo "Using ACR: $ACR_NAME in resource group: $RESOURCE_GROUP with prefix: $PREFIX"
+          
+          # Remover imagens que não estão no JSON
+          echo "Verificando e removendo imagens que não estão no arquivo JSON..."
+          
+          # Cria arquivos temporários com as imagens e repositórios válidos listados no JSON
+          echo "Criando listas de imagens e repositórios válidos..."
+          jq -r '.images[] | "\(.repository):\(.tag)"' internalization-docker-images/docker-public-images-test.json > /tmp/valid_images.txt
+          jq -r '.images[] | .repository' internalization-docker-images/docker-public-images-test.json | sort -u > /tmp/valid_repos.txt
+          
+          # Listar todos os repositórios no ACR
+          echo "Listando repositórios no ACR..."
+          az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
+            # Remove o prefixo para comparar com o repository do JSON
+            BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
+            
+            # Verifica se o repositório está na lista de repositórios válidos
+            if ! grep -q "^$BASE_REPO$" /tmp/valid_repos.txt; then
+              echo "O repositório $repo não está no arquivo JSON. Removendo o repositório inteiro..."
+              
+              # Remover o repositório completo
+              if ! az acr repository delete --name $ACR_NAME --repository $repo --yes; then
+                echo "Erro: Falha ao remover o repositório $repo"
+                echo "Continuando com o próximo item..."
+              fi
+              
+              # Pula para o próximo repositório
+              continue
+            fi
+            
+            echo "Verificando imagens no repositório $repo..."
+            
+            # Listar todas as tags neste repositório
+            az acr repository show-tags --name $ACR_NAME --repository $repo -o tsv | while read -r tag; do
+              # Verifica se a combinação repositório:tag está na lista de imagens válidas
+                if ! grep -q "^$BASE_REPO:$tag$" /tmp/valid_images.txt; then
+                echo "A imagem $repo:$tag não está no arquivo JSON. Removendo..."
+                
+                # Remover a imagem
+                if ! az acr repository delete --name $ACR_NAME --image "$repo:$tag" --yes; then
+                  echo "Erro: Falha ao remover $repo:$tag"
+                  echo "Continuando com o próximo item..."
+                fi
+              else
+                echo "A imagem $repo:$tag está na lista de imagens válidas. Mantendo."
+              fi
+            done
+          done
+          
+          echo "Processo de sincronização concluído."

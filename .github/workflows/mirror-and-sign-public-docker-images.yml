@@ -194,7 +194,7 @@ jobs:
               echo "🔐 Assinando imagem: $ACR_IMAGE"
               
               # Assinar com a chave do Azure Key Vault
-              if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
+              if ! cosign sign --key cosign.pub --yes "$ACR_IMAGE"; then
                 echo "❌ Erro: Falha ao assinar $ACR_IMAGE"
               else
                 echo "✅ Imagem $ACR_IMAGE assinada com sucesso"
@@ -252,7 +252,8 @@ jobs:
           echo "Listando repositórios no ACR..."
           az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
             # Remove o prefixo para comparar com o repository do JSON
-            BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
+            # Usar substituição de string do bash em vez de sed
+            BASE_REPO=${repo#$PREFIX}
             
             # Verifica se o repositório está na lista de repositórios válidos
             if ! grep -q "^$BASE_REPO$" /tmp/valid_repos.txt; then

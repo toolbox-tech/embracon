@@ -150,34 +150,68 @@ jobs:
 
       - name: Sign images with Azure Key Vault key
         run: |
-          echo "Assinando apenas imagens novas com chave do Azure Key Vault..."
+          echo "Verificando e assinando imagens que não estão assinadas com nossa chave..."
           
-          # Verificar se há imagens novas para assinar
-          if [ ! -s /tmp/new_images_to_sign.txt ]; then
-            echo "Nenhuma imagem nova encontrada para assinatura. Pulando etapa de assinatura."
+          # Ler todas as imagens do arquivo JSON (não apenas as novas)
+          IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+          
+          # Lista para rastrear imagens que precisam ser assinadas
+          echo "" > /tmp/images_to_sign.txt
+          
+          echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+            REPO=$(echo "$image" | jq -r '.repository')
+            TAG=$(echo "$image" | jq -r '.tag')
+            TARGET_REPO=$(echo "$image" | jq -r '.repository')
+            
+            # Nome completo da imagem no ACR
+            ACR_IMAGE="$ACR_NAME.azurecr.io/$PREFIX$TARGET_REPO:$TAG"
+            
+            echo "Verificando assinatura da imagem: $ACR_IMAGE"
+            
+            # Verificar se a imagem já está assinada com nossa chave
+            if cosign verify --key cosign.pub "$ACR_IMAGE" >/dev/null 2>&1; then
+              echo "✅ Imagem $ACR_IMAGE já está assinada com nossa chave. Pulando..."
+            else
+              echo "❌ Imagem $ACR_IMAGE não está assinada com nossa chave. Adicionando à lista para assinatura..."
+              echo "$ACR_IMAGE" >> /tmp/images_to_sign.txt
+            fi
+          done
+          
+          # Verificar se há imagens para assinar
+          if [ ! -s /tmp/images_to_sign.txt ]; then
+            echo "✅ Todas as imagens já estão assinadas com nossa chave. Nenhuma ação necessária."
             exit 0
           fi
           
-          echo "Imagens novas que serão assinadas:"
-          cat /tmp/new_images_to_sign.txt
+          echo ""
+          echo "📝 Imagens que serão assinadas:"
+          cat /tmp/images_to_sign.txt
+          echo ""
           
-          # Assinar apenas as imagens novas
+          # Assinar as imagens que não estão assinadas
           while IFS= read -r ACR_IMAGE; do
             if [ -n "$ACR_IMAGE" ]; then
-              echo "Assinando imagem nova: $ACR_IMAGE"
+              echo "🔐 Assinando imagem: $ACR_IMAGE"
               
               # Assinar com a chave do Azure Key Vault
               if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
-                echo "Erro: Falha ao assinar $ACR_IMAGE"
+                echo "❌ Erro: Falha ao assinar $ACR_IMAGE"
               else
-                echo "Imagem $ACR_IMAGE assinada com sucesso"
+                echo "✅ Imagem $ACR_IMAGE assinada com sucesso"
                 
-                # Verificar a assinatura com a chave pública baixada
-                echo "Verificando assinatura..."
-                cosign verify --key cosign.pub "$ACR_IMAGE" || echo "Aviso: Falha na verificação da assinatura"
+                # Verificar a assinatura recém-criada
+                echo "🔍 Verificando assinatura..."
+                if cosign verify --key cosign.pub "$ACR_IMAGE" >/dev/null 2>&1; then
+                  echo "✅ Assinatura verificada com sucesso"
+                else
+                  echo "⚠️ Aviso: Falha na verificação da assinatura"
+                fi
               fi
+              echo ""
             fi
-          done < /tmp/new_images_to_sign.txt
+          done < /tmp/images_to_sign.txt
+          
+          echo "🎉 Processo de assinatura concluído."
           
           echo "Processo de assinatura concluído."
 

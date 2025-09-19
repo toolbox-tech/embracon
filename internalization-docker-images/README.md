@@ -257,7 +257,6 @@ az role assignment create --assignee $groupId --scope $acrId --role "Container R
 az role assignment create --assignee $groupId --scope $acrId --role AcrPush
 az role assignment create --assignee $groupId --scope $acrId --role AcrPull
 az role assignment create --assignee $groupId --scope $acrId --role AcrDelete
-az role assignment create --assignee $groupId --scope $acrId --role AcrRead
 
 # Verificar as permissões atribuídas
 az role assignment list --scope $acrId --output table

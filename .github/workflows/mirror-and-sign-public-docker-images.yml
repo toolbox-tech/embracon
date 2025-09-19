@@ -169,7 +169,7 @@ jobs:
             echo "Verificando assinatura da imagem: $ACR_IMAGE"
             
             # Verificar se a imagem já está assinada com nossa chave
-            if cosign verify --key cosign "$ACR_IMAGE" >/dev/null 2>&1; then
+            if cosign verify --key cosign.pub "$ACR_IMAGE" >/dev/null 2>&1; then
               echo "✅ Imagem $ACR_IMAGE já está assinada com nossa chave. Pulando..."
             else
               echo "❌ Imagem $ACR_IMAGE não está assinada com nossa chave. Adicionando à lista para assinatura..."
@@ -193,15 +193,15 @@ jobs:
             if [ -n "$ACR_IMAGE" ]; then
               echo "🔐 Assinando imagem: $ACR_IMAGE"
               
-              # Assinar com a chave do Azure Key Vault
-              if ! cosign sign --key cosign --yes "$ACR_IMAGE"; then
+              # Assinar com a chave do Azure Key Vault (usar URI completa do Azure KMS)
+              if ! cosign sign --key azurekms://kms-keys.vault.azure.net/cosign --yes "$ACR_IMAGE"; then
                 echo "❌ Erro: Falha ao assinar $ACR_IMAGE"
               else
                 echo "✅ Imagem $ACR_IMAGE assinada com sucesso"
                 
                 # Verificar a assinatura recém-criada
                 echo "🔍 Verificando assinatura..."
-                if cosign verify --key cosign "$ACR_IMAGE" >/dev/null 2>&1; then
+                if cosign verify --key cosign.pub "$ACR_IMAGE" >/dev/null 2>&1; then
                   echo "✅ Assinatura verificada com sucesso"
                 else
                   echo "⚠️ Aviso: Falha na verificação da assinatura"
@@ -212,8 +212,6 @@ jobs:
           done < /tmp/images_to_sign.txt
           
           echo "🎉 Processo de assinatura concluído."
-          
-          echo "Processo de assinatura concluído."
 
 
   cleanup-images-not-in-json:

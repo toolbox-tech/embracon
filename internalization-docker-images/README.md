@@ -412,7 +412,7 @@ on:
 env:
   ACR_NAME: ${{ vars.ACR_NAME }}
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
-  PREFIX: "embracon-"
+  PREFIX: "images/"
   DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
   # As variáveis sensíveis (tokens, secrets) devem ser referenciadas diretamente onde são usadas
 
@@ -434,6 +434,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # enable-AzPSSession: true
 
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
@@ -527,6 +528,7 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          # enable-AzPSSession: true
 
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
@@ -546,7 +548,8 @@ jobs:
           echo "Listando repositórios no ACR..."
           az acr repository list --name $ACR_NAME -o tsv | grep "^$PREFIX" | while read -r repo; do
             # Remove o prefixo para comparar com o repository do JSON
-            BASE_REPO=$(echo $repo | sed "s/^$PREFIX//")
+            # Usar substituição de string nativa do bash em vez de sed
+            BASE_REPO=${repo#$PREFIX}
             
             # Verifica se o repositório está na lista de repositórios válidos
             if ! grep -q "^$BASE_REPO$" /tmp/valid_repos.txt; then

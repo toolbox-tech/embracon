@@ -29,18 +29,16 @@ jobs:
           owner: ${{ github.repository_owner }}
           # É uma lista de repositórios separados por vírgula, para os quais será gerado o token de acesso.
           # Não é necessário utilizar, pois já deu a permissão ao Github App a estes repos, mas se colocar, ele terá acesso somente ao repos escritos e que estejam autorizado para o Github App
-          repositories: "embracon, repo-language"
+          repositories: "embracon"
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Clone repo
+      - name: Generate e move img to img folder
         run: |
-          git clone https://x:${{ steps.app-token.outputs.token }}@github.com/toolbox-tech/repo-language.git
-          cd repo-language
-          git checkout main
+          cd generate-language-img
           pip install -r requirements.txt
           python generate.py
           ls

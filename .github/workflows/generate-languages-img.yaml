@@ -20,6 +20,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Generate GitHub App Token
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          # É uma lista de repositórios separados por vírgula, para os quais será gerado o token de acesso.
+          # Não é necessário utilizar, pois já deu a permissão ao Github App a estes repos, mas se colocar, ele terá acesso somente ao repos escritos e que estejam autorizado para o Github App
+          repositories: "embracon"
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -27,7 +38,7 @@ jobs:
 
       - name: Clone repo
         run: |
-          git clone https://github.com/toolbox-tech/repo-language.git
+          git clone https://x:${{ steps.app-token.outputs.token }}@github.com/toolbox-tech/repo-language.git
           cd repo-language
           git checkout main
           pip install -r requirements.txt
@@ -38,8 +49,6 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           GH_OWNER: ${{ vars.GH_OWNER }}
           GH_REPO: ${{ vars.GH_REPO }}
-
-    
 
       - name: Commit and push if changed
         uses: stefanzweifel/git-auto-commit-action@v5

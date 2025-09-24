@@ -60,7 +60,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'chore: Atualiza imagem de estatísticas de linguagem'
-          file_pattern: 'repo-languages.svg'
           commit_user_name: 'GitHub Actions'
           commit_user_email: 'actions@github.com'
           commit_author: 'GitHub Actions <actions@github.com>'

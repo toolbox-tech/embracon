@@ -43,7 +43,8 @@ jobs:
           git checkout main
           pip install -r requirements.txt
           python generate.py
-          mv repo-languages.svg ../img/
+          ls
+          cp repo-languages.svg ../img/
         env:
           # Passa o secret para o script
           GH_PAT: ${{ steps.app-token.outputs.token }}
@@ -54,7 +55,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'chore: Atualiza imagem de estatísticas de linguagem'
-          file_pattern: 'repo-languages.svg'
+          # file_pattern: 'repo-languages.svg'
           commit_user_name: 'GitHub Actions'
           commit_user_email: 'actions@github.com'
           commit_author: 'GitHub Actions <actions@github.com>'

@@ -29,7 +29,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           # É uma lista de repositórios separados por vírgula, para os quais será gerado o token de acesso.
           # Não é necessário utilizar, pois já deu a permissão ao Github App a estes repos, mas se colocar, ele terá acesso somente ao repos escritos e que estejam autorizado para o Github App
-          repositories: "embracon"
+          repositories: "embracon, repo-language"
 
       - name: Set up Python
         uses: actions/setup-python@v4

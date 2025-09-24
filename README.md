@@ -4,6 +4,10 @@
 
 # 🏢 Embracon - DevOps e Infraestrutura
 
+## Linguagens Usadas
+
+![Top Languages](./img/repo-languages.svg)
+
 ## 🎯 Sobre o Projeto
 
 É uma coleção abrangente de ferramentas, práticas e templates de DevOps desenvolvidos especificamente para a **Embracon**, fornecendo soluções padronizadas para desenvolvimento seguro, CI/CD, gerenciamento de segredos e melhores práticas de SDLC (Software Development Life Cycle).

@@ -47,8 +47,8 @@ jobs:
         env:
           # Passa o secret para o script
           GH_PAT: ${{ steps.app-token.outputs.token }}
-          GH_OWNER: ${{ github.repository_owner }}
-          GH_REPO: ${{ github.repository }}
+          GH_OWNER: ${{ vars.GH_OWNER }}
+          GH_REPO: ${{ vars.GH_REPO }}
 
       - name: Commit and push if changed
         uses: stefanzweifel/git-auto-commit-action@v5

@@ -46,9 +46,9 @@ jobs:
           mv repo-languages.svg ../img/
         env:
           # Passa o secret para o script
-          GH_PAT: ${{ secrets.GH_PAT }}
-          GH_OWNER: ${{ vars.GH_OWNER }}
-          GH_REPO: ${{ vars.GH_REPO }}
+          GH_PAT: ${{ steps.app-token.outputs.token }}
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.repository }}
 
       - name: Commit and push if changed
         uses: stefanzweifel/git-auto-commit-action@v5

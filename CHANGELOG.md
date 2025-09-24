@@ -1,3 +1,20 @@
+## 4.4.0 (2025-09-24)
+
+### Feat
+
+- generate img language script
+- github app token
+- create language used image
+
+### Fix
+
+- move img
+- permission
+- commit
+- change vars
+- vars and secrets
+- repo name
+
 ## 4.3.0 (2025-09-22)
 
 ### Feat

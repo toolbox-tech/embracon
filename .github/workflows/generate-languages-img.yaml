@@ -1,0 +1,63 @@
+name: Generate Repo Language Stats
+
+on:
+  # Roda a cada 24 horas
+  schedule:
+    - cron: '0 0 * * *'
+  # Permite rodar manualmente a partir da aba Actions
+  workflow_dispatch:
+  # Roda a cada push para a branch main (opcional)
+  push:
+    branches:
+      - main
+      - feature/stats
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # added or changed files to the repository.
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Generate GitHub App Token
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          # É uma lista de repositórios separados por vírgula, para os quais será gerado o token de acesso.
+          # Não é necessário utilizar, pois já deu a permissão ao Github App a estes repos, mas se colocar, ele terá acesso somente ao repos escritos e que estejam autorizado para o Github App
+          repositories: "embracon"
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Generate e move img to img folder
+        run: |
+          cd generate-language-img
+          pip install -r requirements.txt
+          python generate.py
+          ls
+          mv repo-languages.svg ../img/
+        env:
+          # Passa o secret para o script
+          GH_PAT: ${{ steps.app-token.outputs.token }}
+          GH_OWNER: ${{ vars.GH_OWNER }}
+          GH_REPO: ${{ vars.GH_REPO }}
+
+      - name: Commit and push if changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: Atualiza imagem de estatísticas de linguagem'
+          # file_pattern: 'repo-languages.svg'
+          commit_user_name: 'GitHub Actions'
+          commit_user_email: 'actions@github.com'
+          commit_author: 'GitHub Actions <actions@github.com>'

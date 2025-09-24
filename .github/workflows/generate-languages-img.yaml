@@ -45,7 +45,10 @@ jobs:
           cd generate-language-img
           pip install -r requirements.txt
           python generate.py
-          ls
+          # Remove a imagem existente se ela existir
+          if [ -f ../img/repo-languages.svg ]; then
+            rm ../img/repo-languages.svg
+          fi
           mv repo-languages.svg ../img/
         env:
           # Passa o secret para o script

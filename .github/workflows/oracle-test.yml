@@ -11,41 +11,31 @@ on:
     branches:
       - feature/internalization-docker-images
 
-# env:
-  # ORACLE CONTAINER REGISTRY (OCR) - COMENTADO (DESCOMENTE QUANDO PRONTO)
-  # OCR_REGION: ${{ vars.OCR_REGION }}           # e.g., us-ashburn-1
-  # OCR_NAMESPACE: ${{ vars.OCR_NAMESPACE }}     # Seu namespace Oracle
-  # OCR_USERNAME: ${{ vars.OCR_USERNAME }}       # Username Oracle
-  # COMPARTMENT_OCID: ${{ vars.COMPARTMENT_OCID }} # OCID do compartment
-
 jobs:
-  login-test-oci:
-    name: Login to Oracle Cloud Infrastructure
+  my-instances:
     runs-on: ubuntu-latest
-    
+    name: List the display name and shape of the instances in my compartment
+    env:
+      OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
+      OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+      OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+      OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+      OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      
-      - name: Setup Oracle CLI
-        run: |
-          # Instalar OCI CLI
-          bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
-          echo "$HOME/bin" >> $GITHUB_PATH
-          
-          # Configurar credenciais
-          mkdir -p ~/.oci
-          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
-          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/private_key.pem
-          chmod 600 ~/.oci/private_key.pem
-          exec -l $SHELL
-          
-          # Testar conexão
-          echo "Verificando a versão da CLI da OCI..."
-          oci --version
-          
-          echo "Verificando a configuração (config list)..."
-          oci setup config list
+      - name: Retrieve the OCID of a named compartment in tenancy
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        id: find-compartment-id
+        with:
+          command: 'iam compartment list --compartment-id-in-subtree=true'
+          query: "data[?name=='testing'].id"
 
-          echo "Executando um comando de exemplo: listando usuários IAM..."
-          oci iam user list
+      - name: Retrieve the display name and shape of the instances in my compartment
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
+        id: find-instances
+        with:
+          command: 'compute instance list --compartment-id ${{ steps.find-compartment-id.outputs.raw_output }}'
+          query: 'data[*].{name: \"display-name\", shape: shape}'
+
+      - name: List the display name and shape of the instances in my compartment
+        run: |
+          echo ${{ steps.find-instances.outputs.output }} | jq .

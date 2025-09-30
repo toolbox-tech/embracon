@@ -1,0 +1,46 @@
+name: Oracle Test
+
+on:
+  # Executa diariamente à meia-noite
+  # schedule:
+  #   - cron: '0 0 * * *'
+  # Permite execução manual pelo GitHub UI
+  workflow_dispatch:
+  # Executa quando o arquivo docker-public-images-test.json é modificado
+  push:
+    branches:
+      - feature/internalization-docker-images
+
+# env:
+  # ORACLE CONTAINER REGISTRY (OCR) - COMENTADO (DESCOMENTE QUANDO PRONTO)
+  # OCR_REGION: ${{ vars.OCR_REGION }}           # e.g., us-ashburn-1
+  # OCR_NAMESPACE: ${{ vars.OCR_NAMESPACE }}     # Seu namespace Oracle
+  # OCR_USERNAME: ${{ vars.OCR_USERNAME }}       # Username Oracle
+  # COMPARTMENT_OCID: ${{ vars.COMPARTMENT_OCID }} # OCID do compartment
+
+jobs:
+  mirror-public-images-with-az-acr-import:
+    name: Mirror Public Docker Images to ACR (using az acr import)
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Oracle CLI
+        run: |
+          # Instalar OCI CLI
+          bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+          echo "$HOME/bin" >> $GITHUB_PATH
+          
+          # Configurar credenciais
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/private_key.pem
+          chmod 600 ~/.oci/private_key.pem
+          
+          # Testar conexão
+          oci iam region list --output table

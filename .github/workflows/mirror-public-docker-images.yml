@@ -1,4 +1,14 @@
-name: Mirror Public Docker Images to ACR
+name: Mirror Public Docker Images to Multi-Cloud (Azure ACR & Oracle OCR)
+
+# ==================================================================================
+# WORKFLOW MULTI-CLOUD - AZURE & ORACLE
+# ==================================================================================
+# Este workflow espelha imagens Docker públicas para AMBAS as clouds:
+# 1. Azure Container Registry (ACR)
+# 2. Oracle Container Registry (OCR)
+# 
+# Jobs executam em paralelo para máxima eficiência
+# ==================================================================================
 
 on:
   # Executa diariamente à meia-noite
@@ -14,11 +24,19 @@ on:
       - 'internalization-docker-images/docker-public-images-test.json'
 
 env:
-  ACR_NAME: ${{ vars.ACR_NAME }}
-  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  # CONFIGURAÇÕES COMPARTILHADAS
   PREFIX: "images/"
   DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
-  # As variáveis sensíveis (tokens, secrets) devem ser referenciadas diretamente onde são usadas
+  
+  # AZURE CONTAINER REGISTRY (ACR) - ATIVO
+  ACR_NAME: ${{ vars.ACR_NAME }}
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  
+  # ORACLE CONTAINER REGISTRY (OCR) - COMENTADO (DESCOMENTE QUANDO PRONTO)
+  # OCR_REGION: ${{ vars.OCR_REGION }}           # e.g., us-ashburn-1
+  # OCR_NAMESPACE: ${{ vars.OCR_NAMESPACE }}     # Seu namespace Oracle
+  # OCR_USERNAME: ${{ vars.OCR_USERNAME }}       # Username Oracle
+  # COMPARTMENT_OCID: ${{ vars.COMPARTMENT_OCID }} # OCID do compartment
 
 jobs:
   mirror-public-images-with-az-acr-import:
@@ -32,6 +50,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
+      # AZURE LOGIN - Para usar Azure
       - name: Azure Login via OIDC
         uses: azure/login@v2
         with:
@@ -40,8 +59,23 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           # enable-AzPSSession: true
 
+      # ORACLE LOGIN - Para usar Oracle, substitua por:
+      # - name: Setup Oracle CLI
+      #   run: |
+      #     bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)"
+      #     mkdir -p ~/.oci
+      #     echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+      #     echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/private_key.pem
+      #     chmod 600 ~/.oci/private_key.pem
+
+      # AZURE ACR LOGIN
       - name: Log in to Azure Container Registry
         run: az acr login -n $ACR_NAME
+      
+      # ORACLE OCR LOGIN - Para usar Oracle, substitua por:
+      # - name: Login to Oracle Container Registry
+      #   run: |
+      #     echo "${{ secrets.OCR_PASSWORD }}" | docker login $OCR_REGION.ocir.io -u "$OCR_NAMESPACE/$OCR_USERNAME" --password-stdin
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -70,11 +104,14 @@ jobs:
             TARGET_IMAGE="$PREFIX$TARGET_REPO:$TAG"
             echo "Processando imagem: $TARGET_IMAGE"
             
-            # Verificar se a imagem existe no ACR
+            # AZURE ACR - Verificar se a imagem existe
             TAG_EXISTS=false
             if az acr repository show-tags --name "$ACR_NAME" --repository "$PREFIX$TARGET_REPO" --output tsv 2>/dev/null | grep -q "^$TAG$"; then
               TAG_EXISTS=true
               echo "Tag $TAG encontrada no repositório $PREFIX$TARGET_REPO do ACR. Verificando digest..."
+              
+              # ORACLE OCR - Para usar Oracle, substitua por:
+              # if oci artifacts container image list --compartment-id $COMPARTMENT_OCID --repository-name "$PREFIX$REPO" | jq -r '.data[].version' | grep -q "^$TAG$"; then
               
               # Obter o digest da imagem no ACR usando az CLI
               echo "Obtendo digest da imagem no ACR..."
@@ -102,6 +139,7 @@ jobs:
             
             echo "Importando imagem $REPO:$TAG para $PREFIX$TARGET_REPO:$TAG"
             
+            # AZURE ACR IMPORT
             if ! az acr import \
               --name "$ACR_NAME" \
               --resource-group "$RESOURCE_GROUP" \
@@ -114,7 +152,110 @@ jobs:
             else
               echo "Imagem $REPO:$TAG importada com sucesso para $PREFIX$TARGET_REPO:$TAG"
             fi
+            
+            # ORACLE OCR IMPORT - Para usar Oracle, substitua a seção acima por:
+            # SOURCE_IMAGE="docker.io/library/$REPO:$TAG"
+            # TARGET_IMAGE="$OCR_REGION.ocir.io/$OCR_NAMESPACE/$PREFIX$REPO:$TAG"
+            # 
+            # if docker pull "$SOURCE_IMAGE"; then
+            #   docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+            #   if docker push "$TARGET_IMAGE"; then
+            #     echo "✅ Imagem $REPO:$TAG espelhada com sucesso"
+            #   else
+            #     echo "❌ Erro ao fazer push de $TARGET_IMAGE"
+            #   fi
+            #   docker rmi "$SOURCE_IMAGE" "$TARGET_IMAGE" || true
+            # else
+            #   echo "❌ Erro ao fazer pull de $SOURCE_IMAGE"
+            # fi
           done
+
+  # ==================================================================================
+  # JOB ORACLE - COMENTADO (DESCOMENTE QUANDO PRONTO PARA USAR)
+  # ==================================================================================
+  # mirror-public-images-to-oracle:
+  #   name: Mirror Public Docker Images to Oracle Container Registry
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #   
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v4
+  #     
+  #     - name: Setup Oracle CLI
+  #       run: |
+  #         # Instalar OCI CLI
+  #         bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+  #         echo "$HOME/bin" >> $GITHUB_PATH
+  #         
+  #         # Configurar credenciais
+  #         mkdir -p ~/.oci
+  #         echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
+  #         echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/private_key.pem
+  #         chmod 600 ~/.oci/private_key.pem
+  #         
+  #         # Testar conexão
+  #         oci iam region list --output table
+  #     
+  #     - name: Login to Oracle Container Registry
+  #       run: |
+  #         echo "${{ secrets.OCR_PASSWORD }}" | docker login $OCR_REGION.ocir.io -u "$OCR_NAMESPACE/$OCR_USERNAME" --password-stdin
+  #     
+  #     - name: Login to Docker Hub
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ env.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+  #         
+  #     - name: Mirror Public Docker Images to Oracle
+  #       run: |
+  #         echo "Using Oracle Container Registry in region: $OCR_REGION with namespace: $OCR_NAMESPACE"
+  #         
+  #         # Ler imagens do arquivo JSON
+  #         IMAGES=$(cat "internalization-docker-images/docker-public-images-test.json" | jq -c '.images')
+  #         
+  #         echo "$IMAGES" | jq -c '.[]' | while read -r image; do
+  #           REPO=$(echo "$image" | jq -r '.repository')
+  #           TAG=$(echo "$image" | jq -r '.tag')
+  #           
+  #           # Nome da imagem de origem
+  #           SOURCE_IMAGE="docker.io/library/$REPO:$TAG"
+  #           
+  #           # Nome da imagem de destino no Oracle Container Registry
+  #           TARGET_IMAGE="$OCR_REGION.ocir.io/$OCR_NAMESPACE/$PREFIX$REPO:$TAG"
+  #           
+  #           echo "🔄 Espelhando $SOURCE_IMAGE para $TARGET_IMAGE"
+  #           
+  #           # Verificar se a imagem já existe no Oracle
+  #           if oci artifacts container image list \
+  #               --compartment-id "$COMPARTMENT_OCID" \
+  #               --repository-name "$PREFIX$REPO" \
+  #               --output json 2>/dev/null | jq -r '.data[].version' | grep -q "^$TAG$"; then
+  #             echo "✅ Imagem $REPO:$TAG já existe no Oracle Container Registry"
+  #             continue
+  #           fi
+  #           
+  #           # Pull da imagem pública
+  #           if docker pull "$SOURCE_IMAGE"; then
+  #             # Tag para Oracle Container Registry
+  #             docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+  #             
+  #             # Push para Oracle Container Registry
+  #             if docker push "$TARGET_IMAGE"; then
+  #               echo "✅ Imagem $REPO:$TAG espelhada com sucesso para Oracle"
+  #             else
+  #               echo "❌ Erro ao fazer push de $TARGET_IMAGE"
+  #             fi
+  #             
+  #             # Limpeza local
+  #             docker rmi "$SOURCE_IMAGE" "$TARGET_IMAGE" || true
+  #           else
+  #             echo "❌ Erro ao fazer pull de $SOURCE_IMAGE"
+  #           fi
+  #         done
+  # ==================================================================================
+
   cleanup-images-not-in-json:
     name: Cleanup Images Not in JSON
     runs-on: ubuntu-latest
@@ -189,3 +330,27 @@ jobs:
           done
           
           echo "Processo de sincronização concluído."
+
+# ==================================================================================
+# WORKFLOW MULTI-CLOUD - AZURE & ORACLE
+# ==================================================================================
+# Este workflow está preparado para espelhar imagens Docker públicas para:
+# ✅ 1. Azure Container Registry (ACR) - ATIVO
+# ⏸️  2. Oracle Container Registry (OCR) - COMENTADO (pronto para ativar)
+# 
+# Para ativar Oracle: descomente as seções marcadas com "ORACLE"
+# ==================================================================================
+# 
+# SECRETS ATIVOS (Azure):
+# - AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# - DOCKERHUB_TOKEN
+# 
+# SECRETS PARA ORACLE (quando ativar):
+# - OCI_CONFIG, OCI_PRIVATE_KEY, OCR_PASSWORD
+# 
+# VARIABLES ATIVAS:
+# - DOCKERHUB_USERNAME, ACR_NAME, RESOURCE_GROUP
+# 
+# VARIABLES PARA ORACLE (quando ativar):
+# - OCR_REGION, OCR_NAMESPACE, OCR_USERNAME, COMPARTMENT_OCID
+# ==================================================================================

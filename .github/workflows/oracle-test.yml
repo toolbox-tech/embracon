@@ -41,4 +41,11 @@ jobs:
           exec -l $SHELL
           
           # Testar conexão
-          oci iam region list --output table
+          echo "Verificando a versão da CLI da OCI..."
+          oci --version
+          
+          echo "Verificando a configuração (config list)..."
+          oci setup config list
+
+          echo "Executando um comando de exemplo: listando usuários IAM..."
+          oci iam user list

@@ -19,12 +19,9 @@ on:
   # COMPARTMENT_OCID: ${{ vars.COMPARTMENT_OCID }} # OCID do compartment
 
 jobs:
-  mirror-public-images-with-az-acr-import:
-    name: Mirror Public Docker Images to ACR (using az acr import)
+  login-test-oci:
+    name: Login to Oracle Cloud Infrastructure
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     
     steps:
       - name: Checkout Repository
@@ -41,6 +38,7 @@ jobs:
           echo "${{ secrets.OCI_CONFIG }}" > ~/.oci/config
           echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/private_key.pem
           chmod 600 ~/.oci/private_key.pem
+          exec -l $SHELL
           
           # Testar conexão
           oci iam region list --output table

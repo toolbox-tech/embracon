@@ -40,8 +40,8 @@ resource "azurerm_key_vault" "this" {
   }
 }
 
-# Role assignments para todos os usuários (emails + principal_ids diretos)
-resource "azurerm_role_assignment" "key_vault_admin" {
+ #Role assignments para todos os usuários (emails + principal_ids diretos)
+ resource "azurerm_role_assignment" "key_vault_admin" {
   count = length(local.all_principal_ids)
   scope                = azurerm_key_vault.this.id
   role_definition_name = "Key Vault Administrator"

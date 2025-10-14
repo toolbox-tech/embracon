@@ -81,14 +81,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Check project structure
         run: |
           echo "Estrutura do projeto:"
@@ -209,7 +201,7 @@ jobs:
         run: |
           echo "🎉 Build enviado para Docker Hub!"
           echo "📦 Imagens criadas:"
-          echo "${{ env.IMAGE_TAGS }}" | sed 's/,/\n- /g' | sed '1s/^/- /'
+          echo "${{ steps.tags.outputs.tags }}" | sed 's/,/\n- /g' | sed '1s/^/- /'
           echo "🔗 Digest: ${{ steps.build.outputs.digest }}"
           echo "🏗️ Platform: linux/amd64"
 

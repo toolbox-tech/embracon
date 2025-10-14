@@ -81,7 +81,7 @@ jobs:
     uses: ./.github/workflows/build.yml  # Usa um workflow reutilizável local para construir a imagem Docker
     with:
       app_context: 'app/java'  # Caminho para o contexto da aplicação Java
-      app_tags: 'toolboxplayground/embracon:java-latest,toolboxplayground/embracon:java-${{ github.sha }}'  # Tags para a imagem Docker
+      app_tags: 'toolboxdevops/embracon:java-latest,toolboxdevops/embracon:java-${{ github.sha }}'  # Tags para a imagem Docker
       dck_username: ${{ vars.DOCKERHUB_USERNAME }}  # Nome de usuário do Docker Hub para autenticação
     secrets:
       dck_token: ${{ secrets.DOCKERHUB_TOKEN }}  # Token do Docker Hub

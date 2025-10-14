@@ -33,9 +33,35 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
 
+      - name: Check project structure
+        run: |
+          echo "Estrutura do projeto:"
+          ls -la
+          echo "Conteúdo do diretório app/java:"
+          ls -la app/java/ || echo "Diretório app/java não encontrado"
+          echo "Procurando por gradlew no projeto:"
+          find . -name "gradlew" -type f || echo "gradlew não encontrado"
+
+      - name: Make gradlew executable
+        working-directory: app/java
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            echo "gradlew tornado executável"
+          else
+            echo "gradlew não encontrado, usando gradle diretamente"
+          fi
+
       - name: Build with Gradle
         working-directory: app/java
-        run: ./gradlew build
+        run: |
+          if [ -f "./gradlew" ]; then
+            echo "Usando Gradle Wrapper"
+            ./gradlew build
+          else
+            echo "Usando Gradle instalado pelo setup-gradle"
+            gradle build
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

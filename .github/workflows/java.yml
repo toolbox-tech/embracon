@@ -98,6 +98,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: java-package-${{ github.sha }}
+          path: app/java/target/
+
       - name: Validate inputs
         run: |
           echo "🔍 Validando parâmetros de entrada..."
@@ -114,6 +120,13 @@ jobs:
           # Verificar se Dockerfile existe
           if [ ! -f "app/java/Dockerfile" ]; then
             echo "❌ Erro: Dockerfile não encontrado em: app/java/Dockerfile"
+            exit 1
+          fi
+          
+          # Verificar se WAR foi baixado
+          if [ ! -f "app/java/target/java-1.0.war" ]; then
+            echo "❌ Erro: Artifact WAR não encontrado: app/java/target/java-1.0.war"
+            ls -la app/java/target/ || echo "Diretório target não existe"
             exit 1
           fi
           

@@ -56,8 +56,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for Organizations, not personal accounts.
-        with:
-          args: '--no-git'
 
   build:
     runs-on: ubuntu-latest
@@ -198,6 +196,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
+          sbom: true
 
       - name: Output build summary
         run: |

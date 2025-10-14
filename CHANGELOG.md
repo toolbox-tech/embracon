@@ -1,3 +1,30 @@
+## 4.5.0 (2025-10-14)
+
+### Feat
+
+- **cache**: java cache
+
+### Fix
+
+- **cache**: docker sbom
+- **cache**: gitleaks only current commit
+- **cache**: cache error
+- **cache**: docker tag
+- **cache**: docker
+- **cache**: gitleaks
+- **cache**: docker hub repo
+- **cache**: docker image tag
+- **cache**: java version
+- **cache**: last tomcat version
+- **cache**: security
+- **cache**: docker token
+- **cache**: cache optimization
+- **cache**: java gradlew generate
+
+### Refactor
+
+- **cache**: change step name build to build-java
+
 ## 4.4.1 (2025-09-24)
 
 ### Fix

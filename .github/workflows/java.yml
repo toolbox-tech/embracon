@@ -122,7 +122,7 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
       tags: ${{ env.IMAGE_TAGS }}
     env:
-      IMAGE_TAGS: 'toolboxdevops/embracon:java-latest,toolboxdevops/embracon:java-${{ github.sha }},toolboxdevops/embracon:java-${{ github.ref_name }}'
+      IMAGE_TAGS: 'toolboxdevops/embracon:java-latest,toolboxdevops/embracon:java-${{ github.sha }}'
     
     steps:
       - name: Checkout code
@@ -164,6 +164,26 @@ jobs:
           
           echo "✅ Validação concluída com sucesso"
 
+      - name: Prepare Docker tags
+        id: tags
+        run: |
+          # Sanitizar nome da branch (substituir / por -)
+          BRANCH_NAME="${{ github.ref_name }}"
+          SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g' | sed 's/[^a-zA-Z0-9._-]/-/g')
+          
+          # Criar tags
+          TAGS="toolboxdevops/embracon:java-latest"
+          TAGS="$TAGS,toolboxdevops/embracon:java-${{ github.sha }}"
+          TAGS="$TAGS,toolboxdevops/embracon:java-$SANITIZED_BRANCH"
+          
+          echo "Branch original: $BRANCH_NAME"
+          echo "Branch sanitizada: $SANITIZED_BRANCH"
+          echo "Tags finais: $TAGS"
+          
+          # Salvar para próximos steps
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "branch-tag=toolboxdevops/embracon:java-$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -179,7 +199,7 @@ jobs:
         with:
           context: app/java
           push: true
-          tags: ${{ env.IMAGE_TAGS }}
+          tags: ${{ steps.tags.outputs.tags }}
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max

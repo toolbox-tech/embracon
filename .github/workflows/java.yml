@@ -57,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for Organizations, not personal accounts.
 
-  build:
+  build-java:
     runs-on: ubuntu-latest
     needs: gitleaks  # Garante que o job 'gitleaks' seja concluído antes de executar este job
     
@@ -109,7 +109,7 @@ jobs:
 
   docker-build:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-java
     outputs:
       digest: ${{ steps.build.outputs.digest }}
       tags: ${{ env.IMAGE_TAGS }}

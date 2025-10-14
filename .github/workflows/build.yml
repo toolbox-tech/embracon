@@ -15,19 +15,56 @@ on:
                 required: true
                 type: string
                 description: 'Docker Hub username for authentication'
+            platforms:
+                required: false
+                type: string
+                default: 'linux/amd64'
+                description: 'Target platforms for Docker build (e.g., linux/amd64,linux/arm64)'
         secrets:
             dck_token:
                 required: true
                 description: 'Docker Hub token for authentication'
+        outputs:
+            image_digest:
+                description: 'Docker image digest'
+                value: ${{ jobs.build.outputs.digest }}
+            image_tags:
+                description: 'Docker image tags'
+                value: ${{ jobs.build.outputs.tags }}
 
 jobs:
     build:
         runs-on: ubuntu-latest
+        outputs:
+            digest: ${{ steps.build.outputs.digest }}
+            tags: ${{ inputs.app_tags }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
               with:
-                fetch-depth: 0
+                fetch-depth: 1  # Otimização: buscar apenas último commit
+
+            - name: Validate inputs
+              run: |
+                echo "🔍 Validando parâmetros de entrada..."
+                echo "Context: ${{ inputs.app_context }}"
+                echo "Tags: ${{ inputs.app_tags }}"
+                echo "Username: ${{ inputs.dck_username }}"
+                echo "Platforms: ${{ inputs.platforms }}"
+                
+                # Verificar se o contexto existe
+                if [ ! -d "${{ inputs.app_context }}" ]; then
+                  echo "❌ Erro: Diretório de contexto não encontrado: ${{ inputs.app_context }}"
+                  exit 1
+                fi
+                
+                # Verificar se Dockerfile existe
+                if [ ! -f "${{ inputs.app_context }}/Dockerfile" ]; then
+                  echo "❌ Erro: Dockerfile não encontrado em: ${{ inputs.app_context }}/Dockerfile"
+                  exit 1
+                fi
+                
+                echo "✅ Validação concluída com sucesso"
 
             - name: Login to Docker Hub
               uses: docker/login-action@v3
@@ -37,12 +74,26 @@ jobs:
 
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
+              with:
+                driver-opts: |
+                  network=host
 
             - name: Build and push Docker image
-              uses: docker/build-push-action@v5
+              id: build
+              uses: docker/build-push-action@v6  # Versão mais recente
               with:
                 context: ${{ inputs.app_context }}
                 push: true
                 tags: ${{ inputs.app_tags }}
+                platforms: ${{ inputs.platforms }}
                 cache-from: type=gha
                 cache-to: type=gha,mode=max
+                provenance: false  # Evita problemas de compatibilidade
+                sbom: false       # Desabilita SBOM para builds mais rápidos
+
+            - name: Output build summary
+              run: |
+                echo "🎉 Build concluído com sucesso!"
+                echo "📦 Imagem: ${{ inputs.app_tags }}"
+                echo "🔗 Digest: ${{ steps.build.outputs.digest }}"
+                echo "🏗️ Platforms: ${{ inputs.platforms }}"

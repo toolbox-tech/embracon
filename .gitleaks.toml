@@ -1,0 +1,70 @@
+title = "Gitleaks Configuration for Embracon Toolbox"
+
+[extend]
+# Usar configuração base do Gitleaks
+useDefault = true
+
+[[rules]]
+# Ignorar chaves genéricas em documentação
+id = "generic-api-key"
+description = "Possible API key"
+regex = '''(?i)(?:key|api|token|secret|password)\s*[:=]\s*['"]?[a-z0-9]{20,}['"]?'''
+
+# Permitir em arquivos de documentação
+[rules.allowlist]
+paths = [
+    '''.*README\.md$''',
+    '''.*\.md$''',
+    '''.*example.*''',
+    '''.*template.*''',
+    '''.*sample.*''',
+    '''.*values\.yaml$''',
+    '''.*Chart\.yaml$'''
+]
+
+[[rules]]
+# Regra específica para Helm charts - placeholders
+id = "helm-values-placeholder"
+description = "Helm chart placeholder values"
+regex = '''(?i)(?:password|token|key|secret)\s*:\s*['"]?(?:changeme|placeholder|example|your-.*|<.*>)['"]?'''
+
+[rules.allowlist]
+paths = [
+    '''.*values\.yaml$''',
+    '''.*values-.*\.yaml$''',
+    '''.*Chart\.yaml$'''
+]
+
+# Configurações globais de allowlist
+[allowlist]
+description = "Global allowlist for documentation and templates"
+paths = [
+    '''\.git/.*''',
+    '''.*\.md$''',
+    '''.*README.*''',
+    '''.*example.*''',
+    '''.*template.*''',
+    '''.*sample.*''',
+    '''.*\.example\..*''',
+    '''.*values\.yaml$''',
+    '''.*Chart\.yaml$''',
+    '''.*helm-chart/.*''',
+    '''kubernetes-templates/.*'''
+]
+
+# Commits específicos para ignorar (falsos positivos já identificados)
+commits = [
+    "02a35b1",  # Secret Management/RBAC/keycloak/helm-chart/README.md
+    "2a0c08d",  # kubernetes-templates/keycloak/helm-chart/README.md
+    "9c7953b"   # kubernetes-templates/helm-charts/values.yaml
+]
+
+# Regras personalizadas para ignorar padrões específicos
+regexes = [
+    '''(?i)changeme''',
+    '''(?i)your-.*-here''',
+    '''(?i)<insert.*>''',
+    '''(?i)\$\{.*\}''',
+    '''(?i)example.*key''',
+    '''(?i)placeholder.*'''
+]

@@ -1,20 +1,32 @@
-# Use an official Maven image as the base image
-FROM maven:3.8.4-openjdk-11-slim AS build
-# Set the working directory in the container
-WORKDIR /app
-# Copy the pom.xml and the project files to the container
-COPY pom.xml .
-COPY src ./src
-# Build the application using Maven
-RUN mvn clean package -DskipTests
+# Runtime otimizado - Tomcat latest com OpenJDK (Eclipse Temurin) - SHA256 específica
+FROM tomcat:latest@sha256:fa1499f834d8711b21202f0f7d13fe0234c739df9a6e1b92cf35a185db7af75c
 
-# Usa a imagem oficial do Tomcat com Java 17
-FROM tomcat:10-jdk17
+# Definir variáveis de ambiente para otimização
+ENV CATALINA_OPTS="-Xms512m -Xmx1024m -server"
+ENV JAVA_OPTS="-Djava.security.egd=file:/dev/./urandom"
 
-# Remove o webapp padrão (opcional)
-RUN rm -rf /usr/local/tomcat/webapps/ROOT
+# Criar usuário não-root para segurança
+RUN groupadd -r tomcat && useradd -r -g tomcat tomcat
 
-# Copia seu .war para a pasta webapps do Tomcat e renomeia para ROOT.war
-COPY --from=build /app/target/java-1.0.war /usr/local/tomcat/webapps/ROOT.war
+# Remove o webapp padrão e aplicações de exemplo
+RUN rm -rf /usr/local/tomcat/webapps/* && \
+    rm -rf /usr/local/tomcat/temp/* && \
+    rm -rf /usr/local/tomcat/logs/*
 
-# O Tomcat já inicia automaticamente
+# Copia o WAR pré-compilado (deve ser fornecido via context)
+COPY target/java-1.0.war /usr/local/tomcat/webapps/ROOT.war
+
+# Definir permissões corretas
+RUN chown -R tomcat:tomcat /usr/local/tomcat
+
+# Usar usuário não-root
+USER tomcat
+
+# Expor porta padrão do Tomcat
+EXPOSE 8080
+
+# Health check para container (usando wget que está disponível na imagem)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
+
+# O Tomcat já inicia automaticamente via CMD da imagem base

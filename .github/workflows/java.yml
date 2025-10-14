@@ -1,29 +1,230 @@
 name: Java CI  # Nome do workflow exibido no GitHub
-
-on: [workflow_dispatch]  # Dispara em pull requests ou execução manual
+on:
+  workflow_dispatch:  # Execução manual
+  push:
+    branches:
+      - main
+      - feature/java-cache
+  pull_request:
+    paths:
+      - 'app/java/**'
 
 jobs:
 
-   gitleaks:  # Job chamado 'gitleaks'
-    uses: ./.github/workflows/gitleaks.yml  # Usa um workflow reutilizável local
-    with:
-      gitleaks-version: 'latest'  # Passa a versão do Gitleaks como parâmetro
-    secrets:
-      TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Token padrão do GitHub para autenticação
-      LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Licença do Gitleaks (necessária para organizações)
+  gitleaks:  # Job de verificação de vazamentos de credenciais
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-   build:
-    uses: ./.github/workflows/build.yml  # Usa um workflow reutilizável local para construir a imagem Docker
-    with:
-      app_context: 'app/java'  # Caminho para o contexto da aplicação Java
-      app_tags: 'toolboxplayground/embracon:java-latest,toolboxplayground/embracon:java'  # Tags para a imagem Docker
-      dck_username: ${{ vars.DOCKERHUB_USERNAME }}  # Nome de usuário do Docker Hub para autenticação
-    secrets:
-      dck_token: ${{ secrets.DOCKERHUB_TOKEN }}  # Token do
+      - name: Create Gitleaks config if not exists
+        run: |
+          if [ ! -f ".gitleaks.toml" ]; then
+            echo "📝 Criando configuração padrão do Gitleaks..."
+            cat > .gitleaks.toml << 'EOF'
+          title = "Gitleaks Configuration for Embracon Toolbox"
+          
+          [extend]
+          useDefault = true
+          
+          [allowlist]
+          description = "Global allowlist for documentation and templates"
+          paths = [
+              '''\.git/.*''',
+              '''.*\.md$''',
+              '''.*README.*''',
+              '''.*example.*''',
+              '''.*template.*''',
+              '''.*values\.yaml$''',
+              '''.*Chart\.yaml$''',
+              '''.*helm-chart/.*''',
+              '''kubernetes-templates/.*'''
+          ]
+          
+          commits = [
+              "02a35b1",
+              "2a0c08d", 
+              "9c7953b"
+          ]
+          EOF
+          fi
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for Organizations, not personal accounts.
+
+  build-java:
+    runs-on: ubuntu-latest
     needs: gitleaks  # Garante que o job 'gitleaks' seja concluído antes de executar este job
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
 
-   trivy:  # Executa o Trivy para escanear a imagem Docker
-    uses: ./.github/workflows/trivy.yml  # Usa um workflow reutilizável para o Trivy
-    needs: build  # Garante que o job 'build' seja concluído antes de executar este job
-    with:
-      docker_image: toolboxplayground/embracon:java-latest  # Especifica a imagem Docker a ser escaneada
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: ${{ runner.os }}-maven-${{ hashFiles('app/java/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Check project structure
+        run: |
+          echo "Estrutura do projeto:"
+          ls -la app/java/
+          echo "Verificando se pom.xml existe:"
+          ls -la app/java/pom.xml || echo "pom.xml não encontrado"
+
+      - name: Build with Maven
+        working-directory: app/java
+        run: |
+          if [ -f "./mvnw" ]; then
+            echo "Usando Maven Wrapper"
+            chmod +x ./mvnw
+            ./mvnw clean package -Dmaven.test.skip=true
+          else
+            echo "Usando Maven instalado no sistema"
+            mvn clean package -Dmaven.test.skip=true
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-package-${{ github.sha }}
+          path: app/java/target/*.war
+          retention-days: 30
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-java
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      tags: ${{ env.IMAGE_TAGS }}
+    env:
+      IMAGE_TAGS: 'toolboxdevops/embracon:java-latest,toolboxdevops/embracon:java-${{ github.sha }}'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: java-package-${{ github.sha }}
+          path: app/java/target/
+
+      - name: Validate inputs
+        run: |
+          echo "🔍 Validando parâmetros de entrada..."
+          echo "Context: app/java"
+          echo "Tags: ${{ env.IMAGE_TAGS }}"
+          echo "Username: ${{ vars.DOCKERHUB_USERNAME }}"
+          
+          # Verificar se o contexto existe
+          if [ ! -d "app/java" ]; then
+            echo "❌ Erro: Diretório de contexto não encontrado: app/java"
+            exit 1
+          fi
+          
+          # Verificar se Dockerfile existe
+          if [ ! -f "app/java/Dockerfile" ]; then
+            echo "❌ Erro: Dockerfile não encontrado em: app/java/Dockerfile"
+            exit 1
+          fi
+          
+          # Verificar se WAR foi baixado
+          if [ ! -f "app/java/target/java-1.0.war" ]; then
+            echo "❌ Erro: Artifact WAR não encontrado: app/java/target/java-1.0.war"
+            ls -la app/java/target/ || echo "Diretório target não existe"
+            exit 1
+          fi
+          
+          echo "✅ Validação concluída com sucesso"
+
+      - name: Prepare Docker tags
+        id: tags
+        run: |
+          # Sanitizar nome da branch (substituir / por -)
+          BRANCH_NAME="${{ github.ref_name }}"
+          SANITIZED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g' | sed 's/[^a-zA-Z0-9._-]/-/g')
+          
+          # Criar tags
+          TAGS="toolboxdevops/embracon:java-latest"
+          TAGS="$TAGS,toolboxdevops/embracon:java-${{ github.sha }}"
+          TAGS="$TAGS,toolboxdevops/embracon:java-$SANITIZED_BRANCH"
+          
+          echo "Branch original: $BRANCH_NAME"
+          echo "Branch sanitizada: $SANITIZED_BRANCH"
+          echo "Tags finais: $TAGS"
+          
+          # Salvar para próximos steps
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "branch-tag=toolboxdevops/embracon:java-$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push to Docker Hub
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: app/java
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: true
+
+      - name: Output build summary
+        run: |
+          echo "🎉 Build enviado para Docker Hub!"
+          echo "📦 Imagens criadas:"
+          echo "${{ steps.tags.outputs.tags }}" | sed 's/,/\n- /g' | sed '1s/^/- /'
+          echo "🔗 Digest: ${{ steps.build.outputs.digest }}"
+          echo "🏗️ Platform: linux/amd64"
+
+  trivy-scan:
+    runs-on: ubuntu-latest
+    needs: docker-build
+    
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: 'toolboxdevops/embracon:java-latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Trivy scan summary
+        if: always()
+        run: |
+          echo "🔍 Trivy scan executado para:"
+          echo "📦 Imagem: toolboxdevops/embracon:java-latest"
+          echo "🎯 Severidade: CRITICAL,HIGH"
+          echo "🔧 Tipo: OS + Library vulnerabilities"

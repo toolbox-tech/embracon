@@ -1,3 +1,9 @@
+## 4.5.3 (2025-10-14)
+
+### Refactor
+
+- **cache**: remove gitleaks args
+
 ## 4.5.2 (2025-10-14)
 
 ### Fix

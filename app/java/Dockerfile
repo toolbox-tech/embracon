@@ -18,7 +18,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 # Stage 2: Runtime otimizado
-FROM tomcat:10-jdk17-openjdk-slim
+FROM tomcat:10.1.44-jdk17-openjdk-slim
 
 # Definir variáveis de ambiente para otimização
 ENV CATALINA_OPTS="-Xms512m -Xmx1024m -server"

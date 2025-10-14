@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - feature/java-cache
+  pull_request:
+    paths:
+      - 'app/java/**'
 
 jobs:
 
@@ -30,50 +33,55 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@017a9effdb900e5b5b2fddfb590a105619dca3c3 # v4.4.2
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: ${{ runner.os }}-maven-${{ hashFiles('app/java/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
 
       - name: Check project structure
         run: |
           echo "Estrutura do projeto:"
-          ls -la
-          echo "Conteúdo do diretório app/java:"
-          ls -la app/java/ || echo "Diretório app/java não encontrado"
-          echo "Procurando por gradlew no projeto:"
-          find . -name "gradlew" -type f || echo "gradlew não encontrado"
+          ls -la app/java/
+          echo "Verificando se pom.xml existe:"
+          ls -la app/java/pom.xml || echo "pom.xml não encontrado"
 
-      - name: Make gradlew executable
+      - name: Build with Maven
         working-directory: app/java
         run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            echo "gradlew tornado executável"
+          if [ -f "./mvnw" ]; then
+            echo "Usando Maven Wrapper"
+            chmod +x ./mvnw
+            ./mvnw clean package -Dmaven.test.skip=true
           else
-            echo "gradlew não encontrado, usando gradle diretamente"
-          fi
-
-      - name: Build with Gradle
-        working-directory: app/java
-        run: |
-          if [ -f "./gradlew" ]; then
-            echo "Usando Gradle Wrapper"
-            ./gradlew build
-          else
-            echo "Usando Gradle instalado pelo setup-gradle"
-            gradle build
+            echo "Usando Maven instalado no sistema"
+            mvn clean package -Dmaven.test.skip=true
           fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Package
-          path: app/java/build/libs
+          name: java-package-${{ github.sha }}
+          path: app/java/target/*.war
+          retention-days: 30
 
   docker-build:
     uses: ./.github/workflows/build.yml  # Usa um workflow reutilizável local para construir a imagem Docker
     with:
       app_context: 'app/java'  # Caminho para o contexto da aplicação Java
-      app_tags: 'toolboxplayground/embracon:java-latest,toolboxplayground/embracon:java'  # Tags para a imagem Docker
+      app_tags: 'toolboxplayground/embracon:java-latest,toolboxplayground/embracon:java-${{ github.sha }}'  # Tags para a imagem Docker
       dck_username: ${{ vars.DOCKERHUB_USERNAME }}  # Nome de usuário do Docker Hub para autenticação
     secrets:
       dck_token: ${{ secrets.DOCKERHUB_TOKEN }}  # Token do Docker Hub

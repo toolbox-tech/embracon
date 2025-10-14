@@ -1,5 +1,5 @@
 # Runtime otimizado - Tomcat latest com OpenJDK (Eclipse Temurin) - SHA256 específica
-FROM tomcat@sha256:f65ab8e0e7388753b17a2ab50aa45692110d5d03fb068fb8d29a93f6ebd637f0
+FROM tomcat:latest@sha256:fa1499f834d8711b21202f0f7d13fe0234c739df9a6e1b92cf35a185db7af75c
 
 # Definir variáveis de ambiente para otimização
 ENV CATALINA_OPTS="-Xms512m -Xmx1024m -server"

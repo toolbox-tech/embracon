@@ -8,58 +8,58 @@
     <g transform="translate(15, 20)">
 
         <text x="0" y="12" class="lang-name">Dockerfile</text>
-        <text x="270" y="12" text-anchor="end" class="lang-percent">51.5%</text>
+        <text x="270" y="12" text-anchor="end" class="lang-percent">51.7%</text>
     
         <rect x="0" y="18" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="18" width="139.0172397638902" height="8" fill="#3498db" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="18" width="139.66689041785537" height="8" fill="#3498db" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="47" class="lang-name">HCL</text>
-        <text x="270" y="47" text-anchor="end" class="lang-percent">12.6%</text>
+        <text x="270" y="47" text-anchor="end" class="lang-percent">12.5%</text>
     
         <rect x="0" y="53" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="53" width="33.923920172397644" height="8" fill="#2ecc71" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="53" width="33.75566370196342" height="8" fill="#2ecc71" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="82" class="lang-name">PowerShell</text>
         <text x="270" y="82" text-anchor="end" class="lang-percent">9.3%</text>
     
         <rect x="0" y="88" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="88" width="25.16087323151879" height="8" fill="#f1c40f" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="88" width="25.03607987917436" height="8" fill="#f1c40f" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="117" class="lang-name">Shell</text>
         <text x="270" y="117" text-anchor="end" class="lang-percent">9.0%</text>
     
         <rect x="0" y="123" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="123" width="24.399419094912396" height="8" fill="#e74c3c" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="123" width="24.27840241651284" height="8" fill="#e74c3c" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="152" class="lang-name">JavaScript</text>
         <text x="270" y="152" text-anchor="end" class="lang-percent">6.1%</text>
     
         <rect x="0" y="158" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="158" width="16.445891501920737" height="8" fill="#9b59b6" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="158" width="16.364322872965264" height="8" fill="#9b59b6" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="187" class="lang-name">Smarty</text>
         <text x="270" y="187" text-anchor="end" class="lang-percent">4.6%</text>
     
         <rect x="0" y="193" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="193" width="12.522252412630001" height="8" fill="#1abc9c" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="193" width="12.460144319516699" height="8" fill="#1abc9c" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="222" class="lang-name">HTML</text>
         <text x="270" y="222" text-anchor="end" class="lang-percent">3.3%</text>
     
         <rect x="0" y="228" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="228" width="8.990724257472126" height="8" fill="#3498db" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="228" width="8.946131901325726" height="8" fill="#3498db" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="257" class="lang-name">Python</text>
         <text x="270" y="257" text-anchor="end" class="lang-percent">3.2%</text>
     
         <rect x="0" y="263" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="263" width="8.742808957181675" height="8" fill="#2ecc71" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="263" width="8.699446215808022" height="8" fill="#2ecc71" rx="4" ry="4" class="progress-bar"/>
     
         <text x="0" y="292" class="lang-name">Java</text>
         <text x="270" y="292" text-anchor="end" class="lang-percent">0.3%</text>
     
         <rect x="0" y="298" width="270" height="8" fill="#ddd" rx="4" ry="4" class="progress-bar"/>
-        <rect x="0" y="298" width="0.7968706080764546" height="8" fill="#f1c40f" rx="4" ry="4" class="progress-bar"/>
+        <rect x="0" y="298" width="0.7929182748783353" height="8" fill="#f1c40f" rx="4" ry="4" class="progress-bar"/>
     
     </g>
 </svg>

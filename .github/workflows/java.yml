@@ -90,7 +90,7 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
       tags: ${{ env.IMAGE_TAGS }}
     env:
-      IMAGE_TAGS: 'toolboxplayground/embracon:java-latest,toolboxplayground/embracon:java-${{ github.sha }}'
+      IMAGE_TAGS: 'toolboxdevops/embracon:java-latest,toolboxdevops/embracon:java-${{ github.sha }}'
     
     steps:
       - name: Checkout code
@@ -172,7 +172,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: 'toolboxplayground/embracon:java-latest'
+          image-ref: 'toolboxdevops/embracon:java-latest'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true

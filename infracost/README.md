@@ -98,7 +98,7 @@ Project: infracost_test.tf
 
 - name: Generate Infracost cost estimate baseline
   run: |
-    infracost breakdown --path infracost_test.tf \
+    infracost breakdown --path . \
                         --format json \
                         --out-file /tmp/infracost-base.json
 

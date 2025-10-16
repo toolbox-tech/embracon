@@ -1,3 +1,13 @@
+## 4.7.0 (2025-10-16)
+
+### Feat
+
+- **infracost**: infracost action
+- **infracost**: action
+- **infracost**: test
+- **infracost**: test
+- **infracost**: test
+
 ## 4.6.0 (2025-10-16)
 
 ### Feat

@@ -1,3 +1,13 @@
+## 4.6.0 (2025-10-16)
+
+### Feat
+
+- **infracost**: test
+
+### Fix
+
+- **infracost**: remove test
+
 ## 4.5.3 (2025-10-14)
 
 ### Refactor

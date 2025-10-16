@@ -1,0 +1,78 @@
+name: 💰 Infracost - Cost Analysis
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, feature/infracost ]
+    paths: 
+      - 'infracost/**'
+  pull_request:
+    paths:
+      - 'infracost/**'
+
+jobs:
+  infracost:
+    name: Infracost Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.5
+          
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v2
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Terraform init
+        run: |
+          cd infracost
+          terraform init
+          
+      - name: Generate Infracost cost estimate baseline
+        run: |
+          cd infracost
+          infracost breakdown --path infracost_test.tf \
+                              --format json \
+                              --out-file /tmp/infracost-base.json
+
+      - name: Generate Infracost diff
+        if: github.event_name == 'pull_request'
+        run: |
+          cd infracost
+          infracost diff --path infracost_test.tf \
+                         --format json \
+                         --compare-to /tmp/infracost-base.json \
+                         --out-file /tmp/infracost.json
+
+      - name: Post Infracost comment
+        if: github.event_name == 'pull_request'
+        run: |
+          infracost comment github --path /tmp/infracost.json \
+                                   --repo $GITHUB_REPOSITORY \
+                                   --github-token ${{ secrets.GITHUB_TOKEN }} \
+                                   --pull-request ${{ github.event.pull_request.number }} \
+                                   --behavior update
+
+      - name: Generate cost report
+        run: |
+          cd infracost
+          infracost breakdown --path infracost_test.tf \
+                              --format table > cost-report.txt
+          echo "📊 Cost Analysis Complete!"
+          cat cost-report.txt
+
+      - name: Upload cost report
+        uses: actions/upload-artifact@v4
+        with:
+          name: infracost-report
+          path: infracost/cost-report.txt
+          retention-days: 30

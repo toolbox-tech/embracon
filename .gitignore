@@ -57,3 +57,5 @@ sa-key-secret-manager.json
 secret.yaml
 todo.md
 *.tfplan
+
+.infracost/
